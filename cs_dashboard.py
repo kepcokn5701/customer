@@ -1,6 +1,6 @@
 # ==============================================================
 #  AI 활용 고객경험관리시스템 조사결과 분석 웹 대시보드  v3.0
-#  한전 CS 리포트 양식 반영 · Corporate Edition
+#  회사 CS 리포트 양식 반영 · Corporate Edition
 #  실행법: python -m streamlit run cs_dashboard.py
 # ==============================================================
 
@@ -80,7 +80,7 @@ C = dict(
     # 채널별 테마 색상 (리포트 양식)
     ch_employee = "#4caf50",   # 직원 응대 — 녹색
     ch_center   = "#1976d2",   # 고객센터 — 파란색
-    ch_online   = "#fbc02d",   # 한전ON — 노란색
+    ch_online   = "#fbc02d",   # 회사ON — 노란색
     ch_etc      = "#9e9e9e",   # 기타
 )
 
@@ -123,7 +123,7 @@ _STOP = {
     "이나","이라","해주세요","요청","드립니다","하겠습니다","하셨으면",
     "관리","시스템","문의","확인","처리","접수","신청","등록","변경","조회",
     "이용","서비스","고객","전화","상담","안내","답변","진행","완료","내용",
-    "한국전력","한전","전력","전기","사용","사용량","검침","수도","가스",
+    "회사","회사","전력","전기","사용","사용량","검침","수도","가스",
     "홈페이지","인터넷","방문","센터","지사","지점","담당","담당자","직원",
     "설문","조사","응답","결과","평가","만족","점수","항목","기타","해당",
 }
@@ -366,7 +366,7 @@ def generate_ai_recommendations(kw_list, category_name):
 #  4. 페이지 설정 & CSS
 # ══════════════════════════════════════════════════════════════
 st.set_page_config(
-    page_title="한전 CS 분석 대시보드",
+    page_title="회사 CS 분석 대시보드",
     page_icon="⚡",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -451,7 +451,7 @@ st.markdown(f"""
 #  5. 사이드바
 # ══════════════════════════════════════════════════════════════
 with st.sidebar:
-    st.markdown("### ⚡ 한전 CS 분석 대시보드")
+    st.markdown("### ⚡ 회사 CS 분석 대시보드")
     st.markdown("<hr>", unsafe_allow_html=True)
     st.markdown("#### 📂 데이터 업로드")
     uploaded_file = st.file_uploader("엑셀 파일을 여기에 드래그하세요", type=["xlsx","xls"], label_visibility="collapsed")
@@ -465,7 +465,7 @@ with st.sidebar:
         f"{'✅ 한글 폰트' if FONT_PATH else '🟡 기본 폰트'}"
     )
     st.markdown("<hr>", unsafe_allow_html=True)
-    st.caption("© 2025 한전 CS 분석 시스템 v3.0")
+    st.caption("© 2025 회사 CS 분석 시스템 v3.0")
 
 # ══════════════════════════════════════════════════════════════
 #  6. 헤더 배너
@@ -473,7 +473,7 @@ with st.sidebar:
 st.markdown("""
 <div class="dash-header">
   <h1>⚡ AI 활용 고객경험관리시스템 조사결과 분석</h1>
-  <p>한전 CS 리포트 양식 · 구간별 비중 · 사업소 벤치마킹 · 채널별/업무별 분석 · VOC 3단 분류 · 사전케어</p>
+  <p>회사 CS 리포트 양식 · 구간별 비중 · 사업소 벤치마킹 · 채널별/업무별 분석 · VOC 3단 분류 · 사전케어</p>
   <span class="dash-badge">📊 구간별 비중</span>
   <span class="dash-badge">🏢 사업소 벤치마킹</span>
   <span class="dash-badge">📡 채널별 분석</span>
@@ -506,7 +506,7 @@ if uploaded_file is None:
 | 고객번호 | 고객 식별 ID |
 | 고객명 | 이름 |
 | 사업소 | 직할, 진주, 마산 등 |
-| 접수채널 | 직원방문, 고객센터, 한전ON |
+| 접수채널 | 직원방문, 고객센터, 회사ON |
 | 계약종 | 주택용/일반용/산업용 |
 | 업무구분 | 요금·설치·정전 등 |
 | 만족도점수 | 숫자 (1~5, 1~10, 100점) |
@@ -553,7 +553,7 @@ def _find_col(keywords):
 
 M = {
     "office":    _find_col(["지사", "사업소"]),
-    "channel":   _find_col(["접수자구분"]),          # 직원/고객센터/한전ON
+    "channel":   _find_col(["접수자구분"]),          # 직원/고객센터/회사ON
     "method":    _find_col(["신청방법"]),             # 전화/내방/사이버지점
     "reception": _find_col(["접수종류"]),             # 청구서재발행/자동이체 등
     "contract":  _find_col(["계약종"]),
@@ -929,7 +929,7 @@ with tab3:
             f'<div style="text-align:center; margin-bottom:1rem;">'
             f'<span style="background:{C["ch_employee"]}; color:white; padding:0.3rem 0.8rem; border-radius:8px; margin:0.2rem; font-weight:700;">🟢 직원 응대</span>'
             f'<span style="background:{C["ch_center"]}; color:white; padding:0.3rem 0.8rem; border-radius:8px; margin:0.2rem; font-weight:700;">🔵 고객센터</span>'
-            f'<span style="background:{C["ch_online"]}; color:#333; padding:0.3rem 0.8rem; border-radius:8px; margin:0.2rem; font-weight:700;">🟡 한전ON</span>'
+            f'<span style="background:{C["ch_online"]}; color:#333; padding:0.3rem 0.8rem; border-radius:8px; margin:0.2rem; font-weight:700;">🟡 회사ON</span>'
             f'</div>', unsafe_allow_html=True)
         st.markdown("---")
     elif M["channel"]:
