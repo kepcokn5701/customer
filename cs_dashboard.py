@@ -635,9 +635,12 @@ with st.spinner("데이터를 불러오는 중…"):
 # ══════════════════════════════════════════════════════════════
 #  9. 컬럼 자동 매핑 (엑셀 컬럼명 기반)
 # ══════════════════════════════════════════════════════════════
-# 순번 컬럼 제거
+# 순번 컬럼: 원본 엑셀 행 번호 보존 후 내부 분석용 제거
 if "순번" in df_raw.columns:
+    df_raw["_원본순번"] = df_raw["순번"]
     df_raw.drop(columns=["순번"], inplace=True)
+else:
+    df_raw["_원본순번"] = range(1, len(df_raw) + 1)
 
 def _find_col(keywords):
     """엑셀 컬럼명에 키워드가 포함되면 해당 컬럼명 반환"""
@@ -1529,11 +1532,18 @@ with tab5:
 
             # 리스트 테이블
             display_cols = []
+            # 순번·접수번호를 맨 앞에 배치
+            if "_원본순번" in df_neg.columns:
+                display_cols.append("_원본순번")
+            if M["receipt_no"] and M["receipt_no"] in df_neg.columns:
+                display_cols.append(M["receipt_no"])
             for key in ["id","name","contact","age","office","channel","contract","business","score","voc"]:
                 if M[key] and M[key] in df_neg.columns:
                     display_cols.append(M[key])
             display_cols.extend(["감지된_부정키워드", "추출유형"])
             df_disp = df_neg[[c for c in display_cols if c in df_neg.columns]].reset_index(drop=True)
+            if "_원본순번" in df_disp.columns:
+                df_disp.rename(columns={"_원본순번": "순번"}, inplace=True)
 
             st.markdown(f'<p class="sec-head">📋 잠재 민원고객 — 총 <span style="color:{C["red"]}">{neg_n:,}명</span></p>',
                         unsafe_allow_html=True)
