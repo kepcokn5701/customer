@@ -509,6 +509,8 @@ st.markdown("""
   <span class="dash-badge">🎯 사전케어</span>
   <span class="dash-badge">📈 교차분석</span>
   <span class="dash-badge">🔗 상관관계</span>
+  <span class="dash-badge">📅 시계열</span>
+  <span class="dash-badge">🔬 패턴탐지</span>
 </div>
 """, unsafe_allow_html=True)
 
@@ -550,7 +552,8 @@ if uploaded_file is None:
 # ══════════════════════════════════════════════════════════════
 _KNOWN_HEADERS = {"지사","사업소","계약종별","접수종류","업무구분","신청방법",
                    "접수자구분","종합 점수","종합점수","서술 의견","서술의견",
-                   "이용 편리성","직원 친절도","전반적 만족","처리 신속도"}
+                   "이용 편리성","직원 친절도","전반적 만족","처리 신속도",
+                   "접수일자","조사일자","접수일","조사일","일자","날짜","등록일"}
 
 def _detect_header_row(raw_bytes, max_scan=10):
     """엑셀 상위 N행을 스캔하여 헤더 행 자동 감지"""
@@ -609,10 +612,25 @@ M = {
     "score":     _find_col(["종합 점수", "종합점수"]),
     "voc":       _find_col(["서술 의견", "서술의견"]),
     "age":       _find_col(["연령"]),
+    "date":      _find_col(["접수일자", "조사일자", "접수일", "조사일", "일자", "날짜", "등록일"]),
     "id":        None,
     "name":      None,
     "contact":   None,
 }
+
+# ── 날짜 컬럼 파싱 ──
+if M["date"]:
+    df_raw[M["date"]] = pd.to_datetime(df_raw[M["date"]], errors="coerce")
+    _valid_dates = df_raw[M["date"]].dropna()
+    if not _valid_dates.empty:
+        df_raw["_년월"] = df_raw[M["date"]].dt.to_period("M").astype(str)
+        df_raw["_분기"] = df_raw[M["date"]].dt.to_period("Q").astype(str)
+        df_raw["_월"] = df_raw[M["date"]].dt.month
+        _season_map = {12:"겨울",1:"겨울",2:"겨울",3:"봄",4:"봄",5:"봄",
+                       6:"여름",7:"여름",8:"여름",9:"가을",10:"가을",11:"가을"}
+        df_raw["_계절"] = df_raw["_월"].map(_season_map)
+    else:
+        M["date"] = None  # 파싱 실패 시 비활성화
 
 # ── 개별 점수 컬럼 자동 탐지 ──
 INDIVIDUAL_SCORE_NAMES = [
@@ -771,7 +789,7 @@ st.markdown("<br>", unsafe_allow_html=True)
 # ══════════════════════════════════════════════════════════════
 #  13. 탭 구성
 # ══════════════════════════════════════════════════════════════
-tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
+tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9 = st.tabs([
     "📊  구간별 비중 · 종합 현황",
     "🏢  사업소별 벤치마킹",
     "📡  채널별 · 업무별 분석",
@@ -779,6 +797,8 @@ tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
     "🎯  CS 인사이트 & 사전케어",
     "📈  다차원 교차분석",
     "🔗  상관관계 · 영향도",
+    "📅  시계열 트렌드",
+    "🔬  지사 심층 · 패턴",
 ])
 
 # ─────────────────────────────────────────────────────────────
@@ -1682,3 +1702,346 @@ with tab7:
                     title_font=dict(size=14, color=C["navy"]),
                 )
                 st.plotly_chart(fig_scatter, use_container_width=True)
+
+
+# ─────────────────────────────────────────────────────────────
+#  TAB 8  시계열 트렌드 분석
+# ─────────────────────────────────────────────────────────────
+with tab8:
+    st.markdown('<p class="sec-head">📅 시계열 트렌드 분석</p>', unsafe_allow_html=True)
+
+    if not M.get("date"):
+        st.info("📌 날짜 컬럼(접수일자, 조사일자 등)이 엑셀에 포함되어 있으면 자동으로 시계열 분석이 활성화됩니다.")
+    elif not M["score"]:
+        st.warning("만족도 점수 컬럼이 필요합니다.")
+    else:
+        # ── 8-1. 월별 만족도 추이 ──
+        st.markdown('<p class="sec-head">📈 월별 만족도 추이</p>', unsafe_allow_html=True)
+        monthly = df_f.groupby("_년월")["_점수100"].agg(["mean","count"]).reset_index()
+        monthly.columns = ["년월", "평균만족도", "응답수"]
+        monthly = monthly.sort_values("년월")
+
+        fig_trend = make_subplots(specs=[[{"secondary_y": True}]])
+        fig_trend.add_trace(
+            go.Scatter(x=monthly["년월"], y=monthly["평균만족도"], mode="lines+markers+text",
+                       name="평균 만족도", line=dict(color=C["blue"], width=3),
+                       marker=dict(size=8), text=monthly["평균만족도"].round(1),
+                       textposition="top center", textfont=dict(size=10)),
+            secondary_y=False)
+        fig_trend.add_trace(
+            go.Bar(x=monthly["년월"], y=monthly["응답수"], name="응답수",
+                   marker_color=C["sky"], opacity=0.35),
+            secondary_y=True)
+        fig_trend.update_layout(
+            height=420, template=PLOTLY_TPL,
+            title=dict(text="월별 평균 만족도 추이 & 응답 건수", font=dict(size=14, color=C["navy"])),
+            margin=dict(t=60, b=60, l=60, r=60), legend=dict(orientation="h", y=1.12),
+        )
+        fig_trend.update_yaxes(title_text="만족도 (100점)", secondary_y=False)
+        fig_trend.update_yaxes(title_text="응답수", secondary_y=True)
+        st.plotly_chart(fig_trend, use_container_width=True)
+
+        # 전월 대비 변화 감지
+        if len(monthly) >= 2:
+            last = monthly.iloc[-1]
+            prev = monthly.iloc[-2]
+            diff = last["평균만족도"] - prev["평균만족도"]
+            arrow = "📈" if diff > 0 else "📉" if diff < 0 else "➡️"
+            st.markdown(
+                f'<div class="insight-box">{arrow} <b>최근 변화:</b> '
+                f'{prev["년월"]} ({prev["평균만족도"]:.1f}점) → {last["년월"]} ({last["평균만족도"]:.1f}점), '
+                f'<b>{diff:+.1f}점</b> 변동</div>', unsafe_allow_html=True)
+
+        st.markdown("---")
+
+        # ── 8-2. 분기별 비교 ──
+        st.markdown('<p class="sec-head">📊 분기별 만족도 비교</p>', unsafe_allow_html=True)
+        quarterly = df_f.groupby("_분기")["_점수100"].agg(["mean","count"]).reset_index()
+        quarterly.columns = ["분기", "평균만족도", "응답수"]
+        quarterly = quarterly.sort_values("분기")
+
+        fig_q = px.bar(quarterly, x="분기", y="평균만족도", text="평균만족도",
+                       color_discrete_sequence=[C["blue"]], template=PLOTLY_TPL,
+                       title="분기별 평균 만족도")
+        fig_q.update_traces(texttemplate="%{text:.1f}", textposition="outside")
+        fig_q.update_layout(height=380, margin=dict(t=60, b=60, l=60, r=20),
+                             yaxis_title="만족도 (100점)", title_font=dict(size=14, color=C["navy"]))
+        st.plotly_chart(fig_q, use_container_width=True)
+
+        st.markdown("---")
+
+        # ── 8-3. 계절별 점수 비교 ──
+        st.markdown('<p class="sec-head">🌤️ 계절별 만족도 비교</p>', unsafe_allow_html=True)
+        season_order = ["봄", "여름", "가을", "겨울"]
+        seasonal = df_f.groupby("_계절")["_점수100"].agg(["mean","count"]).reset_index()
+        seasonal.columns = ["계절", "평균만족도", "응답수"]
+        seasonal["계절"] = pd.Categorical(seasonal["계절"], categories=season_order, ordered=True)
+        seasonal = seasonal.sort_values("계절")
+        season_colors = {"봄": "#66bb6a", "여름": "#ef5350", "가을": "#ffa726", "겨울": "#42a5f5"}
+
+        s_l, s_r = st.columns([1, 1])
+        with s_l:
+            fig_season = px.bar(seasonal, x="계절", y="평균만족도", color="계절",
+                                color_discrete_map=season_colors, text="평균만족도",
+                                template=PLOTLY_TPL, title="계절별 평균 만족도")
+            fig_season.update_traces(texttemplate="%{text:.1f}", textposition="outside")
+            fig_season.update_layout(height=380, showlegend=False,
+                                      yaxis_title="만족도", title_font=dict(size=14, color=C["navy"]))
+            st.plotly_chart(fig_season, use_container_width=True)
+        with s_r:
+            if individual_scores and len(seasonal) >= 3:
+                season_radar = df_f.groupby("_계절")[individual_scores].mean()
+                season_radar = season_radar.reindex(season_order).dropna()
+                fig_sr = go.Figure()
+                for i, (sn, row) in enumerate(season_radar.iterrows()):
+                    vals = row.tolist() + [row.tolist()[0]]
+                    cats = individual_scores + [individual_scores[0]]
+                    fig_sr.add_trace(go.Scatterpolar(
+                        r=vals, theta=cats, fill='toself', name=str(sn),
+                        line=dict(color=season_colors.get(sn, C["gray"]), width=2),
+                    ))
+                fig_sr.update_layout(
+                    polar=dict(radialaxis=dict(visible=True, range=[0, 100], tickfont=dict(size=9))),
+                    height=380, template=PLOTLY_TPL,
+                    title=dict(text="계절별 개별항목 비교", font=dict(size=14, color=C["navy"])),
+                    margin=dict(t=60, b=20, l=60, r=60))
+                st.plotly_chart(fig_sr, use_container_width=True)
+            else:
+                fig_sp = px.pie(seasonal, names="계절", values="응답수", hole=0.45,
+                                color="계절", color_discrete_map=season_colors,
+                                template=PLOTLY_TPL, title="계절별 응답 비율")
+                fig_sp.update_layout(height=380, title_font=dict(size=14, color=C["navy"]))
+                st.plotly_chart(fig_sp, use_container_width=True)
+
+        # 계절 인사이트
+        if len(seasonal) >= 2:
+            best_s = seasonal.loc[seasonal["평균만족도"].idxmax()]
+            worst_s = seasonal.loc[seasonal["평균만족도"].idxmin()]
+            gap = best_s["평균만족도"] - worst_s["평균만족도"]
+            st.markdown(
+                f'<div class="insight-box">🌡️ <b>계절 인사이트:</b> '
+                f'<b>{best_s["계절"]}</b>({best_s["평균만족도"]:.1f}점)이 가장 높고, '
+                f'<b>{worst_s["계절"]}</b>({worst_s["평균만족도"]:.1f}점)이 가장 낮습니다. '
+                f'격차 <b>{gap:.1f}점</b>'
+                + (f' — {worst_s["계절"]}철 집중 CS 관리가 필요합니다.' if gap >= 3 else '.')
+                + '</div>', unsafe_allow_html=True)
+
+        st.markdown("---")
+
+        # ── 8-4. 지사별 월별 추이 ──
+        if M["office"]:
+            st.markdown('<p class="sec-head">🏢 지사별 월별 만족도 추이</p>', unsafe_allow_html=True)
+            office_monthly = df_f.groupby([M["office"], "_년월"])["_점수100"].mean().reset_index()
+            office_monthly.columns = ["지사", "년월", "평균만족도"]
+            office_monthly = office_monthly.sort_values("년월")
+
+            fig_om = px.line(office_monthly, x="년월", y="평균만족도", color="지사",
+                             markers=True, template=PLOTLY_TPL,
+                             color_discrete_sequence=MIXED_COLORS,
+                             title="지사별 월별 만족도 추이")
+            fig_om.update_layout(
+                height=450, margin=dict(t=60, b=60, l=60, r=20),
+                yaxis_title="만족도 (100점)", title_font=dict(size=14, color=C["navy"]),
+                legend=dict(orientation="h", y=-0.2),
+            )
+            st.plotly_chart(fig_om, use_container_width=True)
+
+
+# ─────────────────────────────────────────────────────────────
+#  TAB 9  지사 심층 분석 · 패턴 탐지
+# ─────────────────────────────────────────────────────────────
+with tab9:
+    st.markdown('<p class="sec-head">🔬 지사 심층 분석 · 패턴 탐지</p>', unsafe_allow_html=True)
+
+    if not M["office"] or not M["score"]:
+        st.warning("지사 컬럼과 만족도 점수 컬럼이 필요합니다.")
+    else:
+        # ── 9-1. 지사별 강점/약점 자동 추출 ──
+        if individual_scores:
+            st.markdown('<p class="sec-head">💪 지사별 강점 · 약점 항목</p>', unsafe_allow_html=True)
+            st.markdown(
+                '<div class="card-blue"><b>📌 분석 방법</b> — 각 지사의 개별항목 점수를 전체 평균과 비교하여 '
+                '가장 잘하는 항목(강점)과 가장 부족한 항목(약점)을 자동 추출합니다.</div>',
+                unsafe_allow_html=True)
+
+            overall_means = df_f[individual_scores].mean()
+            office_detail = df_f.groupby(M["office"])[individual_scores].mean()
+
+            # 지사별 강점/약점 카드
+            offices_sorted = df_f.groupby(M["office"])["_점수100"].mean().sort_values()
+            card_cols = st.columns(min(3, len(offices_sorted)))
+
+            for i, (ofc, _) in enumerate(offices_sorted.items()):
+                if ofc not in office_detail.index:
+                    continue
+                row = office_detail.loc[ofc]
+                diff = row - overall_means
+                strength = diff.idxmax()
+                weakness = diff.idxmin()
+                ofc_avg = df_f[df_f[M["office"]] == ofc]["_점수100"].mean()
+
+                card_class = "card-red" if ofc_avg < avg_score_100 - 3 else "card-teal" if ofc_avg >= avg_score_100 else "card"
+                with card_cols[i % len(card_cols)]:
+                    st.markdown(
+                        f'<div class="{card_class}">'
+                        f'<b>🏢 {ofc}</b> (종합 {ofc_avg:.1f}점)<br><br>'
+                        f'💪 강점: <b>{strength}</b> (평균 대비 <span style="color:{C["green"]}">{diff[strength]:+.1f}</span>)<br>'
+                        f'⚠️ 약점: <b>{weakness}</b> (평균 대비 <span style="color:{C["red"]}">{diff[weakness]:+.1f}</span>)'
+                        f'</div>', unsafe_allow_html=True)
+
+            st.markdown("---")
+
+            # ── 지사 간 격차가 큰 항목 ──
+            st.markdown('<p class="sec-head">📊 지사 간 격차가 큰 항목 (편차 Top 5)</p>', unsafe_allow_html=True)
+            office_std = office_detail.std().sort_values(ascending=False)
+            gap_items = office_std.head(5)
+            gap_df = pd.DataFrame({
+                "항목": gap_items.index,
+                "지사간 표준편차": gap_items.values.round(2),
+                "최고 지사": [office_detail[item].idxmax() for item in gap_items.index],
+                "최고 점수": [office_detail[item].max().round(1) for item in gap_items.index],
+                "최저 지사": [office_detail[item].idxmin() for item in gap_items.index],
+                "최저 점수": [office_detail[item].min().round(1) for item in gap_items.index],
+            })
+            gap_df["격차"] = gap_df["최고 점수"] - gap_df["최저 점수"]
+
+            fig_gap = px.bar(gap_df, x="항목", y="격차", text="격차",
+                             color_discrete_sequence=[C["gold"]], template=PLOTLY_TPL,
+                             title="지사 간 격차가 큰 항목 (최고-최저 점수 차이)")
+            fig_gap.update_traces(texttemplate="%{text:.1f}", textposition="outside")
+            fig_gap.update_layout(height=380, margin=dict(t=60, b=60, l=60, r=20),
+                                   yaxis_title="점수 격차", title_font=dict(size=14, color=C["navy"]))
+            st.plotly_chart(fig_gap, use_container_width=True)
+
+            with st.expander("📋 지사 간 격차 상세 데이터"):
+                st.dataframe(gap_df, use_container_width=True, hide_index=True)
+
+            # 인사이트
+            top_gap = gap_df.iloc[0]
+            st.markdown(
+                f'<div class="insight-box">📊 <b>격차 인사이트:</b> '
+                f'<b>{top_gap["항목"]}</b> 항목에서 지사 간 격차가 가장 큽니다. '
+                f'{top_gap["최고 지사"]}({top_gap["최고 점수"]}점) vs '
+                f'{top_gap["최저 지사"]}({top_gap["최저 점수"]}점), '
+                f'격차 <b>{top_gap["격차"]:.1f}점</b> — 하위 지사 대상 집중 교육이 필요합니다.</div>',
+                unsafe_allow_html=True)
+
+            st.markdown("---")
+
+        # ── 9-2. 교차 패턴 탐지 (업무×채널 급락 조합) ──
+        if M["business"] and M["channel"]:
+            st.markdown('<p class="sec-head">🔍 업무 × 채널 교차 패턴 탐지</p>', unsafe_allow_html=True)
+            st.markdown(
+                '<div class="card-gold"><b>📌 분석 방법</b> — 업무와 채널의 모든 조합에서 '
+                '평균 만족도가 전체 평균 대비 크게 낮은 조합을 자동 탐지합니다.</div>',
+                unsafe_allow_html=True)
+
+            df_f["_채널그룹_pat"] = df_f[M["channel"]].apply(_group_channel)
+            cross_pat = df_f[df_f["_채널그룹_pat"].notna()].groupby(
+                [M["business"], "_채널그룹_pat"])["_점수100"].agg(["mean","count"]).reset_index()
+            cross_pat.columns = ["업무", "채널", "평균만족도", "응답수"]
+            cross_pat = cross_pat[cross_pat["응답수"] >= 5]  # 최소 5건 이상
+
+            if not cross_pat.empty:
+                cross_pat["전체대비"] = cross_pat["평균만족도"] - avg_score_100
+                danger = cross_pat[cross_pat["전체대비"] <= -5].sort_values("전체대비")
+
+                # 히트맵
+                pivot_pat = cross_pat.pivot_table(values="평균만족도", index="업무",
+                                                  columns="채널", aggfunc="mean").round(1)
+                fig_pat = px.imshow(pivot_pat, color_continuous_scale="RdYlGn",
+                                    text_auto=".1f", aspect="auto", template=PLOTLY_TPL,
+                                    title="업무 × 채널 평균 만족도 (빨강=낮음)")
+                fig_pat.update_layout(
+                    height=max(350, len(pivot_pat) * 35 + 100),
+                    margin=dict(t=60, b=60, l=120, r=60),
+                    title_font=dict(size=14, color=C["navy"]))
+                st.plotly_chart(fig_pat, use_container_width=True)
+
+                if len(danger) > 0:
+                    st.markdown(
+                        f'<p class="sec-head">🚨 급락 조합 (전체 평균 대비 -5점 이상)</p>',
+                        unsafe_allow_html=True)
+                    for _, row in danger.head(5).iterrows():
+                        st.markdown(
+                            f'<div class="card-red">'
+                            f'🔴 <b>[{row["업무"]}] × [{row["채널"]}]</b> — '
+                            f'평균 {row["평균만족도"]:.1f}점 '
+                            f'(전체 대비 <b>{row["전체대비"]:+.1f}점</b>, 응답 {row["응답수"]:,}건)'
+                            f'</div>', unsafe_allow_html=True)
+                else:
+                    st.success("전체 평균 대비 -5점 이상 급락한 조합이 없습니다.")
+            st.markdown("---")
+
+        # ── 9-3. 부정 키워드 급증 시점/지사 탐지 ──
+        if M["voc"] and M.get("date") and "_년월" in df_f.columns:
+            st.markdown('<p class="sec-head">📈 부정 키워드 급증 탐지 (월별)</p>', unsafe_allow_html=True)
+
+            df_f["_부정여부"] = df_f[M["voc"]].apply(lambda x: check_negative(x)[0])
+            monthly_neg = df_f.groupby("_년월").agg(
+                전체건수=("_부정여부", "count"),
+                부정건수=("_부정여부", "sum"),
+            ).reset_index()
+            monthly_neg["부정비율"] = (monthly_neg["부정건수"] / monthly_neg["전체건수"] * 100).round(1)
+            monthly_neg = monthly_neg.sort_values("_년월")
+
+            fig_neg_trend = make_subplots(specs=[[{"secondary_y": True}]])
+            fig_neg_trend.add_trace(
+                go.Bar(x=monthly_neg["_년월"], y=monthly_neg["부정건수"],
+                       name="부정 VOC 건수", marker_color=C["red"], opacity=0.6),
+                secondary_y=False)
+            fig_neg_trend.add_trace(
+                go.Scatter(x=monthly_neg["_년월"], y=monthly_neg["부정비율"],
+                           name="부정 비율(%)", mode="lines+markers+text",
+                           line=dict(color=C["gold"], width=3), marker=dict(size=7),
+                           text=monthly_neg["부정비율"].apply(lambda v: f"{v:.1f}%"),
+                           textposition="top center", textfont=dict(size=10)),
+                secondary_y=True)
+            fig_neg_trend.update_layout(
+                height=400, template=PLOTLY_TPL,
+                title=dict(text="월별 부정 VOC 건수 & 비율 추이", font=dict(size=14, color=C["navy"])),
+                margin=dict(t=60, b=60, l=60, r=60), legend=dict(orientation="h", y=1.12))
+            fig_neg_trend.update_yaxes(title_text="부정 건수", secondary_y=False)
+            fig_neg_trend.update_yaxes(title_text="부정 비율(%)", secondary_y=True)
+            st.plotly_chart(fig_neg_trend, use_container_width=True)
+
+            # 급증 감지
+            if len(monthly_neg) >= 2:
+                monthly_neg["전월대비"] = monthly_neg["부정비율"].diff()
+                surge = monthly_neg[monthly_neg["전월대비"] >= 5].sort_values("전월대비", ascending=False)
+                if len(surge) > 0:
+                    for _, row in surge.head(3).iterrows():
+                        st.markdown(
+                            f'<div class="card-red">🚨 <b>{row["_년월"]}</b> — '
+                            f'부정 비율 {row["부정비율"]:.1f}% '
+                            f'(전월 대비 <b>+{row["전월대비"]:.1f}%p</b> 급증, {int(row["부정건수"])}건)'
+                            f'</div>', unsafe_allow_html=True)
+                else:
+                    st.success("전월 대비 5%p 이상 급증한 월이 없습니다.")
+
+            # 지사별 부정 비율
+            if M["office"]:
+                st.markdown("---")
+                st.markdown('<p class="sec-head">🏢 지사별 부정 VOC 비율</p>', unsafe_allow_html=True)
+                office_neg = df_f.groupby(M["office"]).agg(
+                    전체건수=("_부정여부", "count"),
+                    부정건수=("_부정여부", "sum"),
+                ).reset_index()
+                office_neg["부정비율"] = (office_neg["부정건수"] / office_neg["전체건수"] * 100).round(1)
+                office_neg = office_neg.sort_values("부정비율", ascending=True)
+
+                fig_on = px.bar(office_neg, x="부정비율", y=M["office"], orientation="h",
+                                text="부정비율", template=PLOTLY_TPL,
+                                color=office_neg["부정비율"].apply(
+                                    lambda v: "🔴 위험" if v >= 30 else "🟡 주의" if v >= 15 else "일반"),
+                                color_discrete_map={"🔴 위험": C["red"], "🟡 주의": C["gold"], "일반": C["sky"]},
+                                title="지사별 부정 VOC 비율 (%)")
+                fig_on.update_traces(texttemplate="%{text:.1f}%", textposition="outside")
+                fig_on.update_layout(
+                    height=max(300, len(office_neg) * 30 + 80),
+                    margin=dict(t=60, b=20, l=10, r=80),
+                    showlegend=False, title_font=dict(size=14, color=C["navy"]))
+                st.plotly_chart(fig_on, use_container_width=True)
+
+        elif M["voc"] and not M.get("date"):
+            st.info("📌 날짜 컬럼이 있으면 부정 키워드 급증 시점을 자동 탐지할 수 있습니다.")
