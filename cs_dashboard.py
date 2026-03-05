@@ -323,7 +323,7 @@ def _group_contract(name):
         return "교육용"
     if "가로등" in s or "가로" in s:
         return "가로등"
-    return None
+    return s  # 원래 값 유지
 
 
 INSIGHT_RULES = [
