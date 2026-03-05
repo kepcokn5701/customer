@@ -643,13 +643,16 @@ M = {
 # ── 날짜 파싱: 접수번호에서 추출 또는 날짜 컬럼 직접 사용 ──
 def _parse_date_from_receipt(val):
     """접수번호(예: 5726-20260131-010017)에서 가운데 8자리 날짜 추출"""
-    s = str(val)
-    m = re.search(r'(\d{8})', s)
-    if m:
-        try:
-            return pd.to_datetime(m.group(1), format="%Y%m%d")
-        except Exception:
-            return pd.NaT
+    s = str(val).strip()
+    # 하이픈/슬래시 구분자가 있으면 가운데 파트 추출
+    parts = re.split(r'[-/]', s)
+    for p in parts:
+        p = p.strip()
+        if len(p) == 8 and p.isdigit():
+            try:
+                return pd.to_datetime(p, format="%Y%m%d")
+            except Exception:
+                continue
     return pd.NaT
 
 # 우선순위: 접수번호 → 날짜 컬럼
@@ -1345,35 +1348,6 @@ with tab5:
                     f'<div class="card-gold"><b>🔴 [{biz_name}] — 만족도 {biz_score:.1f}점</b><br>'
                     f'키워드: {kw_str}<br><br>' + "<br>".join(recs) + '</div>',
                     unsafe_allow_html=True)
-
-        # 업무별 인사이트 카드
-        in_l, in_r = st.columns(2)
-        col_toggle = [in_l, in_r]
-        idx = 0
-        if M["business"]:
-            with st.spinner("업무별 VOC 분석 중…"):
-                for biz in df_f[M["business"]].dropna().value_counts().head(8).index:
-                    texts_b = [t for t in df_f.loc[df_f[M["business"]].astype(str) == str(biz), M["voc"]
-                               ].astype(str).str.strip().tolist() if t and t != "nan"]
-                    if not texts_b:
-                        continue
-                    kws_b = extract_keywords(texts_b, top_n=10)
-                    kw_text = " ".join([k for k, _ in kws_b[:8]])
-                    neg_found = [kw for kw in NEGATIVE_KEYWORDS if kw in kw_text]
-                    rude_found = [kw for kw in RUDE_KEYWORDS if kw in kw_text]
-                    lines = [f"**[업무: {biz}]**"]
-                    lines.append("키워드: " + " ".join([f"`{k}`" for k, _ in kws_b[:7]]))
-                    if rude_found:
-                        lines.append(f"😡 불친절: **{', '.join(rude_found[:3])}** → 직원 교육 긴급")
-                    elif neg_found:
-                        lines.append(f"⚠️ 부정: **{', '.join(neg_found[:4])}** → 즉시 케어")
-                    recs = generate_ai_recommendations(kws_b, str(biz))
-                    for r in recs[:2]:
-                        lines.append(r)
-                    card_cls = "card-rude" if rude_found else "card-red" if neg_found else "card-blue"
-                    with col_toggle[idx % 2]:
-                        st.markdown(f'<div class="{card_cls}">{"<br>".join(lines)}</div>', unsafe_allow_html=True)
-                    idx += 1
 
     st.markdown("---")
 
