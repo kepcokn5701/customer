@@ -553,7 +553,8 @@ if uploaded_file is None:
 _KNOWN_HEADERS = {"지사","사업소","계약종별","접수종류","업무구분","신청방법",
                    "접수자구분","종합 점수","종합점수","서술 의견","서술의견",
                    "이용 편리성","직원 친절도","전반적 만족","처리 신속도",
-                   "접수일자","조사일자","접수일","조사일","일자","날짜","등록일"}
+                   "접수일자","조사일자","접수일","조사일","일자","날짜","등록일",
+                   "접수번호"}
 
 def _detect_header_row(raw_bytes, max_scan=10):
     """엑셀 상위 N행을 스캔하여 헤더 행 자동 감지"""
@@ -613,14 +614,38 @@ M = {
     "voc":       _find_col(["서술 의견", "서술의견"]),
     "age":       _find_col(["연령"]),
     "date":      _find_col(["접수일자", "조사일자", "접수일", "조사일", "일자", "날짜", "등록일"]),
+    "receipt_no": _find_col(["접수번호"]),
     "id":        None,
     "name":      None,
     "contact":   None,
 }
 
-# ── 날짜 컬럼 파싱 ──
-if M["date"]:
+# ── 날짜 파싱: 접수번호에서 추출 또는 날짜 컬럼 직접 사용 ──
+def _parse_date_from_receipt(val):
+    """접수번호(예: 5726-20260131-010017)에서 가운데 8자리 날짜 추출"""
+    s = str(val)
+    m = re.search(r'(\d{8})', s)
+    if m:
+        try:
+            return pd.to_datetime(m.group(1), format="%Y%m%d")
+        except Exception:
+            return pd.NaT
+    return pd.NaT
+
+# 우선순위: 접수번호 → 날짜 컬럼
+_date_parsed = False
+if M["receipt_no"]:
+    df_raw["_접수일"] = df_raw[M["receipt_no"]].apply(_parse_date_from_receipt)
+    if df_raw["_접수일"].dropna().any():
+        M["date"] = "_접수일"
+        _date_parsed = True
+
+if not _date_parsed and M["date"]:
     df_raw[M["date"]] = pd.to_datetime(df_raw[M["date"]], errors="coerce")
+    if df_raw[M["date"]].dropna().empty:
+        M["date"] = None
+
+if M["date"]:
     _valid_dates = df_raw[M["date"]].dropna()
     if not _valid_dates.empty:
         df_raw["_년월"] = df_raw[M["date"]].dt.to_period("M").astype(str)
@@ -630,7 +655,7 @@ if M["date"]:
                        6:"여름",7:"여름",8:"여름",9:"가을",10:"가을",11:"가을"}
         df_raw["_계절"] = df_raw["_월"].map(_season_map)
     else:
-        M["date"] = None  # 파싱 실패 시 비활성화
+        M["date"] = None
 
 # ── 개별 점수 컬럼 자동 탐지 ──
 INDIVIDUAL_SCORE_NAMES = [
