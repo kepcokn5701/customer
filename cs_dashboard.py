@@ -1361,8 +1361,13 @@ with tab5:
 
     # ── 잠재 민원고객 사전케어 ──
     st.markdown('<p class="sec-head">🚨 잠재적 민원고객 사전케어 리스트 (AI 자동 추출)</p>', unsafe_allow_html=True)
-    st.markdown("""<div class="card-red"><b>📌 추출 기준</b> — 부정적 키워드가 VOC에 포함된 고객을 AI가 자동 식별합니다.<br>
-해당 고객에게 <b>72시간 이내</b> 선제적으로 연락하여 민원 발생을 사전에 차단하세요.</div>""", unsafe_allow_html=True)
+    st.markdown(
+        '<div class="card-red"><b>📌 추출 기준</b><br>'
+        '① 종합 점수 하위 30% 고객<br>'
+        '② 점수와 무관하게 서술 의견에 부정적 키워드가 포함된 고객<br>'
+        '두 조건 중 하나라도 해당되면 잠재 민원고객으로 추출합니다.<br>'
+        '해당 고객에게 <b>72시간 이내</b> 선제적으로 연락하여 민원 발생을 사전에 차단하세요.</div>',
+        unsafe_allow_html=True)
 
     if not M["voc"]:
         st.warning("VOC 컬럼을 선택해야 리스트를 추출할 수 있습니다.")
@@ -1370,10 +1375,28 @@ with tab5:
         with st.spinner("잠재 민원고객 추출 중…"):
             neg_res = df_f[M["voc"]].apply(check_negative)
             neg_kw_s = neg_res.apply(lambda x: ", ".join(x[1]) if x[1] else "")
-            neg_mask = pd.Series(_row_sentiments, index=df_f.index) == "negative"
+            # 조건1: 하위 30% 점수
+            low_score_mask = pd.Series(False, index=df_f.index)
+            if M["score"] and "_점수100" in df_f.columns:
+                score_threshold = np.percentile(df_f["_점수100"].dropna(), 30)
+                low_score_mask = df_f["_점수100"] <= score_threshold
+            # 조건2: 부정 키워드 감지 (점수 무관)
+            neg_kw_mask = neg_res.apply(lambda x: x[0])
+            # 합집합
+            neg_mask = low_score_mask | neg_kw_mask
 
         df_neg = df_f[neg_mask].copy()
         df_neg["감지된_부정키워드"] = neg_kw_s[neg_mask].values
+        # 추출 유형 표시
+        _reasons = []
+        for idx in df_neg.index:
+            r = []
+            if low_score_mask.get(idx, False):
+                r.append("하위점수")
+            if neg_kw_mask.get(idx, False):
+                r.append("부정키워드")
+            _reasons.append(" + ".join(r) if r else "")
+        df_neg["추출유형"] = _reasons
         neg_n = len(df_neg)
         neg_r = neg_n / max(len(df_f), 1) * 100
 
@@ -1420,7 +1443,7 @@ with tab5:
             for key in ["id","name","contact","age","office","channel","contract","business","score","voc"]:
                 if M[key] and M[key] in df_neg.columns:
                     display_cols.append(M[key])
-            display_cols.append("감지된_부정키워드")
+            display_cols.extend(["감지된_부정키워드", "추출유형"])
             df_disp = df_neg[[c for c in display_cols if c in df_neg.columns]].reset_index(drop=True)
 
             st.markdown(f'<p class="sec-head">📋 잠재 민원고객 — 총 <span style="color:{C["red"]}">{neg_n:,}명</span></p>',
