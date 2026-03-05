@@ -548,12 +548,30 @@ if uploaded_file is None:
 # ══════════════════════════════════════════════════════════════
 #  8. 데이터 로드
 # ══════════════════════════════════════════════════════════════
+_KNOWN_HEADERS = {"지사","사업소","계약종별","접수종류","업무구분","신청방법",
+                   "접수자구분","종합 점수","종합점수","서술 의견","서술의견",
+                   "이용 편리성","직원 친절도","전반적 만족","처리 신속도"}
+
+def _detect_header_row(raw_bytes, max_scan=10):
+    """엑셀 상위 N행을 스캔하여 헤더 행 자동 감지"""
+    try:
+        preview = pd.read_excel(io.BytesIO(raw_bytes), header=None,
+                                nrows=max_scan, engine="openpyxl")
+    except Exception:
+        preview = pd.read_excel(io.BytesIO(raw_bytes), header=None, nrows=max_scan)
+    for i in range(min(max_scan, len(preview))):
+        row_vals = set(str(v).strip() for v in preview.iloc[i] if pd.notna(v))
+        if row_vals & _KNOWN_HEADERS:
+            return i
+    return 0  # 못 찾으면 첫 행을 헤더로
+
 @st.cache_data(show_spinner=False)
 def load_data(raw_bytes):
+    header_row = _detect_header_row(raw_bytes)
     try:
-        df = pd.read_excel(io.BytesIO(raw_bytes), header=2, engine="openpyxl")
+        df = pd.read_excel(io.BytesIO(raw_bytes), header=header_row, engine="openpyxl")
     except Exception:
-        df = pd.read_excel(io.BytesIO(raw_bytes), header=2)
+        df = pd.read_excel(io.BytesIO(raw_bytes), header=header_row)
     orig = len(df)
     df.dropna(how="all", inplace=True)
     df.dropna(axis=1, how="all", inplace=True)
