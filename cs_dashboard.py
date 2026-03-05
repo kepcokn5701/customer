@@ -120,6 +120,7 @@ _STOP = {
     "회사","회사","전력","전기","사용","사용량","검침","수도","가스",
     "홈페이지","인터넷","방문","센터","지사","지점","담당","담당자","직원",
     "설문","조사","응답","결과","평가","만족","점수","항목","기타","해당",
+    "응답없음",
 }
 
 # ══════════════════════════════════════════════════════════════
@@ -137,7 +138,7 @@ def _extract_nouns_konlpy(texts):
 
 
 def extract_keywords(texts, top_n=60):
-    valid = [str(t) for t in texts if t and str(t).strip() not in ("", "nan")]
+    valid = [str(t) for t in texts if t and str(t).strip() not in ("", "nan", "응답없음")]
     if not valid:
         return []
     if KEYBERT_AVAILABLE and KONLPY_AVAILABLE:
@@ -177,7 +178,7 @@ def extract_keywords(texts, top_n=60):
 
 
 def check_negative(text):
-    if not text or str(text).strip() in ("", "nan"):
+    if not text or str(text).strip() in ("", "nan", "응답없음"):
         return False, []
     s = str(text)
     found = [kw for kw in NEGATIVE_KEYWORDS if kw in s]
@@ -185,7 +186,7 @@ def check_negative(text):
 
 
 def check_rude(text):
-    if not text or str(text).strip() in ("", "nan"):
+    if not text or str(text).strip() in ("", "nan", "응답없음"):
         return False, []
     s = str(text)
     found = [kw for kw in RUDE_KEYWORDS if kw in s]
@@ -194,7 +195,7 @@ def check_rude(text):
 
 def classify_voc_3tier(text):
     """VOC를 [불친절 / 불만 / 긍정]으로 3단 분류 (리포트 양식)"""
-    if not text or str(text).strip() in ("", "nan"):
+    if not text or str(text).strip() in ("", "nan", "응답없음"):
         return "긍정"
     s = str(text)
     is_rude, _ = check_rude(s)
@@ -293,7 +294,7 @@ def _channel_color(name):
 def _group_channel(name):
     """접수자구분을 4개 범주로 통합 (직원/고객센터/한전ON/기타, 검침사 제외)"""
     s = str(name).strip()
-    if s in ("", "nan"):
+    if s in ("", "nan", "응답없음"):
         return None
     if "검침" in s:
         return None  # 검침사 제외
@@ -309,7 +310,7 @@ def _group_channel(name):
 def _group_contract(name):
     """계약종별을 6개 대분류로 통합"""
     s = str(name).strip()
-    if s in ("", "nan"):
+    if s in ("", "nan", "응답없음"):
         return None
     if "주택" in s:
         return "주택용"
@@ -776,12 +777,12 @@ _row_sentiments = ["neutral"] * len(df_f)
 if M["voc"]:
     raw_voc = df_f[M["voc"]].astype(str).str.strip()
     all_texts = raw_voc.tolist()
-    voc_texts_all = [t for t in all_texts if t and t != "nan"]
+    voc_texts_all = [t for t in all_texts if t and t != "nan" and t != "응답없음"]
     if voc_texts_all:
         voc_sentiments = batch_classify_sentiment(tuple(voc_texts_all))
         vi = 0
         for i, t in enumerate(all_texts):
-            if t and t != "nan" and vi < len(voc_sentiments):
+            if t and t != "nan" and t != "응답없음" and vi < len(voc_sentiments):
                 _row_sentiments[i] = voc_sentiments[vi]
                 vi += 1
         for sent in voc_sentiments:
@@ -1155,7 +1156,7 @@ with tab4:
         st.warning("주관식 답변(VOC) 컬럼을 사이드바에서 먼저 선택해주세요.")
     else:
         voc_raw = df_f[M["voc"]].astype(str).str.strip()
-        voc_list = [t for t in voc_raw.tolist() if t and t != "nan"]
+        voc_list = [t for t in voc_raw.tolist() if t and t != "nan" and t != "응답없음"]
         n_voc = len(voc_list)
         _analysis_mode = ("KeyBERT + KoNLPy" if (KEYBERT_AVAILABLE and KONLPY_AVAILABLE)
                           else "KoNLPy 고정밀" if KONLPY_AVAILABLE else "정규식 기본")
@@ -1295,7 +1296,7 @@ with tab4:
                     biz_sel = st.selectbox("분석할 업무 선택",
                                            df_f[M["business"]].dropna().astype(str).unique(), key="voc_biz_sel")
                     biz_voc = [t for t in df_f.loc[df_f[M["business"]].astype(str) == biz_sel, M["voc"]
-                               ].astype(str).str.strip().tolist() if t and t != "nan"]
+                               ].astype(str).str.strip().tolist() if t and t != "nan" and t != "응답없음"]
                     if biz_voc:
                         with st.spinner(f"[{biz_sel}] 분석 중…"):
                             biz_kws = extract_keywords(biz_voc, top_n=30)
@@ -1337,7 +1338,7 @@ with tab5:
 
             for biz_name in bottom3_biz:
                 texts_b = [t for t in df_f.loc[df_f[M["business"]].astype(str) == str(biz_name), M["voc"]
-                           ].astype(str).str.strip().tolist() if t and t != "nan"]
+                           ].astype(str).str.strip().tolist() if t and t != "nan" and t != "응답없음"]
                 if not texts_b:
                     continue
                 kws_b = extract_keywords(texts_b, top_n=15)
@@ -1389,7 +1390,7 @@ with tab5:
                 weak_names = weak_groups[vg_cat].tolist()
                 df_weak = df_f[df_f[vg_cat].astype(str).isin([str(n) for n in weak_names])]
                 weak_voc = [t for t in df_weak[M["voc"]].astype(str).str.strip().tolist()
-                            if t and t != "nan"]
+                            if t and t != "nan" and t != "응답없음"]
                 if weak_voc:
                     with st.spinner("취약그룹 VOC 키워드 분석 중…"):
                         weak_kws = extract_keywords(weak_voc, top_n=30)
