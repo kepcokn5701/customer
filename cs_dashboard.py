@@ -306,6 +306,26 @@ def _group_channel(name):
     return "기타"
 
 
+def _group_contract(name):
+    """계약종별을 6개 대분류로 통합"""
+    s = str(name).strip()
+    if s in ("", "nan"):
+        return None
+    if "주택" in s:
+        return "주택용"
+    if "일반" in s:
+        return "일반용"
+    if "산업" in s:
+        return "산업용"
+    if "농사" in s:
+        return "농사용"
+    if "교육" in s:
+        return "교육용"
+    if "가로등" in s or "가로" in s:
+        return "가로등"
+    return None
+
+
 INSIGHT_RULES = [
     (["요금","비용","청구","과금","납부","고지"],
      "💳 요금·청구 → 청구서 사전 안내 강화, 비용 상담 전담 채널 확충"),
@@ -656,6 +676,14 @@ if M["date"]:
         df_raw["_계절"] = df_raw["_월"].map(_season_map)
     else:
         M["date"] = None
+
+# ── 계약종별 대분류 그룹핑 ──
+if M["contract"]:
+    df_raw["_계약종별"] = df_raw[M["contract"]].apply(_group_contract)
+    if df_raw["_계약종별"].dropna().any():
+        M["contract"] = "_계약종별"
+    else:
+        del df_raw["_계약종별"]
 
 # ── 개별 점수 컬럼 자동 탐지 ──
 INDIVIDUAL_SCORE_NAMES = [
