@@ -324,18 +324,21 @@ INSIGHT_RULES = [
 ]
 
 
-def generate_ai_recommendations(kw_list, category_name):
+def generate_ai_recommendations(kw_list, category_name, max_recs=5):
     if not kw_list:
         return []
     kw_text = " ".join([k for k, _ in kw_list[:15]])
     recs = []
+    seen = set()
     for rule_kws, rule_msg in INSIGHT_RULES:
         if any(rk in kw_text for rk in rule_kws):
-            recs.append(rule_msg)
+            if rule_msg not in seen:
+                recs.append(rule_msg)
+                seen.add(rule_msg)
     if not recs:
         top_kws = ", ".join([k for k, _ in kw_list[:5]])
         recs.append(f"📋 [{category_name}] 주요 키워드: {top_kws} → 해당 분야 개선 필요")
-    return recs
+    return recs[:max_recs]
 
 
 def generate_auto_insight(df, score_col, indiv_scores, cat_cols):
@@ -1156,8 +1159,8 @@ with tab4:
                     st.markdown('</div>', unsafe_allow_html=True)
                 with kw_col:
                     st.markdown('<div class="card">', unsafe_allow_html=True)
-                    st.markdown("**🔑 키워드 빈도 Top 25**")
-                    kw_df = pd.DataFrame(all_kws[:25], columns=["키워드", "언급 횟수"])
+                    st.markdown("**🔑 키워드 빈도 Top 10**")
+                    kw_df = pd.DataFrame(all_kws[:10], columns=["키워드", "언급 횟수"])
                     kw_df["비율(%)"] = (kw_df["언급 횟수"] / kw_df["언급 횟수"].sum() * 100).round(1)
                     kw_df["유형"] = kw_df["키워드"].apply(
                         lambda x: "😡 불친절" if any(r in x for r in RUDE_KEYWORDS)
@@ -1168,8 +1171,8 @@ with tab4:
                 st.markdown("---")
 
                 # 키워드 막대 차트
-                st.markdown('<p class="sec-head">📊 상위 30개 키워드</p>', unsafe_allow_html=True)
-                top30 = all_kws[:30]
+                st.markdown('<p class="sec-head">📊 상위 10개 키워드</p>', unsafe_allow_html=True)
+                top30 = all_kws[:10]
                 kw_names = [k[0] for k in top30]
                 kw_vals = [k[1] for k in top30]
                 kw_types = []
@@ -1183,7 +1186,7 @@ with tab4:
                 kw_chart_df = pd.DataFrame({"키워드": kw_names, "언급 횟수": kw_vals, "유형": kw_types})
                 fig_kw = px.bar(kw_chart_df, x="키워드", y="언급 횟수", color="유형",
                                 color_discrete_map={"불친절": "#e91e63", "부정": C["red"], "일반": C["sky"]},
-                                text="언급 횟수", template=PLOTLY_TPL, title="상위 30 키워드 · 빨간=부정 · 핑크=불친절")
+                                text="언급 횟수", template=PLOTLY_TPL, title="상위 10 키워드 · 빨간=부정 · 핑크=불친절")
                 fig_kw.update_traces(texttemplate="%{text}", textposition="outside")
                 fig_kw.update_layout(height=400, margin=dict(t=50, b=90, l=60, r=20), xaxis_tickangle=-35,
                                       legend_title_text="", title_font=dict(size=14, color=C["navy"]))
@@ -1209,9 +1212,9 @@ with tab4:
                                     st.image(bimg, use_container_width=True)
                             st.markdown('</div>', unsafe_allow_html=True)
                         with bkw_c:
-                            st.markdown(f'<div class="card"><b>[{biz_sel}] Top 15</b>', unsafe_allow_html=True)
+                            st.markdown(f'<div class="card"><b>[{biz_sel}] Top 10</b>', unsafe_allow_html=True)
                             if biz_kws:
-                                bkdf = pd.DataFrame(biz_kws[:15], columns=["키워드","언급 횟수"])
+                                bkdf = pd.DataFrame(biz_kws[:10], columns=["키워드","언급 횟수"])
                                 st.dataframe(bkdf, use_container_width=True, height=320, hide_index=True)
                             st.markdown('</div>', unsafe_allow_html=True)
         else:
@@ -1334,7 +1337,7 @@ with tab5:
                                 if wk_img:
                                     st.image(wk_img, use_container_width=True)
                         with wk_r:
-                            wk_df = pd.DataFrame(weak_kws[:20], columns=["키워드", "언급 횟수"])
+                            wk_df = pd.DataFrame(weak_kws[:10], columns=["키워드", "언급 횟수"])
                             wk_df["유형"] = wk_df["키워드"].apply(
                                 lambda x: "😡 불친절" if any(r in x for r in RUDE_KEYWORDS)
                                 else "⚠️ 부정" if any(n in x for n in NEGATIVE_KEYWORDS) else "일반")
@@ -1389,19 +1392,19 @@ with tab5:
             all_neg_flat = []
             for kws in df_neg["감지된_부정키워드"]:
                 all_neg_flat.extend([k.strip() for k in kws.split(",") if k.strip()])
-            neg_kw_cnt = Counter(all_neg_flat).most_common(12)
+            neg_kw_cnt = Counter(all_neg_flat).most_common(10)
             if neg_kw_cnt:
                 nkw_df = pd.DataFrame(neg_kw_cnt, columns=["부정키워드", "감지횟수"])
                 nk_l, nk_r = st.columns([3, 2])
                 with nk_l:
                     fig_neg = px.bar(nkw_df, x="부정키워드", y="감지횟수", color_discrete_sequence=[C["red"]],
-                                     text="감지횟수", template=PLOTLY_TPL, title="부정 키워드 Top 12")
+                                     text="감지횟수", template=PLOTLY_TPL, title="부정 키워드 Top 10")
                     fig_neg.update_traces(texttemplate="%{text}", textposition="outside")
                     fig_neg.update_layout(height=340, margin=dict(t=50, b=70, l=60, r=20), xaxis_tickangle=-25,
                                            title_font=dict(size=14, color=C["navy"]))
                     st.plotly_chart(fig_neg, use_container_width=True)
                 with nk_r:
-                    fig_don = px.pie(nkw_df.head(8), names="부정키워드", values="감지횟수", hole=0.5,
+                    fig_don = px.pie(nkw_df.head(10), names="부정키워드", values="감지횟수", hole=0.5,
                                      color_discrete_sequence=px.colors.sequential.Reds[::-1],
                                      title="부정 키워드 비중", template=PLOTLY_TPL)
                     fig_don.update_traces(textinfo="percent+label", textfont_size=11,
