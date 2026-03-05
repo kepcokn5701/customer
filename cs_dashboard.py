@@ -1453,7 +1453,7 @@ with tab5:
     st.markdown('<p class="sec-head">🚨 잠재적 민원고객 사전케어 리스트 (AI 자동 추출)</p>', unsafe_allow_html=True)
     st.markdown(
         '<div class="card-red"><b>📌 추출 기준</b><br>'
-        '① 종합 점수 하위 30% 고객<br>'
+        '① 종합 점수 50점 이하 고객<br>'
         '② 점수와 무관하게 서술 의견에 부정적 키워드가 포함된 고객<br>'
         '두 조건 중 하나라도 해당되면 잠재 민원고객으로 추출합니다.<br>'
         '해당 고객에게 <b>72시간 이내</b> 선제적으로 연락하여 민원 발생을 사전에 차단하세요.</div>',
@@ -1465,11 +1465,10 @@ with tab5:
         with st.spinner("잠재 민원고객 추출 중…"):
             neg_res = df_f[M["voc"]].apply(check_negative)
             neg_kw_s = neg_res.apply(lambda x: ", ".join(x[1]) if x[1] else "")
-            # 조건1: 하위 30% 점수
+            # 조건1: 종합 점수 50점 이하
             low_score_mask = pd.Series(False, index=df_f.index)
             if M["score"] and "_점수100" in df_f.columns:
-                score_threshold = np.percentile(df_f["_점수100"].dropna(), 30)
-                low_score_mask = df_f["_점수100"] <= score_threshold
+                low_score_mask = df_f["_점수100"] <= 50
             # 조건2: 부정 키워드 감지 (점수 무관)
             neg_kw_mask = neg_res.apply(lambda x: x[0])
             # 합집합
@@ -1482,7 +1481,7 @@ with tab5:
         for idx in df_neg.index:
             r = []
             if low_score_mask.get(idx, False):
-                r.append("하위점수")
+                r.append("50점이하")
             if neg_kw_mask.get(idx, False):
                 r.append("부정키워드")
             _reasons.append(" + ".join(r) if r else "")
