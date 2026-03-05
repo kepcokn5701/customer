@@ -107,6 +107,14 @@ RUDE_KEYWORDS = [
     "막말","인상","불성실","함부로","권위적","비꼼","쏘아","차갑","냉소",
 ]
 
+# 긍정 문맥 키워드 — 이 단어가 부정/불친절 키워드 근처에 있으면 긍정으로 재판정
+POSITIVE_CONTEXT = [
+    "감사","친절","좋","만족","잘","훌륭","경청","공감","인상깊","고마",
+    "칭찬","최고","기쁘","따뜻","성실","편안","빠르","신속","정확","꼼꼼",
+    "배려","존경","사려깊","세심","상냥","다정","협조","도움","반갑","행복",
+    "깔끔","쾌적","개선","나아","발전",
+]
+
 _STOP = {
     "이","가","은","는","을","를","의","에","에서","으로","로","와","과","하",
     "것","수","있","없","않","못","더","또","그","저","있다","없다","됩니다",
@@ -177,12 +185,27 @@ def extract_keywords(texts, top_n=60):
     return Counter(words).most_common(top_n)
 
 
+def _has_positive_context(text, keyword):
+    """키워드 주변(앞뒤 15자)에 긍정 문맥 단어가 있는지 확인"""
+    s = str(text)
+    idx = s.find(keyword)
+    if idx == -1:
+        return False
+    # 키워드 주변 윈도우 추출 (앞 15자 ~ 뒤 15자)
+    start = max(0, idx - 15)
+    end = min(len(s), idx + len(keyword) + 15)
+    window = s[start:end]
+    return any(pw in window for pw in POSITIVE_CONTEXT)
+
+
 def check_negative(text):
     if not text or str(text).strip() in ("", "nan", "응답없음"):
         return False, []
     s = str(text)
     found = [kw for kw in NEGATIVE_KEYWORDS if kw in s]
-    return bool(found), found
+    # 긍정 문맥에 둘러싸인 키워드는 제거
+    real_neg = [kw for kw in found if not _has_positive_context(s, kw)]
+    return bool(real_neg), real_neg
 
 
 def check_rude(text):
@@ -190,11 +213,13 @@ def check_rude(text):
         return False, []
     s = str(text)
     found = [kw for kw in RUDE_KEYWORDS if kw in s]
-    return bool(found), found
+    # 긍정 문맥에 둘러싸인 키워드는 제거
+    real_rude = [kw for kw in found if not _has_positive_context(s, kw)]
+    return bool(real_rude), real_rude
 
 
 def classify_voc_3tier(text):
-    """VOC를 [불친절 / 불만 / 긍정]으로 3단 분류 (리포트 양식)"""
+    """VOC를 [불친절 / 불만 / 긍정]으로 3단 분류 (문맥 인식 버전)"""
     if not text or str(text).strip() in ("", "nan", "응답없음"):
         return "긍정"
     s = str(text)
