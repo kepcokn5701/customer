@@ -1086,6 +1086,41 @@ def _render_category_section(df, cat_col, cat_label, office_col, score_col, over
         with st.expander(f"📋 지사별 {cat_label} 상세 데이터"):
             st.dataframe(pivot, use_container_width=True)
 
+        # ── 저점수 건 상세 조회 ──
+        _uid = cat_label.replace(" ", "")
+        with st.expander(f"🔍 저점수 건 상세 조회 (지사 × {cat_label})"):
+            _sel_cols = st.columns(2)
+            with _sel_cols[0]:
+                _offices = sorted(df[office_col].dropna().astype(str).unique().tolist())
+                _sel_ofc = st.selectbox("지사 선택", _offices, key=f"lowdet_ofc_{_uid}")
+            with _sel_cols[1]:
+                _cats = sorted(df[cat_col].dropna().astype(str).unique().tolist())
+                _sel_cat = st.selectbox(f"{cat_label} 선택", _cats, key=f"lowdet_cat_{_uid}")
+            _filtered = df[(df[office_col].astype(str) == _sel_ofc) &
+                           (df[cat_col].astype(str) == _sel_cat)].copy()
+            if len(_filtered) > 0:
+                _filtered = _filtered.sort_values(score_col)
+                _avg = _filtered[score_col].mean()
+                _color = C["red"] if _avg < overall_avg - 5 else C["gold"] if _avg < overall_avg else C["teal"]
+                st.markdown(
+                    f'평균 <b style="color:{_color}">{_avg:.1f}점</b> · {len(_filtered):,}건'
+                    f' (전체 대비 {_avg - overall_avg:+.1f}점)',
+                    unsafe_allow_html=True)
+                _show_cols = []
+                if M.get("receipt_no") and M["receipt_no"] in _filtered.columns:
+                    _show_cols.append(M["receipt_no"])
+                _show_cols.append(office_col)
+                _show_cols.append(cat_col)
+                if score_col in _filtered.columns:
+                    _show_cols.append(score_col)
+                if M.get("voc") and M["voc"] in _filtered.columns:
+                    _show_cols.append(M["voc"])
+                _show_cols = [c for c in _show_cols if c in _filtered.columns]
+                st.dataframe(_filtered[_show_cols].reset_index(drop=True),
+                             use_container_width=True, height=300, hide_index=True)
+            else:
+                st.info("해당 조건에 맞는 데이터가 없습니다.")
+
 
 with tab3:
     if not M["score"]:
