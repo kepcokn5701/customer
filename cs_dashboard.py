@@ -529,7 +529,6 @@ st.markdown("""
   <span class="dash-badge">☁️ VOC AI 분석</span>
   <span class="dash-badge">🎯 사전케어</span>
   <span class="dash-badge">📈 교차분석</span>
-  <span class="dash-badge">🔗 상관관계</span>
   <span class="dash-badge">📅 시계열</span>
   <span class="dash-badge">🔬 패턴탐지</span>
 </div>
@@ -846,14 +845,13 @@ st.markdown("<br>", unsafe_allow_html=True)
 # ══════════════════════════════════════════════════════════════
 #  13. 탭 구성
 # ══════════════════════════════════════════════════════════════
-tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9 = st.tabs([
+tab1, tab2, tab3, tab4, tab5, tab6, tab8, tab9 = st.tabs([
     "📊  구간별 비중 · 종합 현황",
     "🏢  사업소별 벤치마킹",
     "📡  채널별 · 업무별 분석",
     "☁️  VOC AI 분석",
     "🎯  CS 인사이트 & 사전케어",
     "📈  다차원 교차분석",
-    "🔗  상관관계 · 영향도",
     "📅  시계열 트렌드",
     "🔬  지사 심층 · 패턴",
 ])
@@ -1638,99 +1636,6 @@ with tab6:
                     title_font=dict(size=14, color=C["navy"]),
                 )
                 st.plotly_chart(fig_hm_cross, use_container_width=True)
-
-
-# ─────────────────────────────────────────────────────────────
-#  TAB 7  상관관계 · 영향도
-# ─────────────────────────────────────────────────────────────
-with tab7:
-    st.markdown('<p class="sec-head">🔗 개별항목 ↔ 종합점수 상관관계 · 영향도</p>', unsafe_allow_html=True)
-
-    if not M["score"] or not individual_scores:
-        st.warning("종합 점수와 개별 점수 항목(이용 편리성, 직원 친절도 등)이 필요합니다.")
-    else:
-        with st.spinner("상관관계 분석 중…"):
-            corr_cols = individual_scores + [M["score"]]
-            df_corr = df_f[corr_cols].apply(pd.to_numeric, errors="coerce").dropna()
-
-            if len(df_corr) < 5:
-                st.warning("상관분석에 충분한 데이터가 없습니다 (최소 5건 필요).")
-            else:
-                corr_matrix = df_corr.corr()
-
-                # ── 전체 상관관계 히트맵 ──
-                st.markdown('<p class="sec-head">🌡️ 상관관계 히트맵 (Pearson)</p>', unsafe_allow_html=True)
-                fig_corr = px.imshow(
-                    corr_matrix.round(3), color_continuous_scale="RdBu_r",
-                    text_auto=".3f", aspect="auto", template=PLOTLY_TPL,
-                    title="개별항목 간 상관관계 행렬",
-                    zmin=-1, zmax=1,
-                )
-                fig_corr.update_layout(
-                    height=max(400, len(corr_cols) * 45 + 80),
-                    margin=dict(t=60, b=60, l=120, r=60),
-                    title_font=dict(size=14, color=C["navy"]),
-                )
-                st.plotly_chart(fig_corr, use_container_width=True)
-
-                st.markdown("---")
-
-                # ── 종합 점수 영향도 랭킹 ──
-                st.markdown('<p class="sec-head">📊 종합 점수 영향도 랭킹</p>', unsafe_allow_html=True)
-                impact = corr_matrix[M["score"]].drop(M["score"]).sort_values(ascending=True)
-                impact_df = pd.DataFrame({
-                    "항목": impact.index,
-                    "상관계수": impact.values,
-                })
-                # 색상: 양의 상관 = 파랑, 음의 상관 = 빨강
-                impact_colors = [C["blue"] if v > 0 else C["red"] for v in impact_df["상관계수"]]
-
-                fig_impact = go.Figure(go.Bar(
-                    x=impact_df["상관계수"], y=impact_df["항목"], orientation="h",
-                    marker_color=impact_colors,
-                    text=impact_df["상관계수"].round(3), textposition="outside",
-                ))
-                fig_impact.update_layout(
-                    height=max(300, len(impact_df) * 40 + 80),
-                    template=PLOTLY_TPL,
-                    title=dict(text="개별항목 → 종합 점수 영향도 (상관계수)", font=dict(size=14, color=C["navy"])),
-                    margin=dict(t=60, b=40, l=120, r=80),
-                    xaxis_title="상관계수 (Pearson r)", xaxis_range=[-1, 1],
-                )
-                st.plotly_chart(fig_impact, use_container_width=True)
-
-                # 핵심 인사이트
-                top_item = impact.index[-1]
-                top_corr = impact.values[-1]
-                bottom_item = impact.index[0]
-                bottom_corr = impact.values[0]
-                st.markdown(
-                    f'<div class="insight-box">'
-                    f'🔑 종합 점수에 <b>가장 큰 영향</b>을 미치는 항목: <b>{top_item}</b> (r={top_corr:.3f})<br>'
-                    f'📉 종합 점수에 <b>가장 낮은 영향</b>을 미치는 항목: <b>{bottom_item}</b> (r={bottom_corr:.3f})'
-                    f'</div>', unsafe_allow_html=True)
-
-                st.markdown("---")
-
-                # ── 개별 Scatter + 추세선 ──
-                st.markdown('<p class="sec-head">📈 개별항목 vs 종합점수 산점도</p>', unsafe_allow_html=True)
-                scatter_sel = st.selectbox(
-                    "항목 선택", individual_scores, key="scatter_item_sel",
-                    index=individual_scores.index(top_item) if top_item in individual_scores else 0,
-                )
-                fig_scatter = px.scatter(
-                    df_corr, x=scatter_sel, y=M["score"],
-                    trendline="ols", template=PLOTLY_TPL,
-                    color_discrete_sequence=[C["sky"]],
-                    title=f"{scatter_sel} vs 종합 점수 (추세선 포함)",
-                    labels={scatter_sel: scatter_sel, M["score"]: "종합 점수"},
-                    opacity=0.5,
-                )
-                fig_scatter.update_layout(
-                    height=450, margin=dict(t=60, b=60, l=60, r=40),
-                    title_font=dict(size=14, color=C["navy"]),
-                )
-                st.plotly_chart(fig_scatter, use_container_width=True)
 
 
 # ─────────────────────────────────────────────────────────────
