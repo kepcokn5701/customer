@@ -288,6 +288,22 @@ def _channel_color(name):
     return C["ch_etc"]
 
 
+def _group_channel(name):
+    """접수자구분을 4개 범주로 통합 (직원/고객센터/한전ON/기타, 검침사 제외)"""
+    s = str(name).strip()
+    if s in ("", "nan"):
+        return None
+    if "검침" in s:
+        return None  # 검침사 제외
+    if any(k in s for k in ["직원", "방문", "현장"]):
+        return "직원"
+    if any(k in s for k in ["고객센터", "콜센터", "전화", "센터"]):
+        return "고객센터"
+    if any(k in s for k in ["ON", "온라인", "앱", "홈페이지", "인터넷", "모바일", "한전ON", "회사ON"]):
+        return "한전ON"
+    return "기타"
+
+
 INSIGHT_RULES = [
     (["요금","비용","청구","과금","납부","고지"],
      "💳 요금·청구 → 청구서 사전 안내 강화, 비용 상담 전담 채널 확충"),
@@ -856,7 +872,7 @@ with tab1:
         pc_list = st.columns(len(pie_cols))
         titles_map = {}
         if M["age"]: titles_map[M["age"]] = "연령대"
-        if M["contract"]: titles_map[M["contract"]] = "계약종"
+        if M["contract"]: titles_map[M["contract"]] = "계약종별"
         if M["business"]: titles_map[M["business"]] = "업무유형"
         for idx, col_nm in enumerate(pie_cols):
             counts = df_f[col_nm].dropna().astype(str).value_counts()
@@ -917,10 +933,12 @@ with tab2:
 #  TAB 3  채널별 · 업무별 분석
 # ─────────────────────────────────────────────────────────────
 with tab3:
-    # ── 채널별 분석 ──
+    # ── 채널별 분석 (4개 범주: 직원/고객센터/한전ON/기타, 검침사 제외) ──
     if M["channel"] and M["score"]:
         st.markdown('<p class="sec-head">📡 접수채널별 만족도 분석</p>', unsafe_allow_html=True)
-        chan_grp = df_f.groupby(M["channel"])["_점수100"].agg(["mean","count"]).reset_index()
+        df_f["_채널그룹"] = df_f[M["channel"]].apply(_group_channel)
+        df_chan = df_f[df_f["_채널그룹"].notna()].copy()
+        chan_grp = df_chan.groupby("_채널그룹")["_점수100"].agg(["mean","count"]).reset_index()
         chan_grp.columns = ["채널", "평균만족도", "응답수"]
 
         ch_l, ch_r = st.columns([1, 1])
