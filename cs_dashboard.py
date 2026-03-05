@@ -223,13 +223,15 @@ def batch_classify_sentiment(texts_tuple):
     return results
 
 
-def make_wordcloud_image(kw_list):
+def make_wordcloud_image(kw_list, max_words=15):
     if not WORDCLOUD_AVAILABLE or not kw_list:
         return None
-    freq = {k: v for k, v in kw_list}
+    freq = {k: v for k, v in kw_list[:max_words]}
     kwargs = dict(
         width=1200, height=500, background_color="white",
-        max_words=120, colormap="Blues", prefer_horizontal=0.7,
+        max_words=max_words, colormap="Blues", prefer_horizontal=0.8,
+        min_font_size=18, max_font_size=120,
+        relative_scaling=0.6, margin=15,
     )
     if FONT_PATH:
         kwargs["font_path"] = FONT_PATH
