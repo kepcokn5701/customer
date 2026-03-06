@@ -2598,15 +2598,15 @@ with tab10:
                     score_item_cols.append(c)
 
         contract_col = M.get("contract")
-        if contract_col and "_계약그룹" in df_pure.columns:
-            contract_groups = df_pure["_계약그룹"].dropna().unique()
+        if contract_col and "_계약종별" in df_pure.columns:
+            contract_groups = df_pure["_계약종별"].dropna().unique()
             contract_groups = [g for g in ["주택용", "일반용", "산업용", "농사용", "교육용", "가로등"]
-                               if g in contract_groups and len(df_pure[df_pure["_계약그룹"] == g]) >= 5]
+                               if g in contract_groups and len(df_pure[df_pure["_계약종별"] == g]) >= 5]
 
             if score_item_cols and contract_groups:
                 corr_data = []
                 for grp_name in contract_groups:
-                    sub = df_pure[df_pure["_계약그룹"] == grp_name]
+                    sub = df_pure[df_pure["_계약종별"] == grp_name]
                     for col in score_item_cols:
                         vals = pd.to_numeric(sub[col], errors="coerce")
                         both = pd.DataFrame({"item": vals, "total": sub["_점수100"]}).dropna()
@@ -2637,7 +2637,7 @@ with tab10:
                                 insights.append(
                                     f"**{grp_name}** 고객은 <b>{top['항목']}</b>(상관 {top['상관계수']:.2f})이 "
                                     f"종합점수에 가장 큰 영향 → 이 항목 집중 개선 시 만족도 급상승 가능")
-                            grp_sub = df_pure[df_pure["_계약그룹"] == grp_name]
+                            grp_sub = df_pure[df_pure["_계약종별"] == grp_name]
                             grp_mean = pd.to_numeric(grp_sub[top["항목"]], errors="coerce").mean()
                             overall_mean = pd.to_numeric(df_pure[top["항목"]], errors="coerce").mean()
                             if pd.notna(grp_mean) and pd.notna(overall_mean) and grp_mean < overall_mean - 2:
@@ -2666,8 +2666,8 @@ with tab10:
                     for i, grp_name in enumerate(contract_groups[:6]):
                         with guide_cols[i % 3]:
                             focus, desc = GUIDE.get(grp_name, ("일반", ""))
-                            n = len(df_pure[df_pure["_계약그룹"] == grp_name])
-                            avg = df_pure[df_pure["_계약그룹"] == grp_name]["_점수100"].mean()
+                            n = len(df_pure[df_pure["_계약종별"] == grp_name])
+                            avg = df_pure[df_pure["_계약종별"] == grp_name]["_점수100"].mean()
                             st.markdown(
                                 f'<div class="card-blue" style="min-height:160px">'
                                 f'<b>{grp_name}</b> (n={n:,}, 평균 {avg:.1f}점)<br><br>'
@@ -2843,8 +2843,8 @@ with tab10:
 
                 # 계약종 비중
                 contract_dist = ""
-                if "_계약그룹" in sub.columns:
-                    top_ct = sub["_계약그룹"].value_counts(normalize=True).head(2)
+                if "_계약종별" in sub.columns:
+                    top_ct = sub["_계약종별"].value_counts(normalize=True).head(2)
                     contract_dist = ", ".join(f"{k} {v * 100:.0f}%" for k, v in top_ct.items())
 
                 # 업무 비중
