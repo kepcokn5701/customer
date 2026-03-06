@@ -959,9 +959,8 @@ st.markdown("<br>", unsafe_allow_html=True)
 # ══════════════════════════════════════════════════════════════
 #  13. 탭 구성
 # ══════════════════════════════════════════════════════════════
-tab1, tab2, tab3, tab4, tab5, tab6, tab8, tab9, tab10 = st.tabs([
+tab1, tab3, tab4, tab5, tab6, tab8, tab9, tab10 = st.tabs([
     "📊  구간별 비중 · 종합 현황",
-    "🏢  사업소별 벤치마킹",
     "📡  채널별 · 업무별 분석",
     "☁️  VOC AI 분석",
     "🎯  CS 인사이트 & 사전케어",
@@ -1101,45 +1100,6 @@ with tab1:
     with st.expander("📄 원본 데이터 미리보기 (상위 30건)"):
         display_df = df_f[[c for c in df_f.columns if not c.startswith("_")]]
         st.dataframe(display_df.head(30), use_container_width=True)
-
-
-# ─────────────────────────────────────────────────────────────
-#  TAB 2  사업소별 벤치마킹
-# ─────────────────────────────────────────────────────────────
-with tab2:
-    if not M["office"]:
-        st.warning("사업소 컬럼을 사이드바에서 먼저 선택해주세요.")
-    elif not M["score"]:
-        st.warning("만족도 점수 컬럼을 선택해야 벤치마킹이 가능합니다.")
-    else:
-        st.markdown('<p class="sec-head">🏢 사업소별 만족도 벤치마킹</p>', unsafe_allow_html=True)
-        office_grp = df_f.groupby(M["office"])["_점수100"].agg(["mean","count"]).reset_index()
-        office_grp.columns = ["사업소", "평균만족도", "응답수"]
-        office_grp = office_grp.sort_values("평균만족도", ascending=True)
-        overall_avg = avg_score_100
-
-        office_grp["그룹"] = office_grp["평균만족도"].apply(
-            lambda v: "⬆ 본부평균 이상" if v >= overall_avg else "⬇ 본부평균 미달")
-        color_map = {"⬆ 본부평균 이상": C["teal"], "⬇ 본부평균 미달": C["red"]}
-
-        fig_bench = px.bar(office_grp, x="평균만족도", y="사업소", color="그룹",
-                           color_discrete_map=color_map, orientation="h", text="평균만족도",
-                           template=PLOTLY_TPL, title=f"사업소별 평균 만족도 — 본부 평균: {overall_avg:.1f}점")
-        fig_bench.update_traces(texttemplate="%{text:.1f}", textposition="outside")
-        fig_bench.add_vline(x=overall_avg, line_color=C["navy"], line_dash="dash", line_width=2.5,
-                            annotation_text=f"본부 평균 {overall_avg:.1f}",
-                            annotation_font_size=12, annotation_font_color=C["navy"])
-        fig_bench.update_layout(height=max(350, len(office_grp) * 35 + 80),
-                                 margin=dict(t=60, b=20, l=10, r=100), legend_title_text="",
-                                 title_font=dict(size=14, color=C["navy"]))
-        st.plotly_chart(fig_bench, use_container_width=True)
-
-        with st.expander("📋 사업소별 상세 데이터"):
-            detail = office_grp.sort_values("평균만족도", ascending=False).copy()
-            detail["평균만족도"] = detail["평균만족도"].round(1)
-            detail["본부평균대비"] = (detail["평균만족도"] - overall_avg).round(1)
-            st.dataframe(detail[["사업소","평균만족도","응답수","본부평균대비","그룹"]],
-                         use_container_width=True, hide_index=True)
 
 
 # ─────────────────────────────────────────────────────────────
@@ -2412,9 +2372,122 @@ with tab10:
     st.markdown("---")
 
     # ══════════════════════════════════════════
-    # 3. 지사별 페르소나 (OOS 제외)
+    # 3. 사업소별 벤치마킹 (OOS 제외 순수 데이터)
     # ══════════════════════════════════════════
-    st.markdown('<p class="sec-head">3️⃣ 지사별 페르소나 — 데이터 기반 캐릭터 프로파일링 (순수 데이터)</p>',
+    st.markdown('<p class="sec-head">3️⃣ 사업소별 벤치마킹 — 만족도 · 개별항목 · 강점/약점 자동 진단</p>',
+                unsafe_allow_html=True)
+
+    office_col_b = M.get("office")
+    if office_col_b and M["score"] and "_점수100" in df_pure.columns:
+        office_grp = df_pure.groupby(office_col_b)["_점수100"].agg(["mean", "count"]).reset_index()
+        office_grp.columns = ["사업소", "평균만족도", "응답수"]
+        office_grp = office_grp.sort_values("평균만족도", ascending=True)
+        _bench_avg = df_pure["_점수100"].mean()
+
+        office_grp["그룹"] = office_grp["평균만족도"].apply(
+            lambda v: "⬆ 본부평균 이상" if v >= _bench_avg else "⬇ 본부평균 미달")
+
+        # 만족도 막대 차트
+        fig_bench = px.bar(office_grp, x="평균만족도", y="사업소", color="그룹",
+                           color_discrete_map={"⬆ 본부평균 이상": C["teal"], "⬇ 본부평균 미달": C["red"]},
+                           orientation="h", text="평균만족도", template=PLOTLY_TPL,
+                           title=f"사업소별 평균 만족도 (OOS 제외) — 본부 평균: {_bench_avg:.1f}점")
+        fig_bench.update_traces(texttemplate="%{text:.1f}", textposition="outside")
+        fig_bench.add_vline(x=_bench_avg, line_color=C["navy"], line_dash="dash", line_width=2.5,
+                            annotation_text=f"본부 평균 {_bench_avg:.1f}",
+                            annotation_font_size=12, annotation_font_color=C["navy"])
+        fig_bench.update_layout(height=max(350, len(office_grp) * 35 + 80),
+                                 margin=dict(t=60, b=20, l=10, r=100), legend_title_text="",
+                                 title_font=dict(size=14, color=C["navy"]))
+        st.plotly_chart(fig_bench, use_container_width=True)
+
+        # 개별항목 레이더 차트 (지사별 비교)
+        _item_cols_bench = []
+        for c in df_pure.columns:
+            if c in ("_점수100", "_원본순번", "_접수일", "_is_oos") or c.startswith("_"):
+                continue
+            if c == M["score"]:
+                continue
+            vals = pd.to_numeric(df_pure[c], errors="coerce")
+            if vals.notna().sum() / max(len(df_pure), 1) > 0.1 and vals.nunique() > 2:
+                _item_cols_bench.append(c)
+
+        if _item_cols_bench and len(office_grp) >= 2:
+            st.markdown('<p class="sec-head">📊 지사별 개별항목 레이더 비교</p>', unsafe_allow_html=True)
+            # 상위 3 + 하위 3 지사 선택
+            _sorted_offices = office_grp.sort_values("평균만족도")
+            _bottom3 = _sorted_offices.head(3)["사업소"].tolist()
+            _top3 = _sorted_offices.tail(3)["사업소"].tolist()
+            _radar_offices = _bottom3 + _top3
+
+            radar_data = []
+            for ofc in _radar_offices:
+                sub = df_pure[df_pure[office_col_b] == ofc]
+                row_data = {"지사": ofc}
+                for col in _item_cols_bench:
+                    val = pd.to_numeric(sub[col], errors="coerce").mean()
+                    if pd.notna(val):
+                        row_data[col] = round(val, 1)
+                radar_data.append(row_data)
+
+            if radar_data:
+                fig_radar = go.Figure()
+                _radar_cats = [c for c in _item_cols_bench if all(c in rd for rd in radar_data)]
+                for rd in radar_data:
+                    is_bottom = rd["지사"] in _bottom3
+                    vals_r = [rd.get(c, 0) for c in _radar_cats]
+                    fig_radar.add_trace(go.Scatterpolar(
+                        r=vals_r + [vals_r[0]] if vals_r else vals_r,
+                        theta=_radar_cats + [_radar_cats[0]] if _radar_cats else _radar_cats,
+                        name=rd["지사"],
+                        line=dict(dash="dash" if is_bottom else "solid",
+                                  width=1.5 if is_bottom else 2.5),
+                        opacity=0.6 if is_bottom else 1.0,
+                    ))
+                fig_radar.update_layout(
+                    polar=dict(radialaxis=dict(visible=True, range=[0, 100])),
+                    height=480, template=PLOTLY_TPL,
+                    title=dict(text="하위 3개(점선) vs 상위 3개(실선) 지사 개별항목 비교",
+                               font=dict(size=14, color=C["navy"])),
+                    margin=dict(t=80, b=40, l=60, r=60))
+                st.plotly_chart(fig_radar, use_container_width=True)
+
+        # 지사별 강점/약점 자동 진단
+        st.markdown('<p class="sec-head">🔍 지사별 강점 · 약점 자동 진단</p>', unsafe_allow_html=True)
+        diag_data = []
+        for _, row_o in office_grp.iterrows():
+            ofc = row_o["사업소"]
+            sub = df_pure[df_pure[office_col_b] == ofc]
+            strengths = []
+            weaknesses = []
+            for col in _item_cols_bench:
+                ofc_val = pd.to_numeric(sub[col], errors="coerce").mean()
+                all_val = pd.to_numeric(df_pure[col], errors="coerce").mean()
+                if pd.notna(ofc_val) and pd.notna(all_val):
+                    gap = ofc_val - all_val
+                    if gap >= 2:
+                        strengths.append(f"{col}(+{gap:.1f})")
+                    elif gap <= -2:
+                        weaknesses.append(f"{col}({gap:.1f})")
+            diag_data.append({
+                "지사": ofc,
+                "평균": round(row_o["평균만족도"], 1),
+                "응답수": int(row_o["응답수"]),
+                "강점 항목": ", ".join(strengths[:3]) if strengths else "-",
+                "약점 항목": ", ".join(weaknesses[:3]) if weaknesses else "-",
+            })
+        df_diag = pd.DataFrame(diag_data).sort_values("평균", ascending=False)
+        st.dataframe(df_diag, use_container_width=True, hide_index=True)
+
+    else:
+        st.info("사업소, 종합점수 컬럼이 필요합니다.")
+
+    st.markdown("---")
+
+    # ══════════════════════════════════════════
+    # 4. 지사별 페르소나 (OOS 제외)
+    # ══════════════════════════════════════════
+    st.markdown('<p class="sec-head">4️⃣ 지사별 페르소나 — 데이터 기반 캐릭터 프로파일링 (순수 데이터)</p>',
                 unsafe_allow_html=True)
 
     office_col = M.get("office")
