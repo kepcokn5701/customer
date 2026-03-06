@@ -136,54 +136,109 @@ _STOP = {
 
 # ── Action-Trigger 키워드 추출 전용: 강화 불용어 ──
 # CS 본질 개선점을 가리는 단순 감성어·인사말·범용어를 철저히 필터링
+# ※ Okt 명사 추출 결과 + regex 2글자 이상 매칭 결과 모두 포괄
 _ACTION_STOP = _STOP | {
-    # 단순 긍정 감성어 / 인사말
-    "친절","감사","만족","좋음","좋다","좋아","빠름","수고","감사합니다","고맙",
-    "고마워","칭찬","최고","훌륭","편안","편리","깔끔","깨끗","성실","정확",
-    "꼼꼼","배려","도움","추천","완벽","노력","발전","유지","응원","믿음",
-    "행복","따뜻","경청","공감","상냥","반갑","기쁘","굿","좋아요","수고하",
-    "고생","덕분","잘해","괜찮","적극","열심","나아","개선","유쾌","쾌적",
-    # 단순 부정 감성어 (원인 아닌 감정 표현)
+    # ── 긍정 감성어 (원형 + 활용형 모두) ──
+    "친절","친절하게","친절히","친절한","친절하고","친절합니다","친절했습니다",
+    "감사","감사합니다","감사드립니다","감사했습니다","감사드려요",
+    "만족","만족합니다","만족했습니다","만족스럽","만족도",
+    "좋음","좋다","좋아","좋아요","좋겠습니다","좋았습니다","좋습니다",
+    "빠름","빠르고","빠르게","빨리","빠른",
+    "수고","수고하","수고하셨","수고하십니다","수고많으","수고합니다",
+    "고맙","고마웠","고마워","고마운","고맙습니다","고마웠습니다",
+    "칭찬","최고","훌륭","편안","편리","깔끔","깨끗","성실","정확","정확한",
+    "꼼꼼","꼼꼼하게","꼼꼼히","배려","도움","추천","완벽","노력","발전",
+    "유지","응원","믿음","행복","따뜻","경청","공감","상냥","반갑","기쁘",
+    "굿","적극","적극적","적극적인","열심","열심히","나아","개선","유쾌","쾌적",
+    "고생","덕분","잘해","괜찮","잘하","잘해주","잘해주셔서",
+    "주셔서","해주셔서","드립니다","드려요","드리겠습니다",
+    "신속","신속하게","신속한","신속히",
+    # ── 부정 감성어 (원인 아닌 감정 표현) ──
     "불만","불쾌","화남","짜증","최악","실망","별로","황당","어이없","답답",
     "이해불가","납득불가","힘듭니다","어렵습니다",
-    # 범용 서베이 필러
+    # ── 범용 서베이 필러 / 무의미 단어 ──
     "없음","있음","필요","바람","희망","생각","의견","마음","정도","특별",
     "나름","보통","그냥","일단","전반","전반적","종합","전체","모든","각각",
     "사항","방면","측면","분야","방향","차원","수준","단계","기본","일반",
+    "너무","매우","정말","아주","조금","많이","항상","계속","때문","현재",
+    "하고","있도록","해서","대로","그래서","그리고","때문에","에서","으로",
+    "시간이","시간","기타","해당","부분","경우","관련","대한","위한","통해",
+    "업무","업무처리","자세히","쉽게","바로","조금더","했는데","있습니다",
+    "없습니다","합니다","입니다","됩니다","습니다","하는","한다",
+    "바랍니다","같습니다","같은","같이","하겠습니다","하셨으면",
+    "해주세요","주세요","부탁","요청",
+    # ── 추가 필러 / 조사 활용형 ──
+    "좋았어요","좋겠어요","있으면","없으면","있어","없어","해주면",
+    "더욱","다소","정도","위해","봅니다","것이","데요","거든요",
+    "필요한","있었","없었","해야","좋을것","좋을","좋을것같","해야할",
+    "도움이","것을","대로","처럼","만큼","에서","으로","하면","하려","하도록",
+    "상세하게","상세","자세","자세하게","올바른","올바르게",
+    "알기쉽게","좀더","더욱더","하였","했음","하였음",
+    # ── 한전/전기 일반 용어 (모든 VOC에 공통 → 변별력 없음) ──
+    "한전","전기","전력","전기가","고객","고객이","서비스","이용","사용",
+    "회사","지사","지점","센터","상담","상담원","전화","통화","연결",
+    "직원","담당","담당자","기사",
 }
 
 # ── 고객여정 + 실무 카테고리 매핑 ──
+# ※ 실제 VOC에서 Okt/regex로 추출되는 단어 형태를 기준으로 매핑
 _JOURNEY_CATEGORIES = {
     "📞 안내·상담": [
-        "설명", "안내문", "고지", "통보", "공지", "알림", "문자", "카톡", "메시지",
-        "응대", "상담", "문의", "답변", "연락", "통화", "전화", "콜백", "회신",
-        "ARS", "자동", "음성", "매뉴얼", "스크립트",
+        "설명", "안내", "안내문", "고지", "통보", "공지", "알림", "문자", "카톡", "메시지",
+        "응대", "상담", "문의", "답변", "연락", "통화", "전화", "콜백", "회신", "통지",
+        "매뉴얼", "스크립트", "고지서", "청구서",
+        "소통", "커뮤니케이션", "공감", "경청", "태도", "말투", "어투",
+        "인사", "존대", "존칭", "반말",
     ],
     "📋 접수·절차": [
         "접수", "신청", "서류", "서식", "양식", "절차", "단계", "구비", "증빙",
         "본인확인", "인증", "승인", "심사", "검토", "반려", "보완", "재접수",
         "온라인", "앱", "모바일", "홈페이지", "창구", "대기", "번호표", "예약",
+        "대기시간", "대기시간이", "기다림", "기다", "번거로", "복잡", "어렵",
+        "서명", "동의서", "서약", "첨부",
+        "등록", "변경", "해지", "이전", "명의", "양도",
     ],
-    "🔧 현장처리": [
+    "🔧 현장처리·시공": [
         "방문", "현장", "출동", "공사", "시공", "설치", "철거", "교체", "수리",
         "점검", "검사", "측정", "계량기", "변압기", "전주", "전선", "배전", "누전",
         "정전", "단전", "복구", "송전", "고장", "장애", "사고", "위험", "안전",
         "기사", "작업자", "외주", "협력", "하청",
+        "충전소", "전기실", "모뎀", "통신", "수소", "태양광", "발전기",
+        "차단기", "개폐기", "배전반", "인입선", "케이블", "전력선",
+        "작업", "시공", "준공", "감리", "계약용량",
     ],
-    "📮 사후관리": [
-        "재방문", "재처리", "재발", "반복", "미해결", "미처리", "미완료", "지연",
+    "⏱️ 처리속도·지연": [
+        "지연", "느림", "느려", "오래", "늦게", "늦은", "늦다", "오래걸",
+        "신속", "빠르", "즉시", "지체", "소요", "일정",
+        "기다", "기다림", "대기", "대기시간",
+        "재방문", "재처리", "재발", "반복", "미해결", "미처리", "미완료",
+    ],
+    "📮 사후관리·피드백": [
         "후속", "피드백", "결과통보", "완료통보", "만족확인", "사후", "사과",
         "보상", "감면", "환불", "정산", "이의", "이의제기", "민원",
+        "재발", "반복", "재차", "또다시", "여전히", "아직",
+        "확인", "안내", "결과", "처리결과", "진행상황",
     ],
-    "💰 요금·제도": [
+    "💰 요금·과금": [
         "요금", "납부", "청구", "고지서", "과금", "누진", "할인", "감면", "경감",
         "계약", "종별", "변경", "이전", "해지", "명의", "양도", "분할", "연체",
-        "체납", "독촉", "제도", "규정", "기준", "법규", "약관", "정책",
+        "체납", "독촉", "제도", "규정", "기준", "약관", "정책",
+        "비싸", "비싸다", "과다", "폭탄", "부당", "억울", "부과",
+        "전기세", "전기요금", "사용량", "검침", "미터기",
+        "계산", "산정", "산출", "적용", "누진제", "누진요금",
     ],
     "🏗️ 시설물·환경": [
         "전주", "전선", "변압기", "개폐기", "배전반", "계량기", "미터기",
         "소음", "진동", "악취", "먼지", "미관", "경관", "가지", "나뭇가지",
-        "수목", "도로", "인도", "보도", "골목", "위치", "이설", "이전",
+        "수목", "도로", "인도", "보도", "골목", "위치", "이설",
+        "위험", "안전", "사고", "누전", "감전", "화재", "합선",
+        "전봇대", "철탑", "송전탑", "지중화",
+    ],
+    "💻 디지털·시스템": [
+        "홈페이지", "앱", "어플", "모바일", "인터넷", "시스템", "프로그램",
+        "로그인", "비밀번호", "패스워드", "인증", "공인인증", "본인확인",
+        "오류", "에러", "버그", "접속", "속도", "다운", "먹통",
+        "결제", "카드", "자동이체", "납부방법",
     ],
 }
 
@@ -242,6 +297,25 @@ def extract_keywords(texts, top_n=60):
 
 
 # ── Action-Trigger TF-IDF 키워드 추출 ──
+# 부분매칭 불용어 패턴: 이 문자열을 *포함*하는 단어도 제거
+_ACTION_STOP_PARTIAL = [
+    "감사", "친절", "만족", "좋겠", "좋았", "좋을", "수고", "고맙", "칭찬", "훌륭", "편안",
+    "깔끔", "성실", "정확", "꼼꼼", "배려", "추천", "완벽", "노력", "발전",
+    "따뜻", "경청", "상냥", "반갑", "적극", "열심", "신속", "쾌적",
+    "불쾌", "짜증", "실망", "황당", "어이없", "답답",
+    "합니다", "습니다", "입니다", "됩니다", "겠습니다", "드립니다",
+    "주셔서", "해주셔", "주시", "하셔", "주었", "주셨",
+    "바랍니다", "같습니다", "없습니다", "있습니다",
+    "봅니다", "거든요", "데요", "네요", "어요", "아요",
+]
+
+def _is_action_stop(word):
+    """강화 불용어 체크: 정확 매칭 + 부분 매칭"""
+    if word in _ACTION_STOP:
+        return True
+    return any(pat in word for pat in _ACTION_STOP_PARTIAL)
+
+
 def _extract_nouns_action(texts):
     """Action-Trigger용 명사 추출 (강화 불용어 적용)"""
     if KONLPY_AVAILABLE:
@@ -251,14 +325,14 @@ def _extract_nouns_action(texts):
             if not t or str(t).strip() in ("", "nan"):
                 continue
             nouns = okt.nouns(str(t))
-            words.extend([n for n in nouns if n not in _ACTION_STOP and len(n) >= 2])
+            words.extend([n for n in nouns if not _is_action_stop(n) and len(n) >= 2])
         return words
     words = []
     for t in texts:
         if not t or str(t).strip() in ("", "nan"):
             continue
         found = re.findall(r"[가-힣]{2,}", str(t))
-        words.extend([w for w in found if w not in _ACTION_STOP])
+        words.extend([w for w in found if not _is_action_stop(w)])
     return words
 
 
@@ -273,7 +347,7 @@ def _tfidf_keywords_sklearn(doc_words_list, top_n=30):
         # 전체 문서 합산 TF-IDF 스코어
         scores = mat.sum(axis=0).A1
         ranked = sorted(zip(feature_names, scores), key=lambda x: x[1], reverse=True)
-        return [(w, round(s, 3)) for w, s in ranked if w not in _ACTION_STOP][:top_n]
+        return [(w, round(s, 3)) for w, s in ranked if not _is_action_stop(w)][:top_n]
     except Exception:
         return []
 
@@ -291,7 +365,7 @@ def _tfidf_keywords_manual(all_words, doc_words_list, top_n=30):
     tfidf = {}
     total_words = len(all_words)
     for w, tf in freq.items():
-        if w in _ACTION_STOP:
+        if _is_action_stop(w):
             continue
         idf = math.log((1 + n_docs) / (1 + df_count.get(w, 0))) + 1
         tfidf[w] = (tf / total_words) * idf
@@ -333,7 +407,7 @@ def extract_action_keywords(texts_tuple, top_n=30):
 
     if not ranked:
         # fallback: 빈도 기반
-        freq = Counter(w for w in all_words if w not in _ACTION_STOP)
+        freq = Counter(w for w in all_words if not _is_action_stop(w))
         ranked = freq.most_common(top_n)
 
     # 카테고리 매핑
@@ -357,15 +431,43 @@ def extract_action_keywords_by_group(df, group_col, voc_col, top_n=15):
     return result
 
 
+# ── 역접 패턴 감지: "~는데/~지만/~었는데" 뒤에 긍정이 오면 전체가 긍정 ──
+_ADVERSATIVE_PATTERNS = re.compile(
+    r"(는데|었는데|했는데|인데|지만|하지만|그런데|그래도|근데|걱정했는데|당황하였는데|"
+    r"몰라|걱정|당황|힘들었|어려웠|불안했|막막했)"
+)
+
+def _has_positive_conclusion(text):
+    """텍스트의 결론(뒷부분)이 긍정인지 확인
+    한국어 VOC는 '~는데 잘 해주셔서 감사합니다' 패턴이 매우 빈번.
+    역접 접속사 뒤에 긍정이 있거나, 문장 끝이 긍정이면 True.
+    """
+    s = str(text)
+    # 1) 역접 패턴 찾기 → 뒷부분에 긍정 있는지
+    match = _ADVERSATIVE_PATTERNS.search(s)
+    if match:
+        after = s[match.end():]
+        if any(pw in after for pw in POSITIVE_CONTEXT):
+            return True
+
+    # 2) 문장 끝 40자에 긍정 키워드가 있는지
+    tail = s[-40:] if len(s) > 40 else s
+    tail_pos = sum(1 for pw in POSITIVE_CONTEXT if pw in tail)
+    tail_neg = sum(1 for kw in NEGATIVE_KEYWORDS if kw in tail)
+    if tail_pos > 0 and tail_pos > tail_neg:
+        return True
+
+    return False
+
+
 def _has_positive_context(text, keyword):
-    """키워드 주변(앞뒤 15자)에 긍정 문맥 단어가 있는지 확인"""
+    """키워드 주변(앞뒤 20자)에 긍정 문맥 단어가 있는지 확인"""
     s = str(text)
     idx = s.find(keyword)
     if idx == -1:
         return False
-    # 키워드 주변 윈도우 추출 (앞 15자 ~ 뒤 15자)
-    start = max(0, idx - 15)
-    end = min(len(s), idx + len(keyword) + 15)
+    start = max(0, idx - 20)
+    end = min(len(s), idx + len(keyword) + 20)
     window = s[start:end]
     return any(pw in window for pw in POSITIVE_CONTEXT)
 
@@ -374,8 +476,10 @@ def check_negative(text):
     if not text or str(text).strip() in ("", "nan", "응답없음"):
         return False, []
     s = str(text)
+    # 문장 전체가 긍정 결론이면 부정 키워드 무시
+    if _has_positive_conclusion(s):
+        return False, []
     found = [kw for kw in NEGATIVE_KEYWORDS if kw in s]
-    # 긍정 문맥에 둘러싸인 키워드는 제거
     real_neg = [kw for kw in found if not _has_positive_context(s, kw)]
     return bool(real_neg), real_neg
 
@@ -384,8 +488,10 @@ def check_rude(text):
     if not text or str(text).strip() in ("", "nan", "응답없음"):
         return False, []
     s = str(text)
+    # 문장 전체가 긍정 결론이면 불친절 키워드 무시
+    if _has_positive_conclusion(s):
+        return False, []
     found = [kw for kw in RUDE_KEYWORDS if kw in s]
-    # 긍정 문맥에 둘러싸인 키워드는 제거
     real_rude = [kw for kw in found if not _has_positive_context(s, kw)]
     return bool(real_rude), real_rude
 
@@ -395,6 +501,9 @@ def classify_voc_3tier(text):
     if not text or str(text).strip() in ("", "nan", "응답없음"):
         return "긍정"
     s = str(text)
+    # 역접 후 긍정 결론 → 바로 긍정 판정
+    if _has_positive_conclusion(s):
+        return "긍정"
     is_rude, _ = check_rude(s)
     if is_rude:
         return "불친절"
@@ -428,28 +537,24 @@ def _is_out_of_scope(text):
 
 
 def _classify_sentiment_3tier(text):
-    """VOC 3단계 감성 분류: 긍정/중립/부정 (문맥 인식)"""
+    """VOC 3단계 감성 분류: 긍정/중립/부정 (역접 패턴 + 결론 우선)"""
     if not text or str(text).strip() in ("", "nan", "응답없음"):
         return "중립"
     s = str(text)
+
+    # 역접 후 긍정 결론 → 바로 긍정
+    if _has_positive_conclusion(s):
+        return "긍정"
+
     _POS_KW = ["감사", "친절", "좋", "만족", "잘", "훌륭", "경청", "공감", "고마",
                "칭찬", "최고", "따뜻", "성실", "편안", "빠르", "신속", "정확", "꼼꼼",
                "배려", "도움", "편리", "추천", "완벽", "수고", "노력", "발전", "유지",
                "응원", "믿음", "행복", "깔끔", "굿", "좋아요"]
     pos_cnt = sum(1 for kw in _POS_KW if kw in s)
     adjusted_neg = 0
-    for kw in NEGATIVE_KEYWORDS:
-        if kw in s:
-            idx = s.find(kw)
-            window = s[max(0, idx - 15):min(len(s), idx + len(kw) + 15)]
-            if not any(pw in window for pw in POSITIVE_CONTEXT):
-                adjusted_neg += 1
-    for kw in RUDE_KEYWORDS:
-        if kw in s:
-            idx = s.find(kw)
-            window = s[max(0, idx - 15):min(len(s), idx + len(kw) + 15)]
-            if not any(pw in window for pw in POSITIVE_CONTEXT):
-                adjusted_neg += 1
+    for kw in NEGATIVE_KEYWORDS + RUDE_KEYWORDS:
+        if kw in s and not _has_positive_context(s, kw):
+            adjusted_neg += 1
     if adjusted_neg > 0 and adjusted_neg >= pos_cnt:
         return "부정"
     elif pos_cnt > 0:
@@ -1547,8 +1652,9 @@ with tab4:
 
                 _cat_colors = {
                     "📞 안내·상담": "#1976d2", "📋 접수·절차": "#f0a500",
-                    "🔧 현장처리": "#e65100", "📮 사후관리": "#00897b",
-                    "💰 요금·제도": "#c62828", "🏗️ 시설물·환경": "#7b1fa2",
+                    "🔧 현장처리·시공": "#e65100", "⏱️ 처리속도·지연": "#ff6f00",
+                    "📮 사후관리·피드백": "#00897b", "💰 요금·과금": "#c62828",
+                    "🏗️ 시설물·환경": "#7b1fa2", "💻 디지털·시스템": "#0288d1",
                     "🔍 기타 이슈": "#546e7a",
                 }
 
@@ -1728,8 +1834,9 @@ with tab5:
                         wk_cat = wk_cat.sort_values("키워드 수", ascending=True)
                         _wk_cat_colors = {
                             "📞 안내·상담": "#1976d2", "📋 접수·절차": "#f0a500",
-                            "🔧 현장처리": "#e65100", "📮 사후관리": "#00897b",
-                            "💰 요금·제도": "#c62828", "🏗️ 시설물·환경": "#7b1fa2",
+                            "🔧 현장처리·시공": "#e65100", "⏱️ 처리속도·지연": "#ff6f00",
+                            "📮 사후관리·피드백": "#00897b", "💰 요금·과금": "#c62828",
+                            "🏗️ 시설물·환경": "#7b1fa2", "💻 디지털·시스템": "#0288d1",
                             "🔍 기타 이슈": "#546e7a",
                         }
                         wk_l, wk_r = st.columns([3, 2])
