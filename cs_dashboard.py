@@ -232,6 +232,86 @@ def classify_voc_3tier(text):
     return "긍정"
 
 
+# ── 통제 불가(Out of Scope) 필터링 ──
+_OOS_KEYWORDS = [
+    "전화연결", "통화연결", "전화 연결", "통화 연결", "대기시간", "대기 시간",
+    "연결이 안", "연결 안", "전화가 안", "전화 안", "연결되지", "연결 되지",
+    "전화를 안 받", "전화안받", "전화를 안받", "전화 잘 안",
+    "콜센터", "고객센터 전화", "고객센터 연결", "상담원 연결", "상담원연결",
+    "자동응답", "ARS", "0번", "대기",
+]
+_OFFICE_DIRECT_KW = ["지사", "직원", "기사", "방문", "현장", "담당자"]
+
+
+def _is_out_of_scope(text):
+    """콜센터/전화 연결 관련 불만 → 지사 통제 불가 영역"""
+    if not text or str(text).strip() in ("", "nan", "응답없음"):
+        return False
+    s = str(text)
+    if not any(kw in s for kw in _OOS_KEYWORDS):
+        return False
+    if any(kw in s for kw in _OFFICE_DIRECT_KW):
+        return False
+    return True
+
+
+def _classify_sentiment_3tier(text):
+    """VOC 3단계 감성 분류: 긍정/중립/부정 (문맥 인식)"""
+    if not text or str(text).strip() in ("", "nan", "응답없음"):
+        return "중립"
+    s = str(text)
+    _POS_KW = ["감사", "친절", "좋", "만족", "잘", "훌륭", "경청", "공감", "고마",
+               "칭찬", "최고", "따뜻", "성실", "편안", "빠르", "신속", "정확", "꼼꼼",
+               "배려", "도움", "편리", "추천", "완벽", "수고", "노력", "발전", "유지",
+               "응원", "믿음", "행복", "깔끔", "굿", "좋아요"]
+    pos_cnt = sum(1 for kw in _POS_KW if kw in s)
+    adjusted_neg = 0
+    for kw in NEGATIVE_KEYWORDS:
+        if kw in s:
+            idx = s.find(kw)
+            window = s[max(0, idx - 15):min(len(s), idx + len(kw) + 15)]
+            if not any(pw in window for pw in POSITIVE_CONTEXT):
+                adjusted_neg += 1
+    for kw in RUDE_KEYWORDS:
+        if kw in s:
+            idx = s.find(kw)
+            window = s[max(0, idx - 15):min(len(s), idx + len(kw) + 15)]
+            if not any(pw in window for pw in POSITIVE_CONTEXT):
+                adjusted_neg += 1
+    if adjusted_neg > 0 and adjusted_neg >= pos_cnt:
+        return "부정"
+    elif pos_cnt > 0:
+        return "긍정"
+    return "중립"
+
+
+# 2차 원인 태깅 사전
+_CAUSE_TAGS = {
+    "직원 태도·불친절": ["불친절", "무시", "무례", "반말", "막말", "냉담", "퉁명", "짜증",
+                       "태도", "소홀", "무성의", "건방", "고압적"],
+    "처리 지연·느림":  ["느림", "느려", "지연", "오래", "기다림", "늦게", "답답"],
+    "처리 오류·부정확": ["잘못", "실수", "착오", "오류", "오작동", "불량", "고장", "문제",
+                       "안됨", "안되", "못하"],
+    "요금·제도 불만":  ["비싸", "과다", "과금", "폭탄", "누진", "억울", "부당", "요금",
+                       "불합리", "불공정"],
+    "절차 복잡·불편":  ["복잡", "어렵", "힘들", "번거로", "피곤", "불편", "서류", "절차"],
+    "정전·안전 관련":  ["정전", "단전", "위험", "사고", "누전"],
+    "정보 안내 부족":  ["안내", "설명", "모르", "몰라", "이해", "정보"],
+    "기대 미충족":     ["실망", "최악", "별로", "황당", "불만", "불쾌", "부족"],
+}
+
+_CAUSE_UNMET_NEEDS = {
+    "직원 태도·불친절": "🤝 고객 감정을 먼저 수용하는 **공감형 응대** (경청→공감→해결 3단계)",
+    "처리 지연·느림":  "⏱️ 접수 후 24시간 내 **진행 상황 문자/콜백** 발송 체계 구축",
+    "처리 오류·부정확": "✅ 재처리 없는 **1회 완결(FCR)** — 체크리스트 기반 처리 확인",
+    "요금·제도 불만":  "💰 고객 눈높이의 **비유·시각자료**로 요금 구조 투명 설명",
+    "절차 복잡·불편":  "📋 한 번에 끝나는 **원스톱 처리** 및 절차 간소화",
+    "정전·안전 관련":  "⚡ 예정 정전 **72시간 전 사전 알림** 및 복구 완료 통지",
+    "정보 안내 부족":  "📖 표준 안내 스크립트 마련 — **FAQ 기반 즉답 체계** 구축",
+    "기대 미충족":     "🎯 처리 완료 후 **만족 확인 콜** (기대치 재확인)",
+}
+
+
 @st.cache_data(show_spinner="감성 분석 중…")
 def batch_classify_sentiment(texts_tuple):
     """키워드 기반 감성 분류 (경량화 버전 — HF 모델 불필요)"""
@@ -2090,87 +2170,6 @@ with tab9:
 # ─────────────────────────────────────────────────────────────
 #  TAB 10  CXO 딥 인사이트 (투트랙 VOC 분석)
 # ─────────────────────────────────────────────────────────────
-
-# ── 통제 불가(Out of Scope) 필터링 함수 ──
-_OOS_KEYWORDS = [
-    "전화연결", "통화연결", "전화 연결", "통화 연결", "대기시간", "대기 시간",
-    "연결이 안", "연결 안", "전화가 안", "전화 안", "연결되지", "연결 되지",
-    "전화를 안 받", "전화안받", "전화를 안받", "전화 잘 안",
-    "콜센터", "고객센터 전화", "고객센터 연결", "상담원 연결", "상담원연결",
-    "자동응답", "ARS", "0번", "대기",
-]
-_OFFICE_DIRECT_KW = ["지사", "직원", "기사", "방문", "현장", "담당자"]
-
-
-def _is_out_of_scope(text):
-    """콜센터/전화 연결 관련 불만 → 지사 통제 불가 영역"""
-    if not text or str(text).strip() in ("", "nan", "응답없음"):
-        return False
-    s = str(text)
-    if not any(kw in s for kw in _OOS_KEYWORDS):
-        return False
-    # 지사 직접 관련 키워드가 같이 있으면 혼합 의견 → OOS 아님
-    if any(kw in s for kw in _OFFICE_DIRECT_KW):
-        return False
-    return True
-
-
-def _classify_sentiment_3tier(text):
-    """VOC 3단계 감성 분류: 긍정/중립/부정 (문맥 인식)"""
-    if not text or str(text).strip() in ("", "nan", "응답없음"):
-        return "중립"
-    s = str(text)
-    _POS_KW = ["감사", "친절", "좋", "만족", "잘", "훌륭", "경청", "공감", "고마",
-               "칭찬", "최고", "따뜻", "성실", "편안", "빠르", "신속", "정확", "꼼꼼",
-               "배려", "도움", "편리", "추천", "완벽", "수고", "노력", "발전", "유지",
-               "응원", "믿음", "행복", "깔끔", "굿", "좋아요"]
-    pos_cnt = sum(1 for kw in _POS_KW if kw in s)
-    adjusted_neg = 0
-    for kw in NEGATIVE_KEYWORDS:
-        if kw in s:
-            idx = s.find(kw)
-            window = s[max(0, idx - 15):min(len(s), idx + len(kw) + 15)]
-            if not any(pw in window for pw in POSITIVE_CONTEXT):
-                adjusted_neg += 1
-    for kw in RUDE_KEYWORDS:
-        if kw in s:
-            idx = s.find(kw)
-            window = s[max(0, idx - 15):min(len(s), idx + len(kw) + 15)]
-            if not any(pw in window for pw in POSITIVE_CONTEXT):
-                adjusted_neg += 1
-    if adjusted_neg > 0 and adjusted_neg >= pos_cnt:
-        return "부정"
-    elif pos_cnt > 0:
-        return "긍정"
-    return "중립"
-
-
-# 2차 원인 태깅 사전
-_CAUSE_TAGS = {
-    "직원 태도·불친절": ["불친절", "무시", "무례", "반말", "막말", "냉담", "퉁명", "짜증",
-                       "태도", "소홀", "무성의", "건방", "고압적"],
-    "처리 지연·느림":  ["느림", "느려", "지연", "오래", "기다림", "늦게", "답답"],
-    "처리 오류·부정확": ["잘못", "실수", "착오", "오류", "오작동", "불량", "고장", "문제",
-                       "안됨", "안되", "못하"],
-    "요금·제도 불만":  ["비싸", "과다", "과금", "폭탄", "누진", "억울", "부당", "요금",
-                       "불합리", "불공정"],
-    "절차 복잡·불편":  ["복잡", "어렵", "힘들", "번거로", "피곤", "불편", "서류", "절차"],
-    "정전·안전 관련":  ["정전", "단전", "위험", "사고", "누전"],
-    "정보 안내 부족":  ["안내", "설명", "모르", "몰라", "이해", "정보"],
-    "기대 미충족":     ["실망", "최악", "별로", "황당", "불만", "불쾌", "부족"],
-}
-
-_CAUSE_UNMET_NEEDS = {
-    "직원 태도·불친절": "🤝 고객 감정을 먼저 수용하는 **공감형 응대** (경청→공감→해결 3단계)",
-    "처리 지연·느림":  "⏱️ 접수 후 24시간 내 **진행 상황 문자/콜백** 발송 체계 구축",
-    "처리 오류·부정확": "✅ 재처리 없는 **1회 완결(FCR)** — 체크리스트 기반 처리 확인",
-    "요금·제도 불만":  "💰 고객 눈높이의 **비유·시각자료**로 요금 구조 투명 설명",
-    "절차 복잡·불편":  "📋 한 번에 끝나는 **원스톱 처리** 및 절차 간소화",
-    "정전·안전 관련":  "⚡ 예정 정전 **72시간 전 사전 알림** 및 복구 완료 통지",
-    "정보 안내 부족":  "📖 표준 안내 스크립트 마련 — **FAQ 기반 즉답 체계** 구축",
-    "기대 미충족":     "🎯 처리 완료 후 **만족 확인 콜** (기대치 재확인)",
-}
-
 
 with tab10:
     st.markdown('<p class="sec-head">🧠 CXO 딥 인사이트 — 투트랙 VOC 분석 · 계약종별 상관관계 · 지사 페르소나</p>',
