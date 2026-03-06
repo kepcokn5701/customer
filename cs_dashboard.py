@@ -354,21 +354,25 @@ def _group_contract(name):
 
 INSIGHT_RULES = [
     (["요금","비용","청구","과금","납부","고지"],
-     "💳 요금·청구 → 청구서 사전 안내 강화, 비용 상담 전담 채널 확충"),
+     "💳 요금·청구 → 고객 눈높이 비유·시각자료로 요금 구조 설명, 청구서 발송 3일 전 예고 문자 발송"),
     (["설치","공사","계량","계기","시공"],
-     "🔧 설치·공사 → 시공 일정 사전 통보, AS 프로세스 개선"),
+     "🔧 설치·공사 → 공사 48시간 전 사전 알림(문자+전화), 시공 완료 후 재확인 콜 실시"),
     (["정전","단전","고장","누전","장애"],
-     "⚡ 정전·장애 → 긴급복구 안내 강화, 사전 예방 점검 확대"),
+     "⚡ 정전·장애 → 예정 정전 72시간 전 사전 알림 + 복구 완료 즉시 통지, 인접 고객 선제 아웃바운드 콜"),
     (["직원","친절","응대","상담","담당자"],
-     "👤 직원 응대 → 고객응대 매뉴얼 재정비, CS 친절 교육 강화"),
+     "👤 직원 응대 → DISC 고객 유형별 맞춤 응대 스크립트 카드 배포, 칭찬 VOC 우수사례 주간 공유"),
     (["앱","홈페이지","사이트","온라인","인터넷","모바일"],
-     "📱 디지털 채널 → 앱·웹 UX 개선, 디지털 이용 가이드 제공"),
+     "📱 디지털 채널 → 고령·취약계층 전담 안내 채널 지정, 주요 메뉴 3클릭 내 도달 UX 개선"),
     (["대기","기다림","오래","느림","지연"],
-     "⏱ 대기·지연 → 처리 속도 개선, 처리 현황 실시간 안내"),
+     "⏱ 대기·지연 → VOC 72시간 피드백 루프 도입(접수→24시간 내 진행 상황 문자→완료 확인 콜)"),
     (["안전","위험","누전","화재"],
-     "🦺 안전 → 즉시 현장 대응, 안전 점검 프로세스 강화"),
+     "🦺 안전 → 서비스 회복 골든타임 프로토콜: 10분 내 원인 인정+사과→복구 후 재확인 콜→3일 내 재발 방지 안내"),
     (["불친절","무시","무성의","태도","반말"],
-     "😡 불친절 → 직원 CS 교육 즉시 강화, 불친절 재발 방지 모니터링"),
+     "😡 불친절 → 3분 감정 리셋 루틴 제도화(강성 민원 후 직원 휴식 보장), 첫 30초 표준 오프닝 훈련 실시"),
+    (["복잡","어렵","힘들","번거로","절차","서류"],
+     "📋 절차 불편 → 원스톱 처리 체계 구축, 고객 여정 맵 워크숍으로 불편 접점 발굴 후 즉시 개선"),
+    (["실수","잘못","오류","착오","부정확"],
+     "✅ 처리 오류 → 1회 완결(FCR) 체크리스트 도입, 접수번호별 처리 완결도 주간 5분 스탠딩 미팅 운영"),
 ]
 
 
@@ -818,6 +822,8 @@ if M["voc"]:
             else:                    neu_cnt += 1
     voc_response_rate = len(voc_texts_all) / max(len(df_f), 1) * 100
     df_f["_VOC분류"] = df_f[M["voc"]].apply(classify_voc_3tier)
+    df_f["_VOC감성"] = df_f[M["voc"]].apply(_classify_sentiment_3tier)  # 투트랙: 긍정/중립/부정
+    df_f["_is_oos"] = df_f[M["voc"]].apply(_is_out_of_scope)           # 통제 불가 필터링
 else:
     voc_response_rate = 0.0
 
@@ -1189,57 +1195,117 @@ with tab4:
         _analysis_mode = ("KeyBERT + KoNLPy" if (KEYBERT_AVAILABLE and KONLPY_AVAILABLE)
                           else "KoNLPy 고정밀" if KONLPY_AVAILABLE else "정규식 기본")
 
-        # ── VOC 3단 분류 (리포트 양식: 긍정/불만/불친절) ──
-        st.markdown(f'<p class="sec-head">🔬 VOC 3단 분류 — {_analysis_mode} ({n_voc:,}건)</p>',
+        # ── 투트랙 VOC 감성 분석 (OOS 제외 → 긍정/중립/부정 → 원인 태깅) ──
+        _oos_cnt_tab4 = df_f["_is_oos"].sum() if "_is_oos" in df_f.columns else 0
+        df_pure_t4 = df_f[~df_f["_is_oos"]] if "_is_oos" in df_f.columns else df_f
+
+        st.markdown(
+            f'<div class="card-gold">'
+            f'<b>🔒 통제 불가(Out of Scope) 필터링</b> — 콜센터 전화 연결 지연 등 '
+            f'지사 통제 불가 VOC <b style="color:{C["red"]}">{_oos_cnt_tab4}건</b> 제외 → '
+            f'순수 분석 대상 <b>{len(df_pure_t4):,}건</b></div>', unsafe_allow_html=True)
+
+        st.markdown(f'<p class="sec-head">🔬 VOC 투트랙 감성 분석 — {_analysis_mode} ({n_voc:,}건)</p>',
                     unsafe_allow_html=True)
 
-        if "_VOC분류" in df_f.columns:
-            voc_cls = df_f["_VOC분류"].value_counts()
-            vc_pos = voc_cls.get("긍정", 0)
-            vc_neg = voc_cls.get("불만", 0)
-            vc_rude = voc_cls.get("불친절", 0)
+        if "_VOC감성" in df_f.columns:
+            # OOS 제외한 감성 분류
+            voc_cls_pure = df_pure_t4["_VOC감성"].value_counts()
+            vc_pos = voc_cls_pure.get("긍정", 0)
+            vc_neu = voc_cls_pure.get("중립", 0)
+            vc_neg = voc_cls_pure.get("부정", 0)
+            _total_pure = vc_pos + vc_neu + vc_neg
 
-            vc1, vc2, vc3 = st.columns(3)
+            vc1, vc2, vc3, vc4 = st.columns(4)
             with vc1:
-                st.metric("😊 긍정", f"{vc_pos:,}건", delta=f"{vc_pos / max(n_voc, 1) * 100:.1f}%")
+                st.metric("📝 분석 대상", f"{_total_pure:,}건")
             with vc2:
-                st.metric("😠 불만", f"{vc_neg:,}건",
-                          delta=f"{vc_neg / max(n_voc, 1) * 100:.1f}%", delta_color="inverse")
+                st.metric("😊 긍정", f"{vc_pos:,}건 ({vc_pos / max(_total_pure, 1) * 100:.1f}%)")
             with vc3:
-                st.metric("😡 불친절", f"{vc_rude:,}건",
-                          delta=f"{vc_rude / max(n_voc, 1) * 100:.1f}%", delta_color="inverse")
+                st.metric("😐 중립", f"{vc_neu:,}건 ({vc_neu / max(_total_pure, 1) * 100:.1f}%)")
+            with vc4:
+                st.metric("😡 부정", f"{vc_neg:,}건 ({vc_neg / max(_total_pure, 1) * 100:.1f}%)")
 
-            fig_3t = px.pie(names=["긍정", "불만", "불친절"], values=[vc_pos, vc_neg, vc_rude],
-                            color_discrete_sequence=[C["teal"], C["gold"], C["red"]],
-                            hole=0.5, template=PLOTLY_TPL, title="VOC 3단 분류 비율")
+            # 1차 감성 도넛 + 2차 원인 태깅 차트
+            _sent_df4 = pd.DataFrame({"감성": ["긍정", "중립", "부정"], "건수": [vc_pos, vc_neu, vc_neg]})
+            fig_3t = px.pie(_sent_df4, values="건수", names="감성", hole=0.5,
+                            color="감성",
+                            color_discrete_map={"긍정": C["teal"], "중립": "#95A5A6", "부정": C["red"]},
+                            title="1차 감성 분류 (OOS 제외)")
             fig_3t.update_traces(textinfo="percent+label", textfont_size=14,
                                   marker=dict(line=dict(color="white", width=3)))
-            fig_3t.update_layout(height=300, margin=dict(t=50, b=10, l=20, r=20),
+            fig_3t.update_layout(height=340, margin=dict(t=50, b=10, l=20, r=20),
                                   title_font=dict(size=14, color=C["navy"]))
-            st.plotly_chart(fig_3t, use_container_width=True)
 
-            # 사업소별 VOC 3단 분류 (리포트 양식)
+            # 2차 원인 태깅 (부정만)
+            _neg_voc_t4 = df_pure_t4[df_pure_t4["_VOC감성"] == "부정"][M["voc"]].dropna()
+            _neg_voc_t4 = _neg_voc_t4[~_neg_voc_t4.isin(["응답없음", "nan", ""])]
+            _cause_cnt_t4 = Counter()
+            _cause_ex_t4 = {}
+            for v in _neg_voc_t4:
+                s = str(v)
+                tagged = False
+                for cause, keywords in _CAUSE_TAGS.items():
+                    for kw in keywords:
+                        if kw in s:
+                            idx = s.find(kw)
+                            window = s[max(0, idx - 15):min(len(s), idx + len(kw) + 15)]
+                            if not any(pw in window for pw in POSITIVE_CONTEXT):
+                                _cause_cnt_t4[cause] += 1
+                                if cause not in _cause_ex_t4:
+                                    _cause_ex_t4[cause] = []
+                                if len(_cause_ex_t4[cause]) < 2 and len(s) > 10:
+                                    _cause_ex_t4[cause].append(s[:120])
+                                tagged = True
+                                break
+                    if tagged:
+                        break
+                if not tagged:
+                    _cause_cnt_t4["기타"] += 1
+
+            _df_cause_t4 = pd.DataFrame([{"원인": k, "건수": v} for k, v in _cause_cnt_t4.most_common()])
+
+            ch_l4, ch_r4 = st.columns(2)
+            with ch_l4:
+                st.plotly_chart(fig_3t, use_container_width=True)
+            with ch_r4:
+                if not _df_cause_t4.empty:
+                    fig_cause4 = px.bar(_df_cause_t4, x="건수", y="원인", orientation="h",
+                                        text="건수", template=PLOTLY_TPL,
+                                        color="건수",
+                                        color_continuous_scale=["#F9E79F", "#E74C3C"],
+                                        title="2차 원인 태깅 — 부정 VOC 근본 원인")
+                    fig_cause4.update_traces(textposition="outside")
+                    fig_cause4.update_layout(height=340,
+                                             margin=dict(t=60, b=20, l=10, r=80),
+                                             coloraxis_showscale=False,
+                                             title_font=dict(size=14, color=C["navy"]))
+                    st.plotly_chart(fig_cause4, use_container_width=True)
+
+            # 사업소별 VOC 감성 분류 (OOS 제외)
             if M["office"]:
                 st.markdown("---")
-                st.markdown('<p class="sec-head">🏢 사업소별 VOC 3단 분류 현황</p>', unsafe_allow_html=True)
-                voc_cross = pd.crosstab(df_f[M["office"]], df_f["_VOC분류"])
-                for col in ["긍정", "불만", "불친절"]:
+                st.markdown('<p class="sec-head">🏢 사업소별 VOC 감성 분류 현황 (OOS 제외)</p>',
+                            unsafe_allow_html=True)
+                voc_cross = pd.crosstab(df_pure_t4[M["office"]], df_pure_t4["_VOC감성"])
+                for col in ["긍정", "중립", "부정"]:
                     if col not in voc_cross.columns:
                         voc_cross[col] = 0
-                voc_cross = voc_cross[["긍정", "불만", "불친절"]]
+                voc_cross = voc_cross[["긍정", "중립", "부정"]]
                 voc_cross["합계"] = voc_cross.sum(axis=1)
                 voc_cross["긍정(%)"] = (voc_cross["긍정"] / voc_cross["합계"] * 100).round(1)
-                voc_cross["불만(%)"] = (voc_cross["불만"] / voc_cross["합계"] * 100).round(1)
-                voc_cross["불친절(%)"] = (voc_cross["불친절"] / voc_cross["합계"] * 100).round(1)
+                voc_cross["중립(%)"] = (voc_cross["중립"] / voc_cross["합계"] * 100).round(1)
+                voc_cross["부정(%)"] = (voc_cross["부정"] / voc_cross["합계"] * 100).round(1)
                 st.dataframe(voc_cross, use_container_width=True)
 
             st.markdown("---")
 
-            # ── 불친절 사례 경고 카드 ──
-            if vc_rude > 0:
-                st.markdown('<p class="sec-head">😡 불친절 사례 리스트</p>', unsafe_allow_html=True)
-                df_rude = df_f[df_f["_VOC분류"] == "불친절"].copy()
-                for _, row in df_rude.head(10).iterrows():
+            # ── 부정 VOC 사례 카드 (원인 태깅 포함) ──
+            if vc_neg > 0:
+                st.markdown('<p class="sec-head">😡 부정 VOC 사례 리스트 (원인 태깅)</p>',
+                            unsafe_allow_html=True)
+                df_neg_t4 = df_pure_t4[df_pure_t4["_VOC감성"] == "부정"].copy()
+                for _, row in df_neg_t4.head(10).iterrows():
                     info_parts = []
                     for key in ["office", "channel", "business"]:
                         if M.get(key) and M[key] in row.index:
@@ -1248,20 +1314,27 @@ with tab4:
                                 info_parts.append(val)
                     info_str = " · ".join(info_parts) if info_parts else ""
                     voc_text = str(row[M["voc"]]) if M["voc"] in row.index else ""
-                    for rk in RUDE_KEYWORDS:
+                    # 부정 키워드 하이라이트
+                    for rk in RUDE_KEYWORDS + NEGATIVE_KEYWORDS:
                         if rk in voc_text:
                             voc_text = voc_text.replace(
                                 rk, f'<b style="color:#c62828; background:#fce4ec; padding:0 3px; border-radius:3px;">{rk}</b>')
-                    cust_id = ""
-                    if M.get("id") and M["id"] in row.index:
-                        cust_id = f' | 고객번호: {row[M["id"]]}'
                     st.markdown(
-                        f'<div class="card-rude"><b>😡 불친절 감지{cust_id}</b><br>'
+                        f'<div class="card-rude"><b>😡 부정 VOC</b><br>'
                         f'<small style="color:#888;">{info_str}</small><br><br>{voc_text}</div>',
                         unsafe_allow_html=True)
-                if len(df_rude) > 10:
-                    st.caption(f"※ 상위 10건만 표시. 전체 {len(df_rude):,}건")
+                if len(df_neg_t4) > 10:
+                    st.caption(f"※ 상위 10건만 표시. 전체 {len(df_neg_t4):,}건")
                 st.markdown("---")
+
+            # OOS 상세 접기
+            if _oos_cnt_tab4 > 0:
+                with st.expander(f"🔒 통제 불가(OOS) VOC 상세 ({_oos_cnt_tab4}건) — 콜센터 전화 연결 관련"):
+                    _oos_vocs_t4 = df_f[df_f["_is_oos"]][M["voc"]].dropna().head(15)
+                    for i, v in enumerate(_oos_vocs_t4, 1):
+                        st.markdown(f"**[{i}]** {str(v)[:200]}")
+                    if _oos_cnt_tab4 > 15:
+                        st.caption(f"... 외 {_oos_cnt_tab4 - 15}건")
 
         # ── 워드클라우드 & 키워드 ──
         if n_voc > 0:
@@ -1457,9 +1530,9 @@ with tab5:
     st.markdown('<p class="sec-head">🚨 잠재적 민원고객 사전케어 리스트 (AI 자동 추출)</p>', unsafe_allow_html=True)
     st.markdown(
         '<div class="card-red"><b>📌 추출 기준</b><br>'
-        '① 종합 점수 50점 이하 고객<br>'
-        '② 점수와 무관하게 서술 의견에 부정적 키워드가 포함된 고객<br>'
-        '두 조건 중 하나라도 해당되면 잠재 민원고객으로 추출합니다.<br>'
+        '① 종합 점수 50점 이하<br>'
+        '② 서술 의견에 부정적 키워드가 포함<br>'
+        '두 조건을 <b>모두 충족</b>하는 고객만 잠재 민원고객으로 추출합니다.<br>'
         '해당 고객에게 <b>72시간 이내</b> 선제적으로 연락하여 민원 발생을 사전에 차단하세요.</div>',
         unsafe_allow_html=True)
 
@@ -1473,23 +1546,15 @@ with tab5:
             low_score_mask = pd.Series(False, index=df_f.index)
             if M["score"] and "_점수100" in df_f.columns:
                 low_score_mask = df_f["_점수100"] <= 50
-            # 조건2: 부정 키워드 감지 (점수 무관)
+            # 조건2: 부정 키워드 감지
             neg_kw_mask = neg_res.apply(lambda x: x[0])
-            # 합집합
-            neg_mask = low_score_mask | neg_kw_mask
+            # 교집합 (두 조건 모두 충족)
+            neg_mask = low_score_mask & neg_kw_mask
 
         df_neg = df_f[neg_mask].copy()
         df_neg["감지된_부정키워드"] = neg_kw_s[neg_mask].values
-        # 추출 유형 표시
-        _reasons = []
-        for idx in df_neg.index:
-            r = []
-            if low_score_mask.get(idx, False):
-                r.append("50점이하")
-            if neg_kw_mask.get(idx, False):
-                r.append("부정키워드")
-            _reasons.append(" + ".join(r) if r else "")
-        df_neg["추출유형"] = _reasons
+        # 추출 유형 표시 (교집합이므로 항상 두 조건 모두 충족)
+        df_neg["추출유형"] = "50점이하 + 부정키워드"
         neg_n = len(df_neg)
         neg_r = neg_n / max(len(df_f), 1) * 100
 
@@ -1556,11 +1621,18 @@ with tab5:
                                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                                use_container_width=True)
 
-            st.markdown("""<div class="card-red"><b>⚠️ 사전케어 행동 가이드</b><br><br>
-✅ <b>72시간 이내</b> — 담당자가 직접 전화·문자로 능동 연락<br>
-✅ <b>경청 우선</b> — 고객 불만을 끝까지 듣고 공감 후 해결책 제시<br>
-✅ <b>CRM 기록 필수</b> — 접촉 일시, 처리 내용, 결과를 반드시 기록<br>
-✅ <b>패턴 분석</b> — 동일 유형 불만이 반복되면 프로세스 자체를 개선</div>""", unsafe_allow_html=True)
+            st.markdown(f"""<div class="card-red"><b>⚠️ 사전케어 행동 가이드 — 서비스 회복 골든타임 프로토콜</b><br><br>
+<b>🔴 1단계 (즉시, 72시간 내)</b><br>
+• 담당자가 직접 전화 — 원인 인정 + 진심 사과 + 예상 해결 시간 제시<br>
+• 경청→공감→해결 3단계: "충분히 불편하셨겠습니다. 제가 직접 책임지고 처리해 드리겠습니다."<br><br>
+<b>🟡 2단계 (처리 완료 즉시)</b><br>
+• 재확인 콜 or 문자 발송: "불편 없이 해결되셨나요?" 확인<br>
+• CRM에 접촉 일시·처리 내용·고객 반응 반드시 기록<br><br>
+<b>🟢 3단계 (3일 이내)</b><br>
+• 팀장 명의 감사 안내문(문자) 발송 — 재발 방지 조치 설명<br>
+• 서비스 회복 패러독스 활용: 탁월한 사후 대응으로 오히려 로열티 고객으로 전환<br><br>
+<b>💡 동일 유형 반복 시</b> — 주간 5분 스탠딩 미팅에서 미처리 건 공유, 프로세스 자체 개선</div>""",
+                               unsafe_allow_html=True)
         else:
             st.markdown("""<div class="card-teal">🎉 <b>잠재 민원고객이 없습니다!</b><br>
 현재 고객 만족 수준이 양호합니다.</div>""", unsafe_allow_html=True)
@@ -2105,16 +2177,10 @@ with tab10:
                 unsafe_allow_html=True)
 
     # ══════════════════════════════════════════
-    # 0. OOS 필터링 실행
+    # 0. OOS 필터링 (이미 전역에서 계산됨, 여기서는 참조만)
     # ══════════════════════════════════════════
-    if M["voc"]:
-        df_f["_is_oos"] = df_f[M["voc"]].apply(_is_out_of_scope)
-        oos_cnt = df_f["_is_oos"].sum()
-        df_pure = df_f[~df_f["_is_oos"]].copy()  # 순수 분석용
-    else:
-        df_f["_is_oos"] = False
-        oos_cnt = 0
-        df_pure = df_f.copy()
+    oos_cnt = df_f["_is_oos"].sum() if "_is_oos" in df_f.columns else 0
+    df_pure = df_f[~df_f["_is_oos"]].copy() if "_is_oos" in df_f.columns else df_f.copy()
 
     # OOS 현황 요약 배너
     st.markdown(
