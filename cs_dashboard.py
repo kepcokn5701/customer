@@ -2016,129 +2016,268 @@ with tab9:
             st.info("📌 날짜 컬럼이 있으면 부정 키워드 급증 시점을 자동 탐지할 수 있습니다.")
 
 # ─────────────────────────────────────────────────────────────
-#  TAB 10  CXO 딥 인사이트
+#  TAB 10  CXO 딥 인사이트 (투트랙 VOC 분석)
 # ─────────────────────────────────────────────────────────────
+
+# ── 통제 불가(Out of Scope) 필터링 함수 ──
+_OOS_KEYWORDS = [
+    "전화연결", "통화연결", "전화 연결", "통화 연결", "대기시간", "대기 시간",
+    "연결이 안", "연결 안", "전화가 안", "전화 안", "연결되지", "연결 되지",
+    "전화를 안 받", "전화안받", "전화를 안받", "전화 잘 안",
+    "콜센터", "고객센터 전화", "고객센터 연결", "상담원 연결", "상담원연결",
+    "자동응답", "ARS", "0번", "대기",
+]
+_OFFICE_DIRECT_KW = ["지사", "직원", "기사", "방문", "현장", "담당자"]
+
+
+def _is_out_of_scope(text):
+    """콜센터/전화 연결 관련 불만 → 지사 통제 불가 영역"""
+    if not text or str(text).strip() in ("", "nan", "응답없음"):
+        return False
+    s = str(text)
+    if not any(kw in s for kw in _OOS_KEYWORDS):
+        return False
+    # 지사 직접 관련 키워드가 같이 있으면 혼합 의견 → OOS 아님
+    if any(kw in s for kw in _OFFICE_DIRECT_KW):
+        return False
+    return True
+
+
+def _classify_sentiment_3tier(text):
+    """VOC 3단계 감성 분류: 긍정/중립/부정 (문맥 인식)"""
+    if not text or str(text).strip() in ("", "nan", "응답없음"):
+        return "중립"
+    s = str(text)
+    _POS_KW = ["감사", "친절", "좋", "만족", "잘", "훌륭", "경청", "공감", "고마",
+               "칭찬", "최고", "따뜻", "성실", "편안", "빠르", "신속", "정확", "꼼꼼",
+               "배려", "도움", "편리", "추천", "완벽", "수고", "노력", "발전", "유지",
+               "응원", "믿음", "행복", "깔끔", "굿", "좋아요"]
+    pos_cnt = sum(1 for kw in _POS_KW if kw in s)
+    adjusted_neg = 0
+    for kw in NEGATIVE_KEYWORDS:
+        if kw in s:
+            idx = s.find(kw)
+            window = s[max(0, idx - 15):min(len(s), idx + len(kw) + 15)]
+            if not any(pw in window for pw in POSITIVE_CONTEXT):
+                adjusted_neg += 1
+    for kw in RUDE_KEYWORDS:
+        if kw in s:
+            idx = s.find(kw)
+            window = s[max(0, idx - 15):min(len(s), idx + len(kw) + 15)]
+            if not any(pw in window for pw in POSITIVE_CONTEXT):
+                adjusted_neg += 1
+    if adjusted_neg > 0 and adjusted_neg >= pos_cnt:
+        return "부정"
+    elif pos_cnt > 0:
+        return "긍정"
+    return "중립"
+
+
+# 2차 원인 태깅 사전
+_CAUSE_TAGS = {
+    "직원 태도·불친절": ["불친절", "무시", "무례", "반말", "막말", "냉담", "퉁명", "짜증",
+                       "태도", "소홀", "무성의", "건방", "고압적"],
+    "처리 지연·느림":  ["느림", "느려", "지연", "오래", "기다림", "늦게", "답답"],
+    "처리 오류·부정확": ["잘못", "실수", "착오", "오류", "오작동", "불량", "고장", "문제",
+                       "안됨", "안되", "못하"],
+    "요금·제도 불만":  ["비싸", "과다", "과금", "폭탄", "누진", "억울", "부당", "요금",
+                       "불합리", "불공정"],
+    "절차 복잡·불편":  ["복잡", "어렵", "힘들", "번거로", "피곤", "불편", "서류", "절차"],
+    "정전·안전 관련":  ["정전", "단전", "위험", "사고", "누전"],
+    "정보 안내 부족":  ["안내", "설명", "모르", "몰라", "이해", "정보"],
+    "기대 미충족":     ["실망", "최악", "별로", "황당", "불만", "불쾌", "부족"],
+}
+
+_CAUSE_UNMET_NEEDS = {
+    "직원 태도·불친절": "🤝 고객 감정을 먼저 수용하는 **공감형 응대** (경청→공감→해결 3단계)",
+    "처리 지연·느림":  "⏱️ 접수 후 24시간 내 **진행 상황 문자/콜백** 발송 체계 구축",
+    "처리 오류·부정확": "✅ 재처리 없는 **1회 완결(FCR)** — 체크리스트 기반 처리 확인",
+    "요금·제도 불만":  "💰 고객 눈높이의 **비유·시각자료**로 요금 구조 투명 설명",
+    "절차 복잡·불편":  "📋 한 번에 끝나는 **원스톱 처리** 및 절차 간소화",
+    "정전·안전 관련":  "⚡ 예정 정전 **72시간 전 사전 알림** 및 복구 완료 통지",
+    "정보 안내 부족":  "📖 표준 안내 스크립트 마련 — **FAQ 기반 즉답 체계** 구축",
+    "기대 미충족":     "🎯 처리 완료 후 **만족 확인 콜** (기대치 재확인)",
+}
+
+
 with tab10:
-    st.markdown('<p class="sec-head">🧠 CXO 딥 인사이트 — VOC 뉘앙스 · 계약종별 상관관계 · 지사 페르소나</p>',
+    st.markdown('<p class="sec-head">🧠 CXO 딥 인사이트 — 투트랙 VOC 분석 · 계약종별 상관관계 · 지사 페르소나</p>',
                 unsafe_allow_html=True)
 
-    # ── 1. VOC 감정 기저 분석 ──
-    st.markdown('<p class="sec-head">1️⃣ VOC 감정 기저 분석 — 고객의 진짜 니즈(Unmet Needs)</p>',
-                unsafe_allow_html=True)
+    # ══════════════════════════════════════════
+    # 0. OOS 필터링 실행
+    # ══════════════════════════════════════════
+    if M["voc"]:
+        df_f["_is_oos"] = df_f[M["voc"]].apply(_is_out_of_scope)
+        oos_cnt = df_f["_is_oos"].sum()
+        df_pure = df_f[~df_f["_is_oos"]].copy()  # 순수 분석용
+    else:
+        df_f["_is_oos"] = False
+        oos_cnt = 0
+        df_pure = df_f.copy()
 
-    EMOTION_CATEGORIES = {
-        "요금 부담·억울함": ["비싸", "과다", "과금", "폭탄", "누진", "억울", "부당", "요금"],
-        "처리 지연·답답함": ["느림", "느려", "지연", "오래", "기다림", "답답", "늦"],
-        "정전·안전 불안":   ["정전", "단전", "위험", "사고", "누전", "불안"],
-        "절차 복잡·피로감": ["복잡", "어렵", "힘들", "번거로", "피곤", "서류", "절차"],
-        "불친절·무례":     ["불친절", "무시", "무례", "반말", "막말", "냉담", "퉁명", "짜증"],
-        "처리 부정확":     ["잘못", "실수", "착오", "오류", "오작동", "불량", "고장", "문제", "안됨"],
-        "기대 미충족":     ["실망", "최악", "별로", "황당", "불편", "불만", "불쾌"],
-        "통화 연결 불가":  ["통화", "연결", "전화"],
-    }
+    # OOS 현황 요약 배너
+    st.markdown(
+        f'<div class="card-gold">'
+        f'<b>🔒 통제 불가(Out of Scope) 필터링 완료</b><br><br>'
+        f'콜센터 전화 연결 지연 등 <b>일선 지사가 통제할 수 없는</b> 중앙 인프라 관련 불만 '
+        f'<b style="color:{C["red"]}">{oos_cnt}건</b>을 분석에서 제외합니다.<br>'
+        f'아래 모든 분석은 <b>순수 지사 통제 가능 VOC {len(df_pure):,}건</b> 기준입니다.'
+        f'</div>', unsafe_allow_html=True)
+
+    st.markdown("---")
+
+    # ══════════════════════════════════════════
+    # 1. 투트랙 VOC 감성·원인 분석
+    # ══════════════════════════════════════════
+    st.markdown('<p class="sec-head">1️⃣ 투트랙 VOC 분석 — 1차 감성 분류 + 2차 원인 태깅</p>',
+                unsafe_allow_html=True)
 
     if M["voc"]:
-        voc_valid = df_f[M["voc"]].dropna()
+        voc_valid = df_pure[M["voc"]].dropna()
         voc_valid = voc_valid[~voc_valid.isin(["응답없음", "nan", ""])]
 
-        emotion_data = []
-        emotion_examples = {}
-        for cat, keywords in EMOTION_CATEGORIES.items():
-            cnt = 0
-            examples = []
-            for v in voc_valid:
-                s = str(v)
+        # 1차: 감성 분류
+        sentiment_series = voc_valid.apply(_classify_sentiment_3tier)
+        sent_counts = sentiment_series.value_counts()
+        pos_n = sent_counts.get("긍정", 0)
+        neu_n = sent_counts.get("중립", 0)
+        neg_n = sent_counts.get("부정", 0)
+
+        sc1, sc2, sc3, sc4 = st.columns(4)
+        with sc1:
+            st.metric("📝 분석 대상 VOC", f"{len(voc_valid):,}건")
+        with sc2:
+            st.metric("😊 긍정", f"{pos_n:,}건 ({pos_n / max(len(voc_valid), 1) * 100:.1f}%)")
+        with sc3:
+            st.metric("😐 중립", f"{neu_n:,}건 ({neu_n / max(len(voc_valid), 1) * 100:.1f}%)")
+        with sc4:
+            st.metric("😡 부정", f"{neg_n:,}건 ({neg_n / max(len(voc_valid), 1) * 100:.1f}%)")
+
+        # 감성 분포 도넛 차트
+        sent_df = pd.DataFrame({"감성": ["긍정", "중립", "부정"], "건수": [pos_n, neu_n, neg_n]})
+        fig_sent = px.pie(sent_df, values="건수", names="감성", hole=0.45,
+                          color="감성",
+                          color_discrete_map={"긍정": "#27AE60", "중립": "#95A5A6", "부정": "#E74C3C"},
+                          title="1차 감성 분류 (OOS 제외)")
+        fig_sent.update_layout(height=340, margin=dict(t=60, b=20, l=20, r=20),
+                               title_font=dict(size=14, color=C["navy"]))
+
+        # 2차: 부정 VOC 원인 태깅
+        neg_vocs = voc_valid[sentiment_series == "부정"]
+        cause_data = []
+        cause_examples = {}
+        for v in neg_vocs:
+            s = str(v)
+            tagged = False
+            for cause, keywords in _CAUSE_TAGS.items():
                 for kw in keywords:
                     if kw in s:
                         idx = s.find(kw)
                         window = s[max(0, idx - 15):min(len(s), idx + len(kw) + 15)]
                         if not any(pw in window for pw in POSITIVE_CONTEXT):
-                            cnt += 1
-                            if len(examples) < 2 and len(s) > 10:
-                                examples.append(s[:120])
+                            cause_data.append(cause)
+                            if cause not in cause_examples:
+                                cause_examples[cause] = []
+                            if len(cause_examples[cause]) < 2 and len(s) > 10:
+                                cause_examples[cause].append(s[:120])
+                            tagged = True
                             break
-            emotion_data.append({"감정 유형": cat, "건수": cnt})
-            emotion_examples[cat] = examples
+                if tagged:
+                    break
+            if not tagged:
+                cause_data.append("기타")
 
-        df_emotion = pd.DataFrame(emotion_data).sort_values("건수", ascending=True)
-        df_emotion = df_emotion[df_emotion["건수"] > 0]
+        cause_counts = Counter(cause_data)
+        df_cause = pd.DataFrame([{"원인": k, "건수": v} for k, v in cause_counts.most_common()])
+        df_cause = df_cause[df_cause["건수"] > 0]
 
-        if not df_emotion.empty:
-            fig_emo = px.bar(df_emotion, x="건수", y="감정 유형", orientation="h",
-                             text="건수", template=PLOTLY_TPL,
-                             color="건수",
-                             color_continuous_scale=["#B6D0E2", "#E74C3C"],
-                             title="VOC 감정 기저 분포 — 불만 이면의 진짜 감정")
-            fig_emo.update_traces(textposition="outside")
-            fig_emo.update_layout(height=max(300, len(df_emotion) * 45 + 80),
-                                  margin=dict(t=60, b=20, l=10, r=80),
-                                  coloraxis_showscale=False,
-                                  title_font=dict(size=14, color=C["navy"]))
-            st.plotly_chart(fig_emo, use_container_width=True)
+        if not df_cause.empty:
+            fig_cause = px.bar(df_cause, x="건수", y="원인", orientation="h",
+                               text="건수", template=PLOTLY_TPL,
+                               color="건수",
+                               color_continuous_scale=["#F9E79F", "#E74C3C"],
+                               title="2차 원인 태깅 — 부정 VOC의 근본 원인 분류")
+            fig_cause.update_traces(textposition="outside")
+            fig_cause.update_layout(height=max(300, len(df_cause) * 45 + 80),
+                                    margin=dict(t=60, b=20, l=10, r=80),
+                                    coloraxis_showscale=False,
+                                    title_font=dict(size=14, color=C["navy"]))
 
-            # Unmet Needs 카드
-            UNMET_NEEDS = {
-                "요금 부담·억울함": "💰 '왜 이렇게 많이 나왔는지' 납득할 수 있는 **투명한 요금 설명**",
-                "처리 지연·답답함": "⏱️ '내 민원이 처리되고 있다'는 **진행 상황 실시간 안내**",
-                "정전·안전 불안":   "⚡ 예정 정전 **72시간 전 사전 알림** 및 복구 완료 통지",
-                "절차 복잡·피로감": "📋 한 번에 끝나는 **원스톱 처리** 및 절차 간소화",
-                "불친절·무례":     "🤝 고객의 감정을 먼저 수용하는 **공감형 응대 매뉴얼**",
-                "처리 부정확":     "✅ 재처리 없는 **1회 완결 처리** (First Call Resolution)",
-                "기대 미충족":     "🎯 '처리는 됐지만 찝찝하다'를 해소하는 **완료 후 만족 확인 콜**",
-                "통화 연결 불가":  "📞 콜백 예약 시스템 도입 및 **예상 대기시간 안내**",
-            }
-            top3_emotions = df_emotion.sort_values("건수", ascending=False).head(3)
-            cols_need = st.columns(min(3, len(top3_emotions)))
-            for i, (_, row) in enumerate(top3_emotions.iterrows()):
-                cat = row["감정 유형"]
-                with cols_need[i]:
-                    need_text = UNMET_NEEDS.get(cat, "개선 필요")
-                    ex_text = "<br>".join(f'<span style="font-size:0.85em;color:#666">• "{e}"</span>'
-                                         for e in emotion_examples.get(cat, []))
+            ch_l, ch_r = st.columns(2)
+            with ch_l:
+                st.plotly_chart(fig_sent, use_container_width=True)
+            with ch_r:
+                st.plotly_chart(fig_cause, use_container_width=True)
+
+            # Unmet Needs 카드 (상위 3개 원인)
+            st.markdown("**🎯 고객의 진짜 니즈 (Unmet Needs) — 부정 원인 TOP 3**")
+            top3_causes = df_cause.head(3)
+            need_cols = st.columns(3)
+            for i, (_, row) in enumerate(top3_causes.iterrows()):
+                cause = row["원인"]
+                with need_cols[i]:
+                    need_text = _CAUSE_UNMET_NEEDS.get(cause, "맞춤 개선 필요")
+                    ex_text = "<br>".join(
+                        f'<span style="font-size:0.85em;color:#666">"{e}"</span>'
+                        for e in cause_examples.get(cause, []))
                     st.markdown(
-                        f'<div class="card-blue" style="min-height:200px">'
-                        f'<b>{cat}</b> ({row["건수"]}건)<br><br>'
-                        f'<b>고객의 진짜 니즈:</b><br>{need_text}<br><br>'
+                        f'<div class="card-blue" style="min-height:220px">'
+                        f'<b>{cause}</b> ({row["건수"]}건)<br><br>'
+                        f'<b>Unmet Need:</b><br>{need_text}<br><br>'
                         f'{ex_text}</div>',
                         unsafe_allow_html=True)
+        else:
+            st.plotly_chart(fig_sent, use_container_width=True)
+
+        # OOS 상세 (접기)
+        if oos_cnt > 0:
+            with st.expander(f"🔒 통제 불가(OOS) VOC 상세 보기 ({oos_cnt}건)"):
+                oos_vocs = df_f[df_f["_is_oos"]][M["voc"]].dropna().head(20)
+                for i, v in enumerate(oos_vocs, 1):
+                    st.markdown(f"**[{i}]** {str(v)[:200]}")
+                if oos_cnt > 20:
+                    st.caption(f"... 외 {oos_cnt - 20}건")
     else:
         st.info("VOC(서술 의견) 컬럼이 필요합니다.")
 
     st.markdown("---")
 
-    # ── 2. 계약종별-점수 상관관계 ──
-    st.markdown('<p class="sec-head">2️⃣ 계약종별 — 개별항목↔종합점수 상관관계</p>',
+    # ══════════════════════════════════════════
+    # 2. 계약종별-점수 상관관계 (OOS 제외 순수 데이터)
+    # ══════════════════════════════════════════
+    st.markdown('<p class="sec-head">2️⃣ 계약종별 — 개별항목↔종합점수 상관관계 (순수 데이터)</p>',
                 unsafe_allow_html=True)
 
-    if M["score"] and "_점수100" in df_f.columns:
+    if M["score"] and "_점수100" in df_pure.columns:
         score_item_cols = []
-        for c in df_f.columns:
-            if c in ("_점수100", "_원본순번", "_접수일"): continue
+        for c in df_pure.columns:
+            if c in ("_점수100", "_원본순번", "_접수일", "_is_oos"): continue
             if c.startswith("_"): continue
-            vals = pd.to_numeric(df_f[c], errors="coerce")
-            valid_ratio = vals.notna().sum() / max(len(df_f), 1)
+            vals = pd.to_numeric(df_pure[c], errors="coerce")
+            valid_ratio = vals.notna().sum() / max(len(df_pure), 1)
             if valid_ratio > 0.1 and vals.nunique() > 2:
-                corr = vals.corr(df_f["_점수100"])
+                corr = vals.corr(df_pure["_점수100"])
                 if pd.notna(corr) and abs(corr) > 0.05 and c != M["score"]:
                     score_item_cols.append(c)
 
         contract_col = M.get("contract")
-        if contract_col and "_계약그룹" in df_f.columns:
-            contract_groups = df_f["_계약그룹"].dropna().unique()
+        if contract_col and "_계약그룹" in df_pure.columns:
+            contract_groups = df_pure["_계약그룹"].dropna().unique()
             contract_groups = [g for g in ["주택용", "일반용", "산업용", "농사용", "교육용", "가로등"]
-                               if g in contract_groups and len(df_f[df_f["_계약그룹"] == g]) >= 5]
+                               if g in contract_groups and len(df_pure[df_pure["_계약그룹"] == g]) >= 5]
 
             if score_item_cols and contract_groups:
                 corr_data = []
-                for grp in contract_groups:
-                    sub = df_f[df_f["_계약그룹"] == grp]
+                for grp_name in contract_groups:
+                    sub = df_pure[df_pure["_계약그룹"] == grp_name]
                     for col in score_item_cols:
                         vals = pd.to_numeric(sub[col], errors="coerce")
                         both = pd.DataFrame({"item": vals, "total": sub["_점수100"]}).dropna()
                         if len(both) >= 5:
                             corr = both["item"].corr(both["total"])
                             if pd.notna(corr):
-                                corr_data.append({"계약종": grp, "항목": col, "상관계수": round(corr, 3)})
+                                corr_data.append({"계약종": grp_name, "항목": col, "상관계수": round(corr, 3)})
 
                 if corr_data:
                     df_corr = pd.DataFrame(corr_data)
@@ -2146,7 +2285,7 @@ with tab10:
 
                     fig_hm = px.imshow(pivot_corr, text_auto=".2f", aspect="auto",
                                        color_continuous_scale="RdYlGn",
-                                       title="계약종별 개별항목↔종합점수 상관관계 히트맵")
+                                       title="계약종별 개별항목↔종합점수 상관관계 히트맵 (OOS 제외)")
                     fig_hm.update_layout(height=max(350, len(score_item_cols) * 40 + 100),
                                           margin=dict(t=60, b=20, l=10, r=20),
                                           title_font=dict(size=14, color=C["navy"]))
@@ -2154,21 +2293,20 @@ with tab10:
 
                     # 핵심 인사이트 자동 도출
                     insights = []
-                    for grp in contract_groups:
-                        grp_corr = df_corr[df_corr["계약종"] == grp].sort_values("상관계수", ascending=False)
+                    for grp_name in contract_groups:
+                        grp_corr = df_corr[df_corr["계약종"] == grp_name].sort_values("상관계수", ascending=False)
                         if len(grp_corr) >= 2:
                             top = grp_corr.iloc[0]
-                            bot = grp_corr.iloc[-1]
                             if top["상관계수"] > 0.8:
                                 insights.append(
-                                    f"**{grp}** 고객은 <b>{top['항목']}</b>(상관 {top['상관계수']:.2f})이 "
+                                    f"**{grp_name}** 고객은 <b>{top['항목']}</b>(상관 {top['상관계수']:.2f})이 "
                                     f"종합점수에 가장 큰 영향 → 이 항목 집중 개선 시 만족도 급상승 가능")
-                            grp_sub = df_f[df_f["_계약그룹"] == grp]
+                            grp_sub = df_pure[df_pure["_계약그룹"] == grp_name]
                             grp_mean = pd.to_numeric(grp_sub[top["항목"]], errors="coerce").mean()
-                            overall_mean = pd.to_numeric(df_f[top["항목"]], errors="coerce").mean()
+                            overall_mean = pd.to_numeric(df_pure[top["항목"]], errors="coerce").mean()
                             if pd.notna(grp_mean) and pd.notna(overall_mean) and grp_mean < overall_mean - 2:
                                 insights.append(
-                                    f"  → {grp}의 {top['항목']} 평균 {grp_mean:.1f}점은 "
+                                    f"  → {grp_name}의 {top['항목']} 평균 {grp_mean:.1f}점은 "
                                     f"전체 평균 {overall_mean:.1f}점 대비 **{overall_mean - grp_mean:.1f}점 낮음** (집중 관리 필요)")
 
                     if insights:
@@ -2189,14 +2327,14 @@ with tab10:
                     st.markdown('<p class="sec-head">📘 계약종별 응대 매뉴얼 인사이트</p>',
                                 unsafe_allow_html=True)
                     guide_cols = st.columns(min(3, len(contract_groups)))
-                    for i, grp in enumerate(contract_groups[:6]):
+                    for i, grp_name in enumerate(contract_groups[:6]):
                         with guide_cols[i % 3]:
-                            focus, desc = GUIDE.get(grp, ("일반", ""))
-                            n = len(df_f[df_f["_계약그룹"] == grp])
-                            avg = df_f[df_f["_계약그룹"] == grp]["_점수100"].mean()
+                            focus, desc = GUIDE.get(grp_name, ("일반", ""))
+                            n = len(df_pure[df_pure["_계약그룹"] == grp_name])
+                            avg = df_pure[df_pure["_계약그룹"] == grp_name]["_점수100"].mean()
                             st.markdown(
                                 f'<div class="card-blue" style="min-height:160px">'
-                                f'<b>{grp}</b> (n={n:,}, 평균 {avg:.1f}점)<br><br>'
+                                f'<b>{grp_name}</b> (n={n:,}, 평균 {avg:.1f}점)<br><br>'
                                 f'🎯 <b>핵심 가치:</b> {focus}<br><br>'
                                 f'<span style="font-size:0.9em">{desc}</span></div>',
                                 unsafe_allow_html=True)
@@ -2208,27 +2346,30 @@ with tab10:
 
     st.markdown("---")
 
-    # ── 3. 지사별 페르소나 ──
-    st.markdown('<p class="sec-head">3️⃣ 지사별 페르소나 — 데이터 기반 캐릭터 프로파일링</p>',
+    # ══════════════════════════════════════════
+    # 3. 지사별 페르소나 (OOS 제외)
+    # ══════════════════════════════════════════
+    st.markdown('<p class="sec-head">3️⃣ 지사별 페르소나 — 데이터 기반 캐릭터 프로파일링 (순수 데이터)</p>',
                 unsafe_allow_html=True)
 
     office_col = M.get("office")
-    if office_col and M["voc"] and "_점수100" in df_f.columns:
-        offices = df_f[office_col].dropna().unique()
+    if office_col and M["voc"] and "_점수100" in df_pure.columns:
+        offices = df_pure[office_col].dropna().unique()
         if len(offices) >= 2:
             persona_data = []
             for ofc in offices:
-                sub = df_f[df_f[office_col] == ofc]
+                sub = df_pure[df_pure[office_col] == ofc]
                 if len(sub) < 5:
                     continue
                 avg_score = sub["_점수100"].mean()
                 n = len(sub)
 
-                # 부정 VOC 비율
+                # 부정 VOC (문맥 인식)
                 voc_vals = sub[M["voc"]].dropna()
                 voc_vals = voc_vals[~voc_vals.isin(["응답없음", "nan", ""])]
                 neg_cnt = 0
                 top_neg_kws = Counter()
+                top_cause_cnt = Counter()
                 for v in voc_vals:
                     s = str(v)
                     is_neg_found = False
@@ -2241,6 +2382,14 @@ with tab10:
                                 is_neg_found = True
                     if is_neg_found:
                         neg_cnt += 1
+                        # 원인 태깅
+                        for cause, keywords in _CAUSE_TAGS.items():
+                            if any(kw in s and not any(
+                                pw in s[max(0, s.find(kw) - 15):min(len(s), s.find(kw) + len(kw) + 15)]
+                                for pw in POSITIVE_CONTEXT) for kw in keywords if kw in s):
+                                top_cause_cnt[cause] += 1
+                                break
+
                 neg_ratio = neg_cnt / max(n, 1) * 100
 
                 # 계약종 비중
@@ -2255,14 +2404,29 @@ with tab10:
                     top_biz = sub[M["business"]].value_counts(normalize=True).head(2)
                     biz_dist = ", ".join(f"{k} {v * 100:.0f}%" for k, v in top_biz.items())
 
-                # 핵심 부정 키워드
-                top_neg_str = ", ".join(f"{k}({v})" for k, v in top_neg_kws.most_common(3)) if top_neg_kws else "없음"
+                # 주요 부정 원인
+                top_cause_str = ", ".join(
+                    f"{k}({v})" for k, v in top_cause_cnt.most_common(2)) if top_cause_cnt else "없음"
+                top_neg_str = ", ".join(
+                    f"{k}({v})" for k, v in top_neg_kws.most_common(3)) if top_neg_kws else "없음"
+
+                # 약점 항목 (전체 대비 3점 이상 낮은 항목)
+                weak_items = []
+                for col in df_pure.columns:
+                    if col.startswith("_") or col == M["score"]:
+                        continue
+                    ofc_val = pd.to_numeric(sub[col], errors="coerce").dropna()
+                    all_val = pd.to_numeric(df_pure[col], errors="coerce").dropna()
+                    if len(ofc_val) > 5 and len(all_val) > 5:
+                        gap = ofc_val.mean() - all_val.mean()
+                        if gap < -3:
+                            weak_items.append(f"{col}({gap:+.1f})")
 
                 # 페르소나 태그
                 tags = []
-                if neg_ratio >= 12:
+                if neg_ratio >= 10:
                     tags.append("🔴 부정VOC 다발")
-                elif neg_ratio <= 5:
+                elif neg_ratio <= 4:
                     tags.append("🟢 안정 지사")
                 if avg_score < 92:
                     tags.append("⚠️ 점수 하위권")
@@ -2271,50 +2435,61 @@ with tab10:
 
                 persona_data.append({
                     "지사": ofc, "건수": n, "평균점수": round(avg_score, 1),
-                    "부정비율": round(neg_ratio, 1), "계약종비중": contract_dist,
-                    "업무비중": biz_dist, "핵심부정키워드": top_neg_str,
+                    "부정비율": round(neg_ratio, 1), "계약종구성": contract_dist,
+                    "주요업무": biz_dist, "부정원인": top_cause_str,
+                    "부정키워드": top_neg_str,
+                    "약점항목": ", ".join(weak_items) if weak_items else "-",
                     "태그": " ".join(tags) if tags else "보통",
                 })
 
             df_persona = pd.DataFrame(persona_data).sort_values("부정비율", ascending=False)
 
-            # 상위 특징 지사 3개 강조 카드
+            # 상위 3개 지사 처방전 카드
             top3 = df_persona.head(3)
-            st.markdown("**🏥 CS 처방전 — 부정 VOC 비율 상위 3개 지사**")
-            PRESCRIPTIONS = {
-                0: {"do": "민원 접수 후 24시간 내 진행상황 문자 발송", "dont": "처리 완료 전까지 연락 없이 방치"},
-                1: {"do": "요금 문의 시 고객 눈높이의 비유·시각자료 활용", "dont": "매뉴얼 그대로 읽어주는 기계적 응대"},
-                2: {"do": "예정 정전 72시간 전 사전 알림 체계 구축", "dont": "예고 없는 정전 및 복구 후 미통보"},
-            }
+            st.markdown("**🏥 CS 처방전 — 부정 VOC 상위 3개 지사 (OOS 제외 순수 부정만)**")
             p_cols = st.columns(3)
             for i, (_, row) in enumerate(top3.iterrows()):
                 with p_cols[i]:
-                    rx = PRESCRIPTIONS.get(i, {"do": "맞춤 응대 강화", "dont": "일괄적 대응"})
-                    card_color = "card-red" if row["부정비율"] >= 12 else "card-gold"
+                    # 주요 원인에 따라 Do/Don't 자동 매칭
+                    main_cause = row["부정원인"].split(",")[0].split("(")[0].strip() if row["부정원인"] != "없음" else ""
+                    rx_map = {
+                        "절차 복잡·불편":  {"do": "원스톱 처리 체계 구축 — 한 번에 끝내기", "dont": "고객을 여러 부서로 돌려보내기"},
+                        "처리 지연·느림":  {"do": "접수 후 24시간 내 진행 상황 문자 발송", "dont": "처리 완료 전까지 연락 없이 방치"},
+                        "처리 오류·부정확": {"do": "처리 전 체크리스트 확인 — 1회 완결 처리", "dont": "확인 없이 신속 처리에만 집중"},
+                        "직원 태도·불친절": {"do": "경청→공감→해결 3단계 응대 훈련 실시", "dont": "감정 대응 없이 업무만 처리"},
+                        "요금·제도 불만":  {"do": "요금 구조를 고객 눈높이 비유·시각자료로 설명", "dont": "매뉴얼 그대로 읽어주는 기계적 응대"},
+                        "정전·안전 관련":  {"do": "예정 정전 72시간 전 사전 알림 체계 구축", "dont": "예고 없는 정전 및 복구 후 미통보"},
+                    }
+                    rx = rx_map.get(main_cause, {"do": "고객 맞춤 응대 프로세스 정비", "dont": "일괄적·기계적 대응"})
+                    card_color = "card-red" if row["부정비율"] >= 10 else "card-gold"
+                    weak_str = f'<br>📉 <b>약점항목:</b> {row["약점항목"]}' if row["약점항목"] != "-" else ""
                     st.markdown(
-                        f'<div class="{card_color}" style="min-height:280px">'
+                        f'<div class="{card_color}" style="min-height:320px">'
                         f'<b>{row["지사"]}</b> {row["태그"]}<br>'
                         f'평균 {row["평균점수"]}점 · 부정비율 {row["부정비율"]}%<br><br>'
-                        f'📊 <b>고객구성:</b> {row["계약종비중"]}<br>'
-                        f'📋 <b>주요업무:</b> {row["업무비중"]}<br>'
-                        f'🔑 <b>부정키워드:</b> {row["핵심부정키워드"]}<br><br>'
+                        f'📊 <b>고객구성:</b> {row["계약종구성"]}<br>'
+                        f'📋 <b>주요업무:</b> {row["주요업무"]}<br>'
+                        f'🔥 <b>부정원인:</b> {row["부정원인"]}<br>'
+                        f'🔑 <b>부정키워드:</b> {row["부정키워드"]}'
+                        f'{weak_str}<br><br>'
                         f'<span style="color:green">✅ Do: {rx["do"]}</span><br>'
                         f'<span style="color:red">❌ Don\'t: {rx["dont"]}</span>'
                         f'</div>',
                         unsafe_allow_html=True)
 
-            # 전체 지사 테이블
-            st.markdown("**📋 전체 지사 프로파일**")
+            # 전체 지사 프로파일 테이블
+            st.markdown("**📋 전체 지사 프로파일 (OOS 제외)**")
             st.dataframe(
-                df_persona[["지사", "건수", "평균점수", "부정비율", "계약종비중", "업무비중", "핵심부정키워드", "태그"]],
+                df_persona[["지사", "건수", "평균점수", "부정비율", "계약종구성", "주요업무",
+                            "부정원인", "부정키워드", "약점항목", "태그"]],
                 use_container_width=True, height=500, hide_index=True)
 
-            # 부정비율 vs 평균점수 scatter
+            # 포지셔닝 맵
             fig_sc = px.scatter(df_persona, x="평균점수", y="부정비율", size="건수",
                                 text="지사", template=PLOTLY_TPL,
                                 color="부정비율",
                                 color_continuous_scale=["#27AE60", "#F39C12", "#E74C3C"],
-                                title="지사별 포지셔닝 맵 (평균점수 vs 부정VOC 비율)")
+                                title="지사별 포지셔닝 맵 — 평균점수 vs 부정VOC 비율 (OOS 제외)")
             fig_sc.update_traces(textposition="top center", textfont_size=10)
             fig_sc.update_layout(height=480, margin=dict(t=60, b=40, l=40, r=40),
                                   title_font=dict(size=14, color=C["navy"]),
