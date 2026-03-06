@@ -15,6 +15,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import matplotlib.font_manager as fm
 from collections import Counter
+import math
 import io, re, os
 
 # ── 선택적 라이브러리 ──────────────────────────────────────────
@@ -24,17 +25,19 @@ try:
 except Exception:
     KONLPY_AVAILABLE = False
 
-try:
-    from wordcloud import WordCloud
-    WORDCLOUD_AVAILABLE = True
-except Exception:
-    WORDCLOUD_AVAILABLE = False
+# WordCloud는 TF-IDF Action-Trigger 분석으로 대체됨
 
 try:
     from keybert import KeyBERT
     KEYBERT_AVAILABLE = True
 except Exception:
     KEYBERT_AVAILABLE = False
+
+try:
+    from sklearn.feature_extraction.text import TfidfVectorizer
+    SKLEARN_AVAILABLE = True
+except Exception:
+    SKLEARN_AVAILABLE = False
 
 # ══════════════════════════════════════════════════════════════
 #  0. 한글 폰트
@@ -131,6 +134,59 @@ _STOP = {
     "응답없음",
 }
 
+# ── Action-Trigger 키워드 추출 전용: 강화 불용어 ──
+# CS 본질 개선점을 가리는 단순 감성어·인사말·범용어를 철저히 필터링
+_ACTION_STOP = _STOP | {
+    # 단순 긍정 감성어 / 인사말
+    "친절","감사","만족","좋음","좋다","좋아","빠름","수고","감사합니다","고맙",
+    "고마워","칭찬","최고","훌륭","편안","편리","깔끔","깨끗","성실","정확",
+    "꼼꼼","배려","도움","추천","완벽","노력","발전","유지","응원","믿음",
+    "행복","따뜻","경청","공감","상냥","반갑","기쁘","굿","좋아요","수고하",
+    "고생","덕분","잘해","괜찮","적극","열심","나아","개선","유쾌","쾌적",
+    # 단순 부정 감성어 (원인 아닌 감정 표현)
+    "불만","불쾌","화남","짜증","최악","실망","별로","황당","어이없","답답",
+    "이해불가","납득불가","힘듭니다","어렵습니다",
+    # 범용 서베이 필러
+    "없음","있음","필요","바람","희망","생각","의견","마음","정도","특별",
+    "나름","보통","그냥","일단","전반","전반적","종합","전체","모든","각각",
+    "사항","방면","측면","분야","방향","차원","수준","단계","기본","일반",
+}
+
+# ── 고객여정 + 실무 카테고리 매핑 ──
+_JOURNEY_CATEGORIES = {
+    "📞 안내·상담": [
+        "설명", "안내문", "고지", "통보", "공지", "알림", "문자", "카톡", "메시지",
+        "응대", "상담", "문의", "답변", "연락", "통화", "전화", "콜백", "회신",
+        "ARS", "자동", "음성", "매뉴얼", "스크립트",
+    ],
+    "📋 접수·절차": [
+        "접수", "신청", "서류", "서식", "양식", "절차", "단계", "구비", "증빙",
+        "본인확인", "인증", "승인", "심사", "검토", "반려", "보완", "재접수",
+        "온라인", "앱", "모바일", "홈페이지", "창구", "대기", "번호표", "예약",
+    ],
+    "🔧 현장처리": [
+        "방문", "현장", "출동", "공사", "시공", "설치", "철거", "교체", "수리",
+        "점검", "검사", "측정", "계량기", "변압기", "전주", "전선", "배전", "누전",
+        "정전", "단전", "복구", "송전", "고장", "장애", "사고", "위험", "안전",
+        "기사", "작업자", "외주", "협력", "하청",
+    ],
+    "📮 사후관리": [
+        "재방문", "재처리", "재발", "반복", "미해결", "미처리", "미완료", "지연",
+        "후속", "피드백", "결과통보", "완료통보", "만족확인", "사후", "사과",
+        "보상", "감면", "환불", "정산", "이의", "이의제기", "민원",
+    ],
+    "💰 요금·제도": [
+        "요금", "납부", "청구", "고지서", "과금", "누진", "할인", "감면", "경감",
+        "계약", "종별", "변경", "이전", "해지", "명의", "양도", "분할", "연체",
+        "체납", "독촉", "제도", "규정", "기준", "법규", "약관", "정책",
+    ],
+    "🏗️ 시설물·환경": [
+        "전주", "전선", "변압기", "개폐기", "배전반", "계량기", "미터기",
+        "소음", "진동", "악취", "먼지", "미관", "경관", "가지", "나뭇가지",
+        "수목", "도로", "인도", "보도", "골목", "위치", "이설", "이전",
+    ],
+}
+
 # ══════════════════════════════════════════════════════════════
 #  3. 유틸리티 함수
 # ══════════════════════════════════════════════════════════════
@@ -183,6 +239,122 @@ def extract_keywords(texts, top_n=60):
         found = re.findall(r"[가-힣]{2,}", t)
         words.extend([w for w in found if w not in _STOP])
     return Counter(words).most_common(top_n)
+
+
+# ── Action-Trigger TF-IDF 키워드 추출 ──
+def _extract_nouns_action(texts):
+    """Action-Trigger용 명사 추출 (강화 불용어 적용)"""
+    if KONLPY_AVAILABLE:
+        okt = Okt()
+        words = []
+        for t in texts:
+            if not t or str(t).strip() in ("", "nan"):
+                continue
+            nouns = okt.nouns(str(t))
+            words.extend([n for n in nouns if n not in _ACTION_STOP and len(n) >= 2])
+        return words
+    words = []
+    for t in texts:
+        if not t or str(t).strip() in ("", "nan"):
+            continue
+        found = re.findall(r"[가-힣]{2,}", str(t))
+        words.extend([w for w in found if w not in _ACTION_STOP])
+    return words
+
+
+def _tfidf_keywords_sklearn(doc_words_list, top_n=30):
+    """sklearn TF-IDF로 문서별 고유 키워드 추출"""
+    docs = [" ".join(ws) for ws in doc_words_list]
+    docs = [d if d.strip() else "빈문서" for d in docs]
+    try:
+        vec = TfidfVectorizer(max_features=500, token_pattern=r"[가-힣]{2,}")
+        mat = vec.fit_transform(docs)
+        feature_names = vec.get_feature_names_out()
+        # 전체 문서 합산 TF-IDF 스코어
+        scores = mat.sum(axis=0).A1
+        ranked = sorted(zip(feature_names, scores), key=lambda x: x[1], reverse=True)
+        return [(w, round(s, 3)) for w, s in ranked if w not in _ACTION_STOP][:top_n]
+    except Exception:
+        return []
+
+
+def _tfidf_keywords_manual(all_words, doc_words_list, top_n=30):
+    """sklearn 없이 수동 TF-IDF 계산"""
+    freq = Counter(all_words)
+    if not freq:
+        return []
+    n_docs = len(doc_words_list)
+    # DF: 각 단어가 등장하는 문서 수
+    df_count = Counter()
+    for dw in doc_words_list:
+        df_count.update(set(dw))
+    tfidf = {}
+    total_words = len(all_words)
+    for w, tf in freq.items():
+        if w in _ACTION_STOP:
+            continue
+        idf = math.log((1 + n_docs) / (1 + df_count.get(w, 0))) + 1
+        tfidf[w] = (tf / total_words) * idf
+    ranked = sorted(tfidf.items(), key=lambda x: x[1], reverse=True)
+    return [(w, round(s, 5)) for w, s in ranked][:top_n]
+
+
+def _categorize_keyword(word):
+    """키워드를 고객여정/실무 카테고리로 매핑"""
+    for cat, kw_list in _JOURNEY_CATEGORIES.items():
+        if any(kw in word or word in kw for kw in kw_list):
+            return cat
+    return "🔍 기타 이슈"
+
+
+@st.cache_data(show_spinner="Action-Trigger 키워드 추출 중…")
+def extract_action_keywords(texts_tuple, top_n=30):
+    """TF-IDF 기반 Action-Trigger 키워드 추출 (감성어 제거, 실무 키워드만)
+    Returns: list of (keyword, score, category)
+    """
+    texts = list(texts_tuple)
+    valid = [str(t) for t in texts if t and str(t).strip() not in ("", "nan", "응답없음")]
+    if not valid:
+        return []
+
+    # 문서별 명사 추출
+    doc_words_list = []
+    for t in valid:
+        doc_words_list.append(_extract_nouns_action([t]))
+    all_words = [w for dw in doc_words_list for w in dw]
+    if not all_words:
+        return []
+
+    # TF-IDF 키워드 추출
+    if SKLEARN_AVAILABLE:
+        ranked = _tfidf_keywords_sklearn(doc_words_list, top_n=top_n)
+    else:
+        ranked = _tfidf_keywords_manual(all_words, doc_words_list, top_n=top_n)
+
+    if not ranked:
+        # fallback: 빈도 기반
+        freq = Counter(w for w in all_words if w not in _ACTION_STOP)
+        ranked = freq.most_common(top_n)
+
+    # 카테고리 매핑
+    result = []
+    for w, s in ranked:
+        cat = _categorize_keyword(w)
+        result.append((w, s, cat))
+    return result
+
+
+def extract_action_keywords_by_group(df, group_col, voc_col, top_n=15):
+    """그룹(지사/업무)별 TF-IDF 키워드 추출 → 그룹 간 비교용"""
+    groups = df[group_col].dropna().unique()
+    result = {}
+    for g in groups:
+        texts = df.loc[df[group_col] == g, voc_col].dropna().astype(str).tolist()
+        texts = [t for t in texts if t.strip() not in ("", "nan", "응답없음")]
+        if texts:
+            kws = extract_action_keywords(tuple(texts), top_n=top_n)
+            result[str(g)] = kws
+    return result
 
 
 def _has_positive_context(text, keyword):
@@ -328,25 +500,6 @@ def batch_classify_sentiment(texts_tuple):
             results[i] = "positive"
     return results
 
-
-def make_wordcloud_image(kw_list, max_words=15):
-    if not WORDCLOUD_AVAILABLE or not kw_list:
-        return None
-    freq = {k: v for k, v in kw_list[:max_words]}
-    kwargs = dict(
-        width=1200, height=500, background_color="white",
-        max_words=max_words, colormap="Blues", prefer_horizontal=0.8,
-        min_font_size=18, max_font_size=120,
-        relative_scaling=0.6, margin=15,
-    )
-    if FONT_PATH:
-        kwargs["font_path"] = FONT_PATH
-    try:
-        wc = WordCloud(**kwargs)
-        wc.generate_from_frequencies(freq)
-        return wc.to_image()
-    except Exception:
-        return None
 
 
 def df_to_excel_bytes(df):
@@ -619,7 +772,7 @@ with st.sidebar:
         f"{'✅ KoNLPy' if KONLPY_AVAILABLE else '🟡 기본 분석'}  \n"
         f"✅ 키워드 감성분석 (경량)  \n"
         f"{'✅ KeyBERT' if KEYBERT_AVAILABLE else '🟡 빈도 키워드'}  \n"
-        f"{'✅ WordCloud' if WORDCLOUD_AVAILABLE else '🟡 미설치'}  \n"
+        f"{'✅ sklearn TF-IDF' if SKLEARN_AVAILABLE else '🟡 수동 TF-IDF'}  \n"
         f"{'✅ 한글 폰트' if FONT_PATH else '🟡 기본 폰트'}"
     )
     st.markdown("<hr>", unsafe_allow_html=True)
@@ -1376,85 +1529,117 @@ with tab4:
                     if _oos_cnt_tab4 > 15:
                         st.caption(f"... 외 {_oos_cnt_tab4 - 15}건")
 
-        # ── 워드클라우드 & 키워드 ──
+        # ── Action-Trigger 키워드 분석 (TF-IDF) ──
         if n_voc > 0:
-            with st.spinner("AI가 키워드를 추출 중입니다…"):
-                all_kws = extract_keywords(voc_list, top_n=60)
-            if all_kws:
-                st.markdown('<p class="sec-head">☁️ VOC 키워드 분석</p>', unsafe_allow_html=True)
-                wc_col, kw_col = st.columns([3, 2])
-                with wc_col:
-                    st.markdown('<div class="card-blue">', unsafe_allow_html=True)
-                    st.markdown("**☁️ 전체 VOC 워드클라우드**")
-                    if WORDCLOUD_AVAILABLE:
-                        img = make_wordcloud_image(all_kws)
-                        if img:
-                            st.image(img, use_container_width=True)
-                        else:
-                            st.error("워드클라우드 생성 실패")
-                    else:
-                        st.warning("`pip install wordcloud` 후 재시작")
-                    st.markdown('</div>', unsafe_allow_html=True)
-                with kw_col:
+            action_kws = extract_action_keywords(tuple(voc_list), top_n=30)
+            if action_kws:
+                st.markdown('<p class="sec-head">🎯 Action-Trigger 키워드 분석</p>', unsafe_allow_html=True)
+                st.markdown(
+                    '<div class="card-gold"><b>📌 분석 방법</b> — TF-IDF 알고리즘으로 감성어·인사말을 제거하고, '
+                    '실제 개선 가능한 <b>행동 유발(Action-Trigger) 키워드</b>만 추출합니다. '
+                    '키워드는 고객 여정별 카테고리로 분류됩니다.</div>',
+                    unsafe_allow_html=True)
+
+                # ── 1) 카테고리별 키워드 수 집계 바차트 ──
+                at_df = pd.DataFrame(action_kws, columns=["키워드", "TF-IDF", "카테고리"])
+                cat_count = at_df.groupby("카테고리").size().reset_index(name="키워드 수")
+                cat_count = cat_count.sort_values("키워드 수", ascending=True)
+
+                _cat_colors = {
+                    "📞 안내·상담": "#1976d2", "📋 접수·절차": "#f0a500",
+                    "🔧 현장처리": "#e65100", "📮 사후관리": "#00897b",
+                    "💰 요금·제도": "#c62828", "🏗️ 시설물·환경": "#7b1fa2",
+                    "🔍 기타 이슈": "#546e7a",
+                }
+
+                at_left, at_right = st.columns([3, 2])
+                with at_left:
+                    fig_cat = px.bar(
+                        cat_count, x="키워드 수", y="카테고리", orientation="h",
+                        color="카테고리", color_discrete_map=_cat_colors,
+                        text="키워드 수", template=PLOTLY_TPL,
+                        title="고객여정 카테고리별 Action-Trigger 키워드 분포",
+                    )
+                    fig_cat.update_traces(texttemplate="%{text}", textposition="outside")
+                    fig_cat.update_layout(
+                        height=max(300, len(cat_count) * 50 + 80),
+                        margin=dict(t=50, b=20, l=10, r=60),
+                        showlegend=False, title_font=dict(size=14, color=C["navy"]),
+                    )
+                    st.plotly_chart(fig_cat, use_container_width=True)
+
+                with at_right:
                     st.markdown('<div class="card">', unsafe_allow_html=True)
-                    st.markdown("**🔑 키워드 빈도 Top 10**")
-                    kw_df = pd.DataFrame(all_kws[:10], columns=["키워드", "언급 횟수"])
-                    kw_df["비율(%)"] = (kw_df["언급 횟수"] / kw_df["언급 횟수"].sum() * 100).round(1)
-                    kw_df["유형"] = kw_df["키워드"].apply(
-                        lambda x: "😡 불친절" if any(r in x for r in RUDE_KEYWORDS)
-                        else "⚠️ 부정" if any(n in x for n in NEGATIVE_KEYWORDS) else "✅ 일반")
-                    st.dataframe(kw_df, use_container_width=True, height=440, hide_index=True)
+                    st.markdown("**🔑 Action-Trigger Top 15**")
+                    top15_df = at_df.head(15)[["키워드", "카테고리"]].reset_index(drop=True)
+                    top15_df.index = top15_df.index + 1
+                    top15_df.index.name = "순위"
+                    st.dataframe(top15_df, use_container_width=True, height=440)
                     st.markdown('</div>', unsafe_allow_html=True)
 
                 st.markdown("---")
 
-                # 키워드 막대 차트
-                st.markdown('<p class="sec-head">📊 상위 10개 키워드</p>', unsafe_allow_html=True)
-                top30 = all_kws[:10]
-                kw_names = [k[0] for k in top30]
-                kw_vals = [k[1] for k in top30]
-                kw_types = []
-                for kw in kw_names:
-                    if any(r in kw for r in RUDE_KEYWORDS):
-                        kw_types.append("불친절")
-                    elif any(n in kw for n in NEGATIVE_KEYWORDS):
-                        kw_types.append("부정")
-                    else:
-                        kw_types.append("일반")
-                kw_chart_df = pd.DataFrame({"키워드": kw_names, "언급 횟수": kw_vals, "유형": kw_types})
-                fig_kw = px.bar(kw_chart_df, x="키워드", y="언급 횟수", color="유형",
-                                color_discrete_map={"불친절": "#e91e63", "부정": C["red"], "일반": C["sky"]},
-                                text="언급 횟수", template=PLOTLY_TPL, title="상위 10 키워드 · 빨간=부정 · 핑크=불친절")
-                fig_kw.update_traces(texttemplate="%{text}", textposition="outside")
-                fig_kw.update_layout(height=400, margin=dict(t=50, b=90, l=60, r=20), xaxis_tickangle=-35,
-                                      legend_title_text="", title_font=dict(size=14, color=C["navy"]))
-                st.plotly_chart(fig_kw, use_container_width=True)
+                # ── 2) 카테고리별 상세 키워드 히트맵 ──
+                st.markdown('<p class="sec-head">📊 카테고리별 핵심 키워드 상세</p>', unsafe_allow_html=True)
+                cats_with_kws = at_df.groupby("카테고리")
+                n_cats = len(cats_with_kws)
+                cols_per_row = min(3, n_cats)
+                cat_items = list(cats_with_kws)
+                for row_start in range(0, len(cat_items), cols_per_row):
+                    row_cats = cat_items[row_start:row_start + cols_per_row]
+                    cols = st.columns(len(row_cats))
+                    for col, (cat_name, cat_df) in zip(cols, row_cats):
+                        with col:
+                            cat_top = cat_df.head(5)
+                            color = _cat_colors.get(cat_name, C["sky"])
+                            st.markdown(
+                                f'<div style="background:{color}15;border-left:4px solid {color};'
+                                f'padding:12px;border-radius:8px;margin-bottom:8px">'
+                                f'<b>{cat_name}</b> ({len(cat_df)}건)<br>'
+                                + " · ".join(f"`{r['키워드']}`" for _, r in cat_top.iterrows())
+                                + '</div>', unsafe_allow_html=True)
 
-                # 업무별 VOC
+                st.markdown("---")
+
+                # ── 3) 업무별 Action-Trigger 키워드 비교 ──
                 if M["business"]:
-                    st.markdown("---")
-                    st.markdown('<p class="sec-head">🏢 업무별 VOC 키워드</p>', unsafe_allow_html=True)
+                    st.markdown('<p class="sec-head">🏢 업무별 Action-Trigger 키워드</p>', unsafe_allow_html=True)
                     biz_sel = st.selectbox("분석할 업무 선택",
                                            df_f[M["business"]].dropna().astype(str).unique(), key="voc_biz_sel")
                     biz_voc = [t for t in df_f.loc[df_f[M["business"]].astype(str) == biz_sel, M["voc"]
                                ].astype(str).str.strip().tolist() if t and t != "nan" and t != "응답없음"]
                     if biz_voc:
-                        with st.spinner(f"[{biz_sel}] 분석 중…"):
-                            biz_kws = extract_keywords(biz_voc, top_n=30)
-                        bwc_c, bkw_c = st.columns([3, 2])
-                        with bwc_c:
-                            st.markdown(f'<div class="card-blue"><b>[{biz_sel}] 워드클라우드</b>', unsafe_allow_html=True)
-                            if WORDCLOUD_AVAILABLE and biz_kws:
-                                bimg = make_wordcloud_image(biz_kws)
-                                if bimg:
-                                    st.image(bimg, use_container_width=True)
-                            st.markdown('</div>', unsafe_allow_html=True)
-                        with bkw_c:
-                            st.markdown(f'<div class="card"><b>[{biz_sel}] Top 10</b>', unsafe_allow_html=True)
-                            if biz_kws:
-                                bkdf = pd.DataFrame(biz_kws[:10], columns=["키워드","언급 횟수"])
-                                st.dataframe(bkdf, use_container_width=True, height=320, hide_index=True)
-                            st.markdown('</div>', unsafe_allow_html=True)
+                        biz_at_kws = extract_action_keywords(tuple(biz_voc), top_n=20)
+                        if biz_at_kws:
+                            biz_at_df = pd.DataFrame(biz_at_kws, columns=["키워드", "TF-IDF", "카테고리"])
+                            biz_cat = biz_at_df.groupby("카테고리").size().reset_index(name="키워드 수")
+                            biz_cat = biz_cat.sort_values("키워드 수", ascending=True)
+                            b_left, b_right = st.columns([3, 2])
+                            with b_left:
+                                fig_biz = px.bar(
+                                    biz_cat, x="키워드 수", y="카테고리", orientation="h",
+                                    color="카테고리", color_discrete_map=_cat_colors,
+                                    text="키워드 수", template=PLOTLY_TPL,
+                                    title=f"[{biz_sel}] Action-Trigger 카테고리 분포",
+                                )
+                                fig_biz.update_traces(texttemplate="%{text}", textposition="outside")
+                                fig_biz.update_layout(
+                                    height=max(250, len(biz_cat) * 50 + 60),
+                                    margin=dict(t=50, b=20, l=10, r=60),
+                                    showlegend=False, title_font=dict(size=14, color=C["navy"]),
+                                )
+                                st.plotly_chart(fig_biz, use_container_width=True)
+                            with b_right:
+                                st.markdown(f'<div class="card"><b>[{biz_sel}] Top 10 키워드</b>', unsafe_allow_html=True)
+                                biz_top10 = biz_at_df.head(10)[["키워드", "카테고리"]].reset_index(drop=True)
+                                biz_top10.index = biz_top10.index + 1
+                                biz_top10.index.name = "순위"
+                                st.dataframe(biz_top10, use_container_width=True, height=320)
+                                st.markdown('</div>', unsafe_allow_html=True)
+                        else:
+                            st.info(f"[{biz_sel}] 업무에서 추출된 키워드가 없습니다.")
+                    else:
+                        st.info(f"[{biz_sel}] 업무의 VOC 텍스트가 없습니다.")
         else:
             st.info("VOC 텍스트가 없습니다.")
 
@@ -1533,27 +1718,46 @@ with tab5:
                 weak_voc = [t for t in df_weak[M["voc"]].astype(str).str.strip().tolist()
                             if t and t != "nan" and t != "응답없음"]
                 if weak_voc:
-                    with st.spinner("취약그룹 VOC 키워드 분석 중…"):
-                        weak_kws = extract_keywords(weak_voc, top_n=30)
-                    if weak_kws:
+                    weak_at_kws = extract_action_keywords(tuple(weak_voc), top_n=20)
+                    if weak_at_kws:
                         st.markdown(
-                            f'<p class="sec-head">🔍 취약그룹({", ".join(str(n) for n in weak_names)}) VOC 키워드</p>',
+                            f'<p class="sec-head">🔍 취약그룹({", ".join(str(n) for n in weak_names)}) Action-Trigger 키워드</p>',
                             unsafe_allow_html=True)
+                        wk_at_df = pd.DataFrame(weak_at_kws, columns=["키워드", "TF-IDF", "카테고리"])
+                        wk_cat = wk_at_df.groupby("카테고리").size().reset_index(name="키워드 수")
+                        wk_cat = wk_cat.sort_values("키워드 수", ascending=True)
+                        _wk_cat_colors = {
+                            "📞 안내·상담": "#1976d2", "📋 접수·절차": "#f0a500",
+                            "🔧 현장처리": "#e65100", "📮 사후관리": "#00897b",
+                            "💰 요금·제도": "#c62828", "🏗️ 시설물·환경": "#7b1fa2",
+                            "🔍 기타 이슈": "#546e7a",
+                        }
                         wk_l, wk_r = st.columns([3, 2])
                         with wk_l:
-                            if WORDCLOUD_AVAILABLE:
-                                wk_img = make_wordcloud_image(weak_kws)
-                                if wk_img:
-                                    st.image(wk_img, use_container_width=True)
+                            fig_wk = px.bar(
+                                wk_cat, x="키워드 수", y="카테고리", orientation="h",
+                                color="카테고리", color_discrete_map=_wk_cat_colors,
+                                text="키워드 수", template=PLOTLY_TPL,
+                                title="취약그룹 Action-Trigger 카테고리 분포",
+                            )
+                            fig_wk.update_traces(texttemplate="%{text}", textposition="outside")
+                            fig_wk.update_layout(
+                                height=max(250, len(wk_cat) * 50 + 60),
+                                margin=dict(t=50, b=20, l=10, r=60),
+                                showlegend=False, title_font=dict(size=14, color=C["navy"]),
+                            )
+                            st.plotly_chart(fig_wk, use_container_width=True)
                         with wk_r:
-                            wk_df = pd.DataFrame(weak_kws[:10], columns=["키워드", "언급 횟수"])
-                            wk_df["유형"] = wk_df["키워드"].apply(
-                                lambda x: "😡 불친절" if any(r in x for r in RUDE_KEYWORDS)
-                                else "⚠️ 부정" if any(n in x for n in NEGATIVE_KEYWORDS) else "일반")
-                            st.dataframe(wk_df, use_container_width=True, height=380, hide_index=True)
+                            st.markdown('<div class="card"><b>취약그룹 Top 10 키워드</b>', unsafe_allow_html=True)
+                            wk_top = wk_at_df.head(10)[["키워드", "카테고리"]].reset_index(drop=True)
+                            wk_top.index = wk_top.index + 1
+                            wk_top.index.name = "순위"
+                            st.dataframe(wk_top, use_container_width=True, height=380)
+                            st.markdown('</div>', unsafe_allow_html=True)
 
                         # 취약그룹 AI 개선대책
-                        recs_vg = generate_ai_recommendations(weak_kws, f"취약그룹({', '.join(str(n) for n in weak_names)})")
+                        weak_kws_for_rec = extract_keywords(weak_voc, top_n=15)
+                        recs_vg = generate_ai_recommendations(weak_kws_for_rec, f"취약그룹({', '.join(str(n) for n in weak_names)})")
                         if recs_vg:
                             st.markdown(
                                 '<div class="card-red"><b>💡 취약그룹 AI 개선대책</b><br><br>'
