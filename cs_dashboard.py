@@ -16,7 +16,7 @@ import matplotlib.pyplot as plt
 import matplotlib.font_manager as fm
 from collections import Counter
 import math
-import io, re, os
+import io, re, os, json
 
 # ── 선택적 라이브러리 ──────────────────────────────────────────
 try:
@@ -38,6 +38,27 @@ try:
     SKLEARN_AVAILABLE = True
 except Exception:
     SKLEARN_AVAILABLE = False
+
+try:
+    from huggingface_hub import InferenceClient
+    _HF_KEY = os.environ.get("HF_API_KEY", "")
+    if not _HF_KEY:
+        # .env 파일에서 읽기
+        _env_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env")
+        if os.path.exists(_env_path):
+            with open(_env_path, encoding="utf-8") as _ef:
+                for _line in _ef:
+                    _line = _line.strip()
+                    if _line.startswith("HF_API_KEY="):
+                        _HF_KEY = _line.split("=", 1)[1].strip().strip('"').strip("'")
+                        break
+    if _HF_KEY:
+        hf_client = InferenceClient(token=_HF_KEY)
+        HF_AVAILABLE = True
+    else:
+        HF_AVAILABLE = False
+except Exception:
+    HF_AVAILABLE = False
 
 # ══════════════════════════════════════════════════════════════
 #  0. 한글 폰트
@@ -878,6 +899,7 @@ with st.sidebar:
         f"✅ 키워드 감성분석 (경량)  \n"
         f"{'✅ KeyBERT' if KEYBERT_AVAILABLE else '🟡 빈도 키워드'}  \n"
         f"{'✅ sklearn TF-IDF' if SKLEARN_AVAILABLE else '🟡 수동 TF-IDF'}  \n"
+        f"{'✅ Hugging Face AI' if HF_AVAILABLE else '🟡 Hugging Face 미연결'}  \n"
         f"{'✅ 한글 폰트' if FONT_PATH else '🟡 기본 폰트'}"
     )
     st.markdown("<hr>", unsafe_allow_html=True)
@@ -1217,15 +1239,13 @@ st.markdown("<br>", unsafe_allow_html=True)
 # ══════════════════════════════════════════════════════════════
 #  13. 탭 구성
 # ══════════════════════════════════════════════════════════════
-tab1, tab3, tab4, tab5, tab6, tab8, tab9, tab10 = st.tabs([
+tab1, tab3, tab5, tab9, tab10, tab11 = st.tabs([
     "📊  구간별 비중 · 종합 현황",
     "📡  채널별 · 업무별 분석",
-    "☁️  VOC AI 분석",
     "🎯  CS 인사이트 & 사전케어",
-    "📈  다차원 교차분석",
-    "📅  시계열 트렌드",
     "🔬  지사 심층 · 패턴",
     "🧠  CXO 딥 인사이트",
+    "🏢  지사 맞춤형 CS 솔루션",
 ])
 
 # ─────────────────────────────────────────────────────────────
@@ -1414,33 +1434,20 @@ def _render_category_section(df, cat_col, cat_label, office_col, score_col, over
                 title_font=dict(size=14, color=C["navy"]))
             st.plotly_chart(fig_hm, use_container_width=True)
 
-        with st.expander(f"📋 지사별 {cat_label} 상세 데이터"):
-            st.dataframe(pivot, use_container_width=True)
-
-        # ── 저점수 건 상세 조회 ──
+        # ── 저점수 건 상세 조회 (60점 이하 전체 표) ──
         _uid = cat_label.replace(" ", "")
-        with st.expander(f"🔍 저점수 건 상세 조회 (지사 × {cat_label})"):
-            _sel_cols = st.columns(2)
-            with _sel_cols[0]:
-                _offices = sorted(df[office_col].dropna().astype(str).unique().tolist())
-                _sel_ofc = st.selectbox("지사 선택", _offices, key=f"lowdet_ofc_{_uid}")
-            with _sel_cols[1]:
-                _cats = sorted(df[cat_col].dropna().astype(str).unique().tolist())
-                _sel_cat = st.selectbox(f"{cat_label} 선택", _cats, key=f"lowdet_cat_{_uid}")
-            _filtered = df[(df[office_col].astype(str) == _sel_ofc) &
-                           (df[cat_col].astype(str) == _sel_cat)].copy()
+        with st.expander(f"🔍 60점 이하 저점수 건 상세 조회 ({cat_label})"):
+            _filtered = df[df[score_col] <= 60].copy()
             if len(_filtered) > 0:
                 _filtered = _filtered.sort_values(score_col)
-                _avg = _filtered[score_col].mean()
-                _color = C["red"] if _avg < overall_avg - 5 else C["gold"] if _avg < overall_avg else C["teal"]
                 st.markdown(
-                    f'평균 <b style="color:{_color}">{_avg:.1f}점</b> · {len(_filtered):,}건'
-                    f' (전체 대비 {_avg - overall_avg:+.1f}점)',
+                    f'총 <b style="color:{C["red"]}">{len(_filtered):,}건</b>이 60점 이하입니다.',
                     unsafe_allow_html=True)
                 _show_cols = []
                 if M.get("receipt_no") and M["receipt_no"] in _filtered.columns:
                     _show_cols.append(M["receipt_no"])
-                _show_cols.append(office_col)
+                if office_col and office_col in _filtered.columns:
+                    _show_cols.append(office_col)
                 _show_cols.append(cat_col)
                 if score_col in _filtered.columns:
                     _show_cols.append(score_col)
@@ -1448,9 +1455,9 @@ def _render_category_section(df, cat_col, cat_label, office_col, score_col, over
                     _show_cols.append(M["voc"])
                 _show_cols = [c for c in _show_cols if c in _filtered.columns]
                 st.dataframe(_filtered[_show_cols].reset_index(drop=True),
-                             use_container_width=True, height=300, hide_index=True)
+                             use_container_width=True, height=400, hide_index=True)
             else:
-                st.info("해당 조건에 맞는 데이터가 없습니다.")
+                st.success("60점 이하 데이터가 없습니다.")
 
 
 with tab3:
@@ -1481,402 +1488,9 @@ with tab3:
 
 
 # ─────────────────────────────────────────────────────────────
-#  TAB 4  VOC AI 분석
-# ─────────────────────────────────────────────────────────────
-with tab4:
-    if not M["voc"]:
-        st.warning("주관식 답변(VOC) 컬럼을 사이드바에서 먼저 선택해주세요.")
-    else:
-        voc_raw = df_f[M["voc"]].astype(str).str.strip()
-        voc_list = [t for t in voc_raw.tolist() if t and t != "nan" and t != "응답없음"]
-        n_voc = len(voc_list)
-        _analysis_mode = ("KeyBERT + KoNLPy" if (KEYBERT_AVAILABLE and KONLPY_AVAILABLE)
-                          else "KoNLPy 고정밀" if KONLPY_AVAILABLE else "정규식 기본")
-
-        # ── 투트랙 VOC 감성 분석 (OOS 제외 → 긍정/중립/부정 → 원인 태깅) ──
-        _oos_cnt_tab4 = df_f["_is_oos"].sum() if "_is_oos" in df_f.columns else 0
-        df_pure_t4 = df_f[~df_f["_is_oos"]] if "_is_oos" in df_f.columns else df_f
-
-        st.markdown(
-            f'<div class="card-gold">'
-            f'<b>🔒 통제 불가(Out of Scope) 필터링</b> — 콜센터 전화 연결 지연 등 '
-            f'지사 통제 불가 VOC <b style="color:{C["red"]}">{_oos_cnt_tab4}건</b> 제외 → '
-            f'순수 분석 대상 <b>{len(df_pure_t4):,}건</b></div>', unsafe_allow_html=True)
-
-        st.markdown(f'<p class="sec-head">🔬 VOC 투트랙 감성 분석 — {_analysis_mode} ({n_voc:,}건)</p>',
-                    unsafe_allow_html=True)
-
-        if "_VOC감성" in df_f.columns:
-            # OOS 제외한 감성 분류
-            voc_cls_pure = df_pure_t4["_VOC감성"].value_counts()
-            vc_pos = voc_cls_pure.get("긍정", 0)
-            vc_neu = voc_cls_pure.get("중립", 0)
-            vc_neg = voc_cls_pure.get("부정", 0)
-            _total_pure = vc_pos + vc_neu + vc_neg
-
-            vc1, vc2, vc3, vc4 = st.columns(4)
-            with vc1:
-                st.metric("📝 분석 대상", f"{_total_pure:,}건")
-            with vc2:
-                st.metric("😊 긍정", f"{vc_pos:,}건 ({vc_pos / max(_total_pure, 1) * 100:.1f}%)")
-            with vc3:
-                st.metric("😐 중립", f"{vc_neu:,}건 ({vc_neu / max(_total_pure, 1) * 100:.1f}%)")
-            with vc4:
-                st.metric("😡 부정", f"{vc_neg:,}건 ({vc_neg / max(_total_pure, 1) * 100:.1f}%)")
-
-            # 1차 감성 도넛 + 2차 원인 태깅 차트
-            _sent_df4 = pd.DataFrame({"감성": ["긍정", "중립", "부정"], "건수": [vc_pos, vc_neu, vc_neg]})
-            fig_3t = px.pie(_sent_df4, values="건수", names="감성", hole=0.5,
-                            color="감성",
-                            color_discrete_map={"긍정": C["teal"], "중립": "#95A5A6", "부정": C["red"]},
-                            title="1차 감성 분류 (OOS 제외)")
-            fig_3t.update_traces(textinfo="percent+label", textfont_size=14,
-                                  marker=dict(line=dict(color="white", width=3)))
-            fig_3t.update_layout(height=340, margin=dict(t=50, b=10, l=20, r=20),
-                                  title_font=dict(size=14, color=C["navy"]))
-
-            # 2차 원인 태깅 (부정만)
-            _neg_voc_t4 = df_pure_t4[df_pure_t4["_VOC감성"] == "부정"][M["voc"]].dropna()
-            _neg_voc_t4 = _neg_voc_t4[~_neg_voc_t4.isin(["응답없음", "nan", ""])]
-            _cause_cnt_t4 = Counter()
-            _cause_ex_t4 = {}
-            for v in _neg_voc_t4:
-                s = str(v)
-                tagged = False
-                for cause, keywords in _CAUSE_TAGS.items():
-                    for kw in keywords:
-                        if kw in s:
-                            idx = s.find(kw)
-                            window = s[max(0, idx - 15):min(len(s), idx + len(kw) + 15)]
-                            if not any(pw in window for pw in POSITIVE_CONTEXT):
-                                _cause_cnt_t4[cause] += 1
-                                if cause not in _cause_ex_t4:
-                                    _cause_ex_t4[cause] = []
-                                if len(_cause_ex_t4[cause]) < 2 and len(s) > 10:
-                                    _cause_ex_t4[cause].append(s[:120])
-                                tagged = True
-                                break
-                    if tagged:
-                        break
-                if not tagged:
-                    _cause_cnt_t4["기타"] += 1
-
-            _df_cause_t4 = pd.DataFrame([{"원인": k, "건수": v} for k, v in _cause_cnt_t4.most_common()])
-
-            ch_l4, ch_r4 = st.columns(2)
-            with ch_l4:
-                st.plotly_chart(fig_3t, use_container_width=True)
-            with ch_r4:
-                if not _df_cause_t4.empty:
-                    fig_cause4 = px.bar(_df_cause_t4, x="건수", y="원인", orientation="h",
-                                        text="건수", template=PLOTLY_TPL,
-                                        color="건수",
-                                        color_continuous_scale=["#F9E79F", "#E74C3C"],
-                                        title="2차 원인 태깅 — 부정 VOC 근본 원인")
-                    fig_cause4.update_traces(textposition="outside")
-                    fig_cause4.update_layout(height=340,
-                                             margin=dict(t=60, b=20, l=10, r=80),
-                                             coloraxis_showscale=False,
-                                             title_font=dict(size=14, color=C["navy"]))
-                    st.plotly_chart(fig_cause4, use_container_width=True)
-
-            # 사업소별 VOC 감성 분류 (OOS 제외)
-            if M["office"]:
-                st.markdown("---")
-                st.markdown('<p class="sec-head">🏢 사업소별 VOC 감성 분류 현황 (OOS 제외)</p>',
-                            unsafe_allow_html=True)
-                voc_cross = pd.crosstab(df_pure_t4[M["office"]], df_pure_t4["_VOC감성"])
-                for col in ["긍정", "중립", "부정"]:
-                    if col not in voc_cross.columns:
-                        voc_cross[col] = 0
-                voc_cross = voc_cross[["긍정", "중립", "부정"]]
-                voc_cross["합계"] = voc_cross.sum(axis=1)
-                voc_cross["긍정(%)"] = (voc_cross["긍정"] / voc_cross["합계"] * 100).round(1)
-                voc_cross["중립(%)"] = (voc_cross["중립"] / voc_cross["합계"] * 100).round(1)
-                voc_cross["부정(%)"] = (voc_cross["부정"] / voc_cross["합계"] * 100).round(1)
-                st.dataframe(voc_cross, use_container_width=True)
-
-            st.markdown("---")
-
-            # ── 부정 VOC 사례 카드 (원인 태깅 포함) ──
-            if vc_neg > 0:
-                st.markdown('<p class="sec-head">😡 부정 VOC 사례 리스트 (원인 태깅)</p>',
-                            unsafe_allow_html=True)
-                df_neg_t4 = df_pure_t4[df_pure_t4["_VOC감성"] == "부정"].copy()
-                for _, row in df_neg_t4.head(10).iterrows():
-                    info_parts = []
-                    for key in ["office", "channel", "business"]:
-                        if M.get(key) and M[key] in row.index:
-                            val = str(row[M[key]])
-                            if val and val != "nan":
-                                info_parts.append(val)
-                    info_str = " · ".join(info_parts) if info_parts else ""
-                    voc_text = str(row[M["voc"]]) if M["voc"] in row.index else ""
-                    # 부정 키워드 하이라이트
-                    for rk in RUDE_KEYWORDS + NEGATIVE_KEYWORDS:
-                        if rk in voc_text:
-                            voc_text = voc_text.replace(
-                                rk, f'<b style="color:#c62828; background:#fce4ec; padding:0 3px; border-radius:3px;">{rk}</b>')
-                    st.markdown(
-                        f'<div class="card-rude"><b>😡 부정 VOC</b><br>'
-                        f'<small style="color:#888;">{info_str}</small><br><br>{voc_text}</div>',
-                        unsafe_allow_html=True)
-                if len(df_neg_t4) > 10:
-                    st.caption(f"※ 상위 10건만 표시. 전체 {len(df_neg_t4):,}건")
-                st.markdown("---")
-
-            # OOS 상세 접기
-            if _oos_cnt_tab4 > 0:
-                with st.expander(f"🔒 통제 불가(OOS) VOC 상세 ({_oos_cnt_tab4}건) — 콜센터 전화 연결 관련"):
-                    _oos_vocs_t4 = df_f[df_f["_is_oos"]][M["voc"]].dropna().head(15)
-                    for i, v in enumerate(_oos_vocs_t4, 1):
-                        st.markdown(f"**[{i}]** {str(v)[:200]}")
-                    if _oos_cnt_tab4 > 15:
-                        st.caption(f"... 외 {_oos_cnt_tab4 - 15}건")
-
-        # ── Action-Trigger 키워드 분석 (TF-IDF) ──
-        if n_voc > 0:
-            action_kws = extract_action_keywords(tuple(voc_list), top_n=30)
-            if action_kws:
-                st.markdown('<p class="sec-head">🎯 Action-Trigger 키워드 분석</p>', unsafe_allow_html=True)
-                st.markdown(
-                    '<div class="card-gold"><b>📌 분석 방법</b> — TF-IDF 알고리즘으로 감성어·인사말을 제거하고, '
-                    '실제 개선 가능한 <b>행동 유발(Action-Trigger) 키워드</b>만 추출합니다. '
-                    '키워드는 고객 여정별 카테고리로 분류됩니다.</div>',
-                    unsafe_allow_html=True)
-
-                # ── 1) 카테고리별 키워드 수 집계 바차트 ──
-                at_df = pd.DataFrame(action_kws, columns=["키워드", "TF-IDF", "카테고리"])
-                cat_count = at_df.groupby("카테고리").size().reset_index(name="키워드 수")
-                cat_count = cat_count.sort_values("키워드 수", ascending=True)
-
-                _cat_colors = {
-                    "📞 안내·상담": "#1976d2", "📋 접수·절차": "#f0a500",
-                    "🔧 현장처리·시공": "#e65100", "⏱️ 처리속도·지연": "#ff6f00",
-                    "📮 사후관리·피드백": "#00897b", "💰 요금·과금": "#c62828",
-                    "🏗️ 시설물·환경": "#7b1fa2", "💻 디지털·시스템": "#0288d1",
-                    "🔍 기타 이슈": "#546e7a",
-                }
-
-                at_left, at_right = st.columns([3, 2])
-                with at_left:
-                    fig_cat = px.bar(
-                        cat_count, x="키워드 수", y="카테고리", orientation="h",
-                        color="카테고리", color_discrete_map=_cat_colors,
-                        text="키워드 수", template=PLOTLY_TPL,
-                        title="고객여정 카테고리별 Action-Trigger 키워드 분포",
-                    )
-                    fig_cat.update_traces(texttemplate="%{text}", textposition="outside")
-                    fig_cat.update_layout(
-                        height=max(300, len(cat_count) * 50 + 80),
-                        margin=dict(t=50, b=20, l=10, r=60),
-                        showlegend=False, title_font=dict(size=14, color=C["navy"]),
-                    )
-                    st.plotly_chart(fig_cat, use_container_width=True)
-
-                with at_right:
-                    st.markdown('<div class="card">', unsafe_allow_html=True)
-                    st.markdown("**🔑 Action-Trigger Top 15**")
-                    top15_df = at_df.head(15)[["키워드", "카테고리"]].reset_index(drop=True)
-                    top15_df.index = top15_df.index + 1
-                    top15_df.index.name = "순위"
-                    st.dataframe(top15_df, use_container_width=True, height=440)
-                    st.markdown('</div>', unsafe_allow_html=True)
-
-                st.markdown("---")
-
-                # ── 2) 카테고리별 상세 키워드 히트맵 ──
-                st.markdown('<p class="sec-head">📊 카테고리별 핵심 키워드 상세</p>', unsafe_allow_html=True)
-                cats_with_kws = at_df.groupby("카테고리")
-                n_cats = len(cats_with_kws)
-                cols_per_row = min(3, n_cats)
-                cat_items = list(cats_with_kws)
-                for row_start in range(0, len(cat_items), cols_per_row):
-                    row_cats = cat_items[row_start:row_start + cols_per_row]
-                    cols = st.columns(len(row_cats))
-                    for col, (cat_name, cat_df) in zip(cols, row_cats):
-                        with col:
-                            cat_top = cat_df.head(5)
-                            color = _cat_colors.get(cat_name, C["sky"])
-                            st.markdown(
-                                f'<div style="background:{color}15;border-left:4px solid {color};'
-                                f'padding:12px;border-radius:8px;margin-bottom:8px">'
-                                f'<b>{cat_name}</b> ({len(cat_df)}건)<br>'
-                                + " · ".join(f"`{r['키워드']}`" for _, r in cat_top.iterrows())
-                                + '</div>', unsafe_allow_html=True)
-
-                st.markdown("---")
-
-                # ── 3) 업무별 Action-Trigger 키워드 비교 ──
-                if M["business"]:
-                    st.markdown('<p class="sec-head">🏢 업무별 Action-Trigger 키워드</p>', unsafe_allow_html=True)
-                    biz_sel = st.selectbox("분석할 업무 선택",
-                                           df_f[M["business"]].dropna().astype(str).unique(), key="voc_biz_sel")
-                    biz_voc = [t for t in df_f.loc[df_f[M["business"]].astype(str) == biz_sel, M["voc"]
-                               ].astype(str).str.strip().tolist() if t and t != "nan" and t != "응답없음"]
-                    if biz_voc:
-                        biz_at_kws = extract_action_keywords(tuple(biz_voc), top_n=20)
-                        if biz_at_kws:
-                            biz_at_df = pd.DataFrame(biz_at_kws, columns=["키워드", "TF-IDF", "카테고리"])
-                            biz_cat = biz_at_df.groupby("카테고리").size().reset_index(name="키워드 수")
-                            biz_cat = biz_cat.sort_values("키워드 수", ascending=True)
-                            b_left, b_right = st.columns([3, 2])
-                            with b_left:
-                                fig_biz = px.bar(
-                                    biz_cat, x="키워드 수", y="카테고리", orientation="h",
-                                    color="카테고리", color_discrete_map=_cat_colors,
-                                    text="키워드 수", template=PLOTLY_TPL,
-                                    title=f"[{biz_sel}] Action-Trigger 카테고리 분포",
-                                )
-                                fig_biz.update_traces(texttemplate="%{text}", textposition="outside")
-                                fig_biz.update_layout(
-                                    height=max(250, len(biz_cat) * 50 + 60),
-                                    margin=dict(t=50, b=20, l=10, r=60),
-                                    showlegend=False, title_font=dict(size=14, color=C["navy"]),
-                                )
-                                st.plotly_chart(fig_biz, use_container_width=True)
-                            with b_right:
-                                st.markdown(f'<div class="card"><b>[{biz_sel}] Top 10 키워드</b>', unsafe_allow_html=True)
-                                biz_top10 = biz_at_df.head(10)[["키워드", "카테고리"]].reset_index(drop=True)
-                                biz_top10.index = biz_top10.index + 1
-                                biz_top10.index.name = "순위"
-                                st.dataframe(biz_top10, use_container_width=True, height=320)
-                                st.markdown('</div>', unsafe_allow_html=True)
-                        else:
-                            st.info(f"[{biz_sel}] 업무에서 추출된 키워드가 없습니다.")
-                    else:
-                        st.info(f"[{biz_sel}] 업무의 VOC 텍스트가 없습니다.")
-        else:
-            st.info("VOC 텍스트가 없습니다.")
-
-
-# ─────────────────────────────────────────────────────────────
 #  TAB 5  CS 인사이트 & 사전케어
 # ─────────────────────────────────────────────────────────────
 with tab5:
-    st.markdown('<p class="sec-head">💡 AI CS 활동 방향 인사이트 & 개선대책</p>', unsafe_allow_html=True)
-
-    if not M["voc"]:
-        st.warning("VOC 컬럼을 선택해야 인사이트를 생성할 수 있습니다.")
-    else:
-        # 부진 하위 3개 업무 → AI 개선대책
-        if M["business"] and M["score"]:
-            biz_grp_ins = df_f.groupby(M["business"])["_점수100"].mean().sort_values()
-            bottom3_biz = biz_grp_ins.head(3).index.tolist()
-            st.markdown(
-                '<div class="card-red"><b>🎯 AI 자동 개선대책 — 부진 하위 3개 업무</b><br>'
-                '만족도 하위 업무의 VOC 키워드를 분석하여 AI가 자동 생성한 개선대책입니다.</div>',
-                unsafe_allow_html=True)
-
-            for biz_name in bottom3_biz:
-                texts_b = [t for t in df_f.loc[df_f[M["business"]].astype(str) == str(biz_name), M["voc"]
-                           ].astype(str).str.strip().tolist() if t and t != "nan" and t != "응답없음"]
-                if not texts_b:
-                    continue
-                kws_b = extract_keywords(texts_b, top_n=15)
-                biz_score = biz_grp_ins.get(biz_name, 0)
-                recs = generate_ai_recommendations(kws_b, str(biz_name))
-                kw_str = " ".join([f"`{k}`" for k, _ in kws_b[:7]])
-                st.markdown(
-                    f'<div class="card-gold"><b>🔴 [{biz_name}] — 만족도 {biz_score:.1f}점</b><br>'
-                    f'키워드: {kw_str}<br><br>' + "<br>".join(recs) + '</div>',
-                    unsafe_allow_html=True)
-
-    st.markdown("---")
-
-    # ── 취약그룹 타겟 분석 ──
-    if M["score"] and available_cats:
-        st.markdown('<p class="sec-head">🎯 취약그룹 타겟 VOC 분석</p>', unsafe_allow_html=True)
-        st.markdown(
-            '<div class="card-gold"><b>📌 분석 방법</b> — 범주별 평균 점수 하위 30% 그룹만 선별하여 '
-            '해당 그룹의 VOC 텍스트를 집중 분석합니다. 전체 데이터가 아닌 취약그룹에 대해서만 '
-            '키워드를 추출하므로, 실질적인 개선 포인트를 정확히 파악할 수 있습니다.</div>',
-            unsafe_allow_html=True)
-
-        vg_cat = st.selectbox("취약그룹 분석 기준", available_cats, key="vg_cat_sel")
-        weak_groups, threshold, all_grp = find_vulnerable_group(df_f, vg_cat, "_점수100", percentile=30)
-
-        if len(weak_groups) > 0:
-            vg1, vg2 = st.columns([1, 1])
-            with vg1:
-                st.markdown(f"**하위 30% 기준선:** {threshold:.1f}점")
-                st.dataframe(weak_groups, use_container_width=True, hide_index=True)
-            with vg2:
-                fig_vg = px.bar(
-                    all_grp.sort_values("평균"), x="평균", y=vg_cat, orientation="h",
-                    color=all_grp["평균"].apply(lambda v: "🔴 취약" if v <= threshold else "일반"),
-                    color_discrete_map={"🔴 취약": C["red"], "일반": C["sky"]},
-                    template=PLOTLY_TPL, text=all_grp.sort_values("평균")["평균"].round(1),
-                    title=f"{vg_cat}별 평균 만족도 (빨간색 = 취약그룹)",
-                )
-                fig_vg.update_traces(texttemplate="%{text:.1f}", textposition="outside")
-                fig_vg.update_layout(
-                    height=max(300, len(all_grp) * 30 + 80),
-                    margin=dict(t=60, b=20, l=10, r=80),
-                    showlegend=False, title_font=dict(size=14, color=C["navy"]),
-                )
-                st.plotly_chart(fig_vg, use_container_width=True)
-
-            # 취약그룹 VOC 집중 분석
-            if M["voc"]:
-                weak_names = weak_groups[vg_cat].tolist()
-                df_weak = df_f[df_f[vg_cat].astype(str).isin([str(n) for n in weak_names])]
-                weak_voc = [t for t in df_weak[M["voc"]].astype(str).str.strip().tolist()
-                            if t and t != "nan" and t != "응답없음"]
-                if weak_voc:
-                    weak_at_kws = extract_action_keywords(tuple(weak_voc), top_n=20)
-                    if weak_at_kws:
-                        st.markdown(
-                            f'<p class="sec-head">🔍 취약그룹({", ".join(str(n) for n in weak_names)}) Action-Trigger 키워드</p>',
-                            unsafe_allow_html=True)
-                        wk_at_df = pd.DataFrame(weak_at_kws, columns=["키워드", "TF-IDF", "카테고리"])
-                        wk_cat = wk_at_df.groupby("카테고리").size().reset_index(name="키워드 수")
-                        wk_cat = wk_cat.sort_values("키워드 수", ascending=True)
-                        _wk_cat_colors = {
-                            "📞 안내·상담": "#1976d2", "📋 접수·절차": "#f0a500",
-                            "🔧 현장처리·시공": "#e65100", "⏱️ 처리속도·지연": "#ff6f00",
-                            "📮 사후관리·피드백": "#00897b", "💰 요금·과금": "#c62828",
-                            "🏗️ 시설물·환경": "#7b1fa2", "💻 디지털·시스템": "#0288d1",
-                            "🔍 기타 이슈": "#546e7a",
-                        }
-                        wk_l, wk_r = st.columns([3, 2])
-                        with wk_l:
-                            fig_wk = px.bar(
-                                wk_cat, x="키워드 수", y="카테고리", orientation="h",
-                                color="카테고리", color_discrete_map=_wk_cat_colors,
-                                text="키워드 수", template=PLOTLY_TPL,
-                                title="취약그룹 Action-Trigger 카테고리 분포",
-                            )
-                            fig_wk.update_traces(texttemplate="%{text}", textposition="outside")
-                            fig_wk.update_layout(
-                                height=max(250, len(wk_cat) * 50 + 60),
-                                margin=dict(t=50, b=20, l=10, r=60),
-                                showlegend=False, title_font=dict(size=14, color=C["navy"]),
-                            )
-                            st.plotly_chart(fig_wk, use_container_width=True)
-                        with wk_r:
-                            st.markdown('<div class="card"><b>취약그룹 Top 10 키워드</b>', unsafe_allow_html=True)
-                            wk_top = wk_at_df.head(10)[["키워드", "카테고리"]].reset_index(drop=True)
-                            wk_top.index = wk_top.index + 1
-                            wk_top.index.name = "순위"
-                            st.dataframe(wk_top, use_container_width=True, height=380)
-                            st.markdown('</div>', unsafe_allow_html=True)
-
-                        # 취약그룹 AI 개선대책
-                        weak_kws_for_rec = extract_keywords(weak_voc, top_n=15)
-                        recs_vg = generate_ai_recommendations(weak_kws_for_rec, f"취약그룹({', '.join(str(n) for n in weak_names)})")
-                        if recs_vg:
-                            st.markdown(
-                                '<div class="card-red"><b>💡 취약그룹 AI 개선대책</b><br><br>'
-                                + "<br>".join(recs_vg)
-                                + '</div>', unsafe_allow_html=True)
-                else:
-                    st.info("취약그룹에 해당하는 VOC 텍스트가 없습니다.")
-        else:
-            st.success("하위 30% 기준에 해당하는 취약그룹이 없습니다. 전체적으로 양호합니다.")
-
-        st.markdown("---")
-
     # ── 잠재 민원고객 사전케어 ──
     st.markdown('<p class="sec-head">🚨 잠재적 민원고객 사전케어 리스트 (AI 자동 추출)</p>', unsafe_allow_html=True)
     st.markdown(
@@ -2015,231 +1629,6 @@ with tab5:
 
 
 # ─────────────────────────────────────────────────────────────
-#  TAB 6  다차원 교차분석
-# ─────────────────────────────────────────────────────────────
-with tab6:
-    st.markdown('<p class="sec-head">📈 다차원 교차분석</p>', unsafe_allow_html=True)
-
-    if not M["score"]:
-        st.warning("만족도 점수 컬럼이 필요합니다.")
-    elif not available_cats:
-        st.warning("범주형 컬럼(지사, 접수자구분, 업무구분 등)이 필요합니다.")
-    else:
-        # ── 범주 선택 ──
-        cat_sel = st.selectbox("교차분석 기준 범주 선택", available_cats, key="cross_cat_sel")
-
-        # ── Boxplot: 범주별 종합점수 분포 ──
-        st.markdown('<p class="sec-head">📦 범주별 점수 분포 (Boxplot)</p>', unsafe_allow_html=True)
-        fig_box = px.box(
-            df_f, x=cat_sel, y="_점수100", color=cat_sel,
-            color_discrete_sequence=MIXED_COLORS, template=PLOTLY_TPL,
-            title=f"{cat_sel}별 종합 점수 분포", points="outliers",
-        )
-        fig_box.add_hline(y=avg_score_100, line_dash="dot", line_color=C["gold"], line_width=2,
-                          annotation_text=f"전체 평균 {avg_score_100:.1f}",
-                          annotation_font_size=11, annotation_font_color=C["gold"])
-        fig_box.update_layout(
-            height=450, margin=dict(t=60, b=80, l=60, r=20),
-            xaxis_tickangle=-25, showlegend=False,
-            yaxis_title="종합 점수 (100점)", title_font=dict(size=14, color=C["navy"]),
-        )
-        st.plotly_chart(fig_box, use_container_width=True)
-
-        # ── Radar Chart: 범주별 개별 점수 비교 ──
-        if individual_scores and len(individual_scores) >= 3:
-            st.markdown("---")
-            st.markdown('<p class="sec-head">🕸️ 범주별 개별항목 레이더 차트</p>', unsafe_allow_html=True)
-            radar_groups = df_f.groupby(cat_sel)[individual_scores].mean()
-
-            # 상위 8개 그룹만 표시 (너무 많으면 가독성 저하)
-            if len(radar_groups) > 8:
-                radar_groups = radar_groups.head(8)
-                st.caption("※ 가독성을 위해 상위 8개 그룹만 표시합니다.")
-
-            fig_radar_cross = go.Figure()
-            colors_iter = MIXED_COLORS
-            for i, (grp_name, row) in enumerate(radar_groups.iterrows()):
-                vals = row.tolist() + [row.tolist()[0]]
-                cats = individual_scores + [individual_scores[0]]
-                fig_radar_cross.add_trace(go.Scatterpolar(
-                    r=vals, theta=cats, fill='toself',
-                    name=str(grp_name),
-                    fillcolor=f"rgba({int(colors_iter[i % len(colors_iter)][1:3], 16)},{int(colors_iter[i % len(colors_iter)][3:5], 16)},{int(colors_iter[i % len(colors_iter)][5:7], 16)},0.08)",
-                    line=dict(color=colors_iter[i % len(colors_iter)], width=2),
-                ))
-            fig_radar_cross.update_layout(
-                polar=dict(radialaxis=dict(visible=True, range=[0, 100], tickfont=dict(size=9))),
-                height=500, template=PLOTLY_TPL,
-                title=dict(text=f"{cat_sel}별 개별항목 비교 (레이더)", font=dict(size=14, color=C["navy"])),
-                margin=dict(t=80, b=40, l=80, r=80),
-            )
-            st.plotly_chart(fig_radar_cross, use_container_width=True)
-
-        # ── 범주별 평균 점수 히트맵 (개별항목) ──
-        if individual_scores:
-            st.markdown("---")
-            st.markdown('<p class="sec-head">🌡️ 범주별 개별항목 평균 히트맵</p>', unsafe_allow_html=True)
-            pivot_cross = df_f.pivot_table(
-                values=individual_scores, index=cat_sel, aggfunc="mean"
-            ).round(1)
-            if not pivot_cross.empty:
-                fig_hm_cross = px.imshow(
-                    pivot_cross, color_continuous_scale="RdYlGn",
-                    text_auto=".1f", aspect="auto", template=PLOTLY_TPL,
-                    title=f"{cat_sel}별 개별항목 평균 점수 (초록=높음 / 빨강=낮음)",
-                )
-                fig_hm_cross.update_layout(
-                    height=max(350, len(pivot_cross) * 30 + 100),
-                    margin=dict(t=60, b=60, l=120, r=60),
-                    title_font=dict(size=14, color=C["navy"]),
-                )
-                st.plotly_chart(fig_hm_cross, use_container_width=True)
-
-
-# ─────────────────────────────────────────────────────────────
-#  TAB 8  시계열 트렌드 분석
-# ─────────────────────────────────────────────────────────────
-with tab8:
-    st.markdown('<p class="sec-head">📅 시계열 트렌드 분석</p>', unsafe_allow_html=True)
-
-    if not M.get("date"):
-        st.info("📌 날짜 컬럼(접수일자, 조사일자 등)이 엑셀에 포함되어 있으면 자동으로 시계열 분석이 활성화됩니다.")
-    elif not M["score"]:
-        st.warning("만족도 점수 컬럼이 필요합니다.")
-    else:
-        # ── 8-1. 월별 만족도 추이 ──
-        st.markdown('<p class="sec-head">📈 월별 만족도 추이</p>', unsafe_allow_html=True)
-        monthly = df_f.groupby("_년월")["_점수100"].agg(["mean","count"]).reset_index()
-        monthly.columns = ["년월", "평균만족도", "응답수"]
-        monthly = monthly.sort_values("년월")
-
-        fig_trend = make_subplots(specs=[[{"secondary_y": True}]])
-        fig_trend.add_trace(
-            go.Scatter(x=monthly["년월"], y=monthly["평균만족도"], mode="lines+markers+text",
-                       name="평균 만족도", line=dict(color=C["blue"], width=3),
-                       marker=dict(size=8), text=monthly["평균만족도"].round(1),
-                       textposition="top center", textfont=dict(size=10)),
-            secondary_y=False)
-        fig_trend.add_trace(
-            go.Bar(x=monthly["년월"], y=monthly["응답수"], name="응답수",
-                   marker_color=C["sky"], opacity=0.35),
-            secondary_y=True)
-        fig_trend.update_layout(
-            height=420, template=PLOTLY_TPL,
-            title=dict(text="월별 평균 만족도 추이 & 응답 건수", font=dict(size=14, color=C["navy"])),
-            margin=dict(t=60, b=60, l=60, r=60), legend=dict(orientation="h", y=1.12),
-        )
-        fig_trend.update_yaxes(title_text="만족도 (100점)", secondary_y=False)
-        fig_trend.update_yaxes(title_text="응답수", secondary_y=True)
-        st.plotly_chart(fig_trend, use_container_width=True)
-
-        # 전월 대비 변화 감지
-        if len(monthly) >= 2:
-            last = monthly.iloc[-1]
-            prev = monthly.iloc[-2]
-            diff = last["평균만족도"] - prev["평균만족도"]
-            arrow = "📈" if diff > 0 else "📉" if diff < 0 else "➡️"
-            st.markdown(
-                f'<div class="insight-box">{arrow} <b>최근 변화:</b> '
-                f'{prev["년월"]} ({prev["평균만족도"]:.1f}점) → {last["년월"]} ({last["평균만족도"]:.1f}점), '
-                f'<b>{diff:+.1f}점</b> 변동</div>', unsafe_allow_html=True)
-
-        st.markdown("---")
-
-        # ── 8-2. 분기별 비교 ──
-        st.markdown('<p class="sec-head">📊 분기별 만족도 비교</p>', unsafe_allow_html=True)
-        quarterly = df_f.groupby("_분기")["_점수100"].agg(["mean","count"]).reset_index()
-        quarterly.columns = ["분기", "평균만족도", "응답수"]
-        quarterly = quarterly.sort_values("분기")
-
-        fig_q = px.bar(quarterly, x="분기", y="평균만족도", text="평균만족도",
-                       color_discrete_sequence=[C["blue"]], template=PLOTLY_TPL,
-                       title="분기별 평균 만족도")
-        fig_q.update_traces(texttemplate="%{text:.1f}", textposition="outside")
-        fig_q.update_layout(height=380, margin=dict(t=60, b=60, l=60, r=20),
-                             yaxis_title="만족도 (100점)", title_font=dict(size=14, color=C["navy"]))
-        st.plotly_chart(fig_q, use_container_width=True)
-
-        st.markdown("---")
-
-        # ── 8-3. 계절별 점수 비교 ──
-        st.markdown('<p class="sec-head">🌤️ 계절별 만족도 비교</p>', unsafe_allow_html=True)
-        season_order = ["봄", "여름", "가을", "겨울"]
-        seasonal = df_f.groupby("_계절")["_점수100"].agg(["mean","count"]).reset_index()
-        seasonal.columns = ["계절", "평균만족도", "응답수"]
-        seasonal["계절"] = pd.Categorical(seasonal["계절"], categories=season_order, ordered=True)
-        seasonal = seasonal.sort_values("계절")
-        season_colors = {"봄": "#66bb6a", "여름": "#ef5350", "가을": "#ffa726", "겨울": "#42a5f5"}
-
-        s_l, s_r = st.columns([1, 1])
-        with s_l:
-            fig_season = px.bar(seasonal, x="계절", y="평균만족도", color="계절",
-                                color_discrete_map=season_colors, text="평균만족도",
-                                template=PLOTLY_TPL, title="계절별 평균 만족도")
-            fig_season.update_traces(texttemplate="%{text:.1f}", textposition="outside")
-            fig_season.update_layout(height=380, showlegend=False,
-                                      yaxis_title="만족도", title_font=dict(size=14, color=C["navy"]))
-            st.plotly_chart(fig_season, use_container_width=True)
-        with s_r:
-            if individual_scores and len(seasonal) >= 3:
-                season_radar = df_f.groupby("_계절")[individual_scores].mean()
-                season_radar = season_radar.reindex(season_order).dropna()
-                fig_sr = go.Figure()
-                for i, (sn, row) in enumerate(season_radar.iterrows()):
-                    vals = row.tolist() + [row.tolist()[0]]
-                    cats = individual_scores + [individual_scores[0]]
-                    fig_sr.add_trace(go.Scatterpolar(
-                        r=vals, theta=cats, fill='toself', name=str(sn),
-                        line=dict(color=season_colors.get(sn, C["gray"]), width=2),
-                    ))
-                fig_sr.update_layout(
-                    polar=dict(radialaxis=dict(visible=True, range=[0, 100], tickfont=dict(size=9))),
-                    height=380, template=PLOTLY_TPL,
-                    title=dict(text="계절별 개별항목 비교", font=dict(size=14, color=C["navy"])),
-                    margin=dict(t=60, b=20, l=60, r=60))
-                st.plotly_chart(fig_sr, use_container_width=True)
-            else:
-                fig_sp = px.pie(seasonal, names="계절", values="응답수", hole=0.45,
-                                color="계절", color_discrete_map=season_colors,
-                                template=PLOTLY_TPL, title="계절별 응답 비율")
-                fig_sp.update_layout(height=380, title_font=dict(size=14, color=C["navy"]))
-                st.plotly_chart(fig_sp, use_container_width=True)
-
-        # 계절 인사이트
-        if len(seasonal) >= 2:
-            best_s = seasonal.loc[seasonal["평균만족도"].idxmax()]
-            worst_s = seasonal.loc[seasonal["평균만족도"].idxmin()]
-            gap = best_s["평균만족도"] - worst_s["평균만족도"]
-            st.markdown(
-                f'<div class="insight-box">🌡️ <b>계절 인사이트:</b> '
-                f'<b>{best_s["계절"]}</b>({best_s["평균만족도"]:.1f}점)이 가장 높고, '
-                f'<b>{worst_s["계절"]}</b>({worst_s["평균만족도"]:.1f}점)이 가장 낮습니다. '
-                f'격차 <b>{gap:.1f}점</b>'
-                + (f' — {worst_s["계절"]}철 집중 CS 관리가 필요합니다.' if gap >= 3 else '.')
-                + '</div>', unsafe_allow_html=True)
-
-        st.markdown("---")
-
-        # ── 8-4. 지사별 월별 추이 ──
-        if M["office"]:
-            st.markdown('<p class="sec-head">🏢 지사별 월별 만족도 추이</p>', unsafe_allow_html=True)
-            office_monthly = df_f.groupby([M["office"], "_년월"])["_점수100"].mean().reset_index()
-            office_monthly.columns = ["지사", "년월", "평균만족도"]
-            office_monthly = office_monthly.sort_values("년월")
-
-            fig_om = px.line(office_monthly, x="년월", y="평균만족도", color="지사",
-                             markers=True, template=PLOTLY_TPL,
-                             color_discrete_sequence=MIXED_COLORS,
-                             title="지사별 월별 만족도 추이")
-            fig_om.update_layout(
-                height=450, margin=dict(t=60, b=60, l=60, r=20),
-                yaxis_title="만족도 (100점)", title_font=dict(size=14, color=C["navy"]),
-                legend=dict(orientation="h", y=-0.2),
-            )
-            st.plotly_chart(fig_om, use_container_width=True)
-
-
-# ─────────────────────────────────────────────────────────────
 #  TAB 9  지사 심층 분석 · 패턴 탐지
 # ─────────────────────────────────────────────────────────────
 with tab9:
@@ -2365,78 +1754,26 @@ with tab9:
                     st.success("전체 평균 대비 -5점 이상 급락한 조합이 없습니다.")
             st.markdown("---")
 
-        # ── 9-3. 부정 키워드 급증 시점/지사 탐지 ──
-        if M["voc"] and M.get("date") and "_년월" in df_f.columns:
-            st.markdown('<p class="sec-head">📈 부정 키워드 급증 탐지 (월별)</p>', unsafe_allow_html=True)
-
-            df_f["_부정여부"] = df_f[M["voc"]].apply(lambda x: check_negative(x)[0])
-            monthly_neg = df_f.groupby("_년월").agg(
-                전체건수=("_부정여부", "count"),
-                부정건수=("_부정여부", "sum"),
-            ).reset_index()
-            monthly_neg["부정비율"] = (monthly_neg["부정건수"] / monthly_neg["전체건수"] * 100).round(1)
-            monthly_neg = monthly_neg.sort_values("_년월")
-
-            fig_neg_trend = make_subplots(specs=[[{"secondary_y": True}]])
-            fig_neg_trend.add_trace(
-                go.Bar(x=monthly_neg["_년월"], y=monthly_neg["부정건수"],
-                       name="부정 VOC 건수", marker_color=C["red"], opacity=0.6),
-                secondary_y=False)
-            fig_neg_trend.add_trace(
-                go.Scatter(x=monthly_neg["_년월"], y=monthly_neg["부정비율"],
-                           name="부정 비율(%)", mode="lines+markers+text",
-                           line=dict(color=C["gold"], width=3), marker=dict(size=7),
-                           text=monthly_neg["부정비율"].apply(lambda v: f"{v:.1f}%"),
-                           textposition="top center", textfont=dict(size=10)),
-                secondary_y=True)
-            fig_neg_trend.update_layout(
-                height=400, template=PLOTLY_TPL,
-                title=dict(text="월별 부정 VOC 건수 & 비율 추이", font=dict(size=14, color=C["navy"])),
-                margin=dict(t=60, b=60, l=60, r=60), legend=dict(orientation="h", y=1.12))
-            fig_neg_trend.update_yaxes(title_text="부정 건수", secondary_y=False)
-            fig_neg_trend.update_yaxes(title_text="부정 비율(%)", secondary_y=True)
-            st.plotly_chart(fig_neg_trend, use_container_width=True)
-
-            # 급증 감지
-            if len(monthly_neg) >= 2:
-                monthly_neg["전월대비"] = monthly_neg["부정비율"].diff()
-                surge = monthly_neg[monthly_neg["전월대비"] >= 5].sort_values("전월대비", ascending=False)
-                if len(surge) > 0:
-                    for _, row in surge.head(3).iterrows():
-                        st.markdown(
-                            f'<div class="card-red">🚨 <b>{row["_년월"]}</b> — '
-                            f'부정 비율 {row["부정비율"]:.1f}% '
-                            f'(전월 대비 <b>+{row["전월대비"]:.1f}%p</b> 급증, {int(row["부정건수"])}건)'
-                            f'</div>', unsafe_allow_html=True)
-                else:
-                    st.success("전월 대비 5%p 이상 급증한 월이 없습니다.")
-
-            # 지사별 부정 비율
-            if M["office"]:
-                st.markdown("---")
-                st.markdown('<p class="sec-head">🏢 지사별 부정 VOC 비율</p>', unsafe_allow_html=True)
-                office_neg = df_f.groupby(M["office"]).agg(
-                    전체건수=("_부정여부", "count"),
-                    부정건수=("_부정여부", "sum"),
-                ).reset_index()
-                office_neg["부정비율"] = (office_neg["부정건수"] / office_neg["전체건수"] * 100).round(1)
-                office_neg = office_neg.sort_values("부정비율", ascending=True)
-
-                fig_on = px.bar(office_neg, x="부정비율", y=M["office"], orientation="h",
-                                text="부정비율", template=PLOTLY_TPL,
-                                color=office_neg["부정비율"].apply(
-                                    lambda v: "🔴 위험" if v >= 30 else "🟡 주의" if v >= 15 else "일반"),
-                                color_discrete_map={"🔴 위험": C["red"], "🟡 주의": C["gold"], "일반": C["sky"]},
-                                title="지사별 부정 VOC 비율 (%)")
-                fig_on.update_traces(texttemplate="%{text:.1f}%", textposition="outside")
-                fig_on.update_layout(
-                    height=max(300, len(office_neg) * 30 + 80),
-                    margin=dict(t=60, b=20, l=10, r=80),
-                    showlegend=False, title_font=dict(size=14, color=C["navy"]))
-                st.plotly_chart(fig_on, use_container_width=True)
-
-        elif M["voc"] and not M.get("date"):
-            st.info("📌 날짜 컬럼이 있으면 부정 키워드 급증 시점을 자동 탐지할 수 있습니다.")
+        # ── 9-3. 범주별 개별항목 평균 히트맵 (다차원 교차분석에서 이동) ──
+        if individual_scores and available_cats:
+            st.markdown("---")
+            st.markdown('<p class="sec-head">🌡️ 범주별 개별항목 평균 히트맵</p>', unsafe_allow_html=True)
+            cat_sel_hm = st.selectbox("히트맵 기준 범주 선택", available_cats, key="hm_cat_sel_tab9")
+            pivot_cross = df_f.pivot_table(
+                values=individual_scores, index=cat_sel_hm, aggfunc="mean"
+            ).round(1)
+            if not pivot_cross.empty:
+                fig_hm_cross = px.imshow(
+                    pivot_cross, color_continuous_scale="RdYlGn",
+                    text_auto=".1f", aspect="auto", template=PLOTLY_TPL,
+                    title=f"{cat_sel_hm}별 개별항목 평균 점수 (초록=높음 / 빨강=낮음)",
+                )
+                fig_hm_cross.update_layout(
+                    height=max(350, len(pivot_cross) * 30 + 100),
+                    margin=dict(t=60, b=60, l=120, r=60),
+                    title_font=dict(size=14, color=C["navy"]),
+                )
+                st.plotly_chart(fig_hm_cross, use_container_width=True)
 
 # ─────────────────────────────────────────────────────────────
 #  TAB 10  CXO 딥 인사이트 (투트랙 VOC 분석)
@@ -2469,26 +1806,28 @@ with tab10:
     st.markdown('<p class="sec-head">1️⃣ 투트랙 VOC 분석 — 1차 감성 분류 + 2차 원인 태깅</p>',
                 unsafe_allow_html=True)
 
-    if M["voc"]:
+    if M["voc"] and "_VOC감성" in df_pure.columns:
+        # 전역 _VOC감성 컬럼 사용 (전체 행 기준 — 응답없음도 중립으로 포함)
+        voc_cls_pure = df_pure["_VOC감성"].value_counts()
+        pos_n = voc_cls_pure.get("긍정", 0)
+        neu_n = voc_cls_pure.get("중립", 0)
+        neg_n = voc_cls_pure.get("부정", 0)
+        _total_pure = pos_n + neu_n + neg_n
+
+        # 부정 VOC 원인 태깅용: 텍스트가 있는 부정 VOC만 별도 추출
         voc_valid = df_pure[M["voc"]].dropna()
         voc_valid = voc_valid[~voc_valid.isin(["응답없음", "nan", ""])]
-
-        # 1차: 감성 분류
         sentiment_series = voc_valid.apply(_classify_sentiment_3tier)
-        sent_counts = sentiment_series.value_counts()
-        pos_n = sent_counts.get("긍정", 0)
-        neu_n = sent_counts.get("중립", 0)
-        neg_n = sent_counts.get("부정", 0)
 
         sc1, sc2, sc3, sc4 = st.columns(4)
         with sc1:
-            st.metric("📝 분석 대상 VOC", f"{len(voc_valid):,}건")
+            st.metric("📝 분석 대상", f"{_total_pure:,}건")
         with sc2:
-            st.metric("😊 긍정", f"{pos_n:,}건 ({pos_n / max(len(voc_valid), 1) * 100:.1f}%)")
+            st.metric("😊 긍정", f"{pos_n:,}건 ({pos_n / max(_total_pure, 1) * 100:.1f}%)")
         with sc3:
-            st.metric("😐 중립", f"{neu_n:,}건 ({neu_n / max(len(voc_valid), 1) * 100:.1f}%)")
+            st.metric("😐 중립", f"{neu_n:,}건 ({neu_n / max(_total_pure, 1) * 100:.1f}%)")
         with sc4:
-            st.metric("😡 부정", f"{neg_n:,}건 ({neg_n / max(len(voc_valid), 1) * 100:.1f}%)")
+            st.metric("😡 부정", f"{neg_n:,}건 ({neg_n / max(_total_pure, 1) * 100:.1f}%)")
 
         # 감성 분포 도넛 차트
         sent_df = pd.DataFrame({"감성": ["긍정", "중립", "부정"], "건수": [pos_n, neu_n, neg_n]})
@@ -2946,3 +2285,184 @@ with tab10:
             st.plotly_chart(fig_sc, use_container_width=True)
     else:
         st.info("지사, VOC, 종합점수 컬럼이 모두 필요합니다.")
+
+# ─────────────────────────────────────────────────────────────
+#  TAB 11  지사 맞춤형 CS 솔루션 (Hugging Face AI 연동)
+# ─────────────────────────────────────────────────────────────
+
+# ── Hugging Face AI 인사이트 함수 ─────────────────────────────────
+
+@st.cache_data(show_spinner=False)
+def get_hf_insight(office, biz_name, target_ct, voc_texts):
+    """Hugging Face API를 호출하여 다차원 인사이트를 도출하는 함수"""
+    if not HF_AVAILABLE:
+        return ("AI 모듈 미설치", "huggingface_hub 패키지를 설치해주세요.", "pip install huggingface_hub")
+
+    if not voc_texts:
+        return ("추가 VOC 데이터 필요",
+                "서술 의견이 존재하지 않아 문맥 분석이 불가합니다.",
+                "해당 업무 불만 고객 대상 아웃바운드 콜을 통한 상세 원인 파악")
+
+    meaningful_voc = [str(t).strip() for t in voc_texts if len(str(t).strip()) > 5]
+    if not meaningful_voc:
+        return ("단순 불만 (구체적 의견 없음)", "수집된 의견이 너무 짧아 원인 특정이 어렵습니다.", "VOC 수집 시 구체적 사유 작성 유도")
+
+    voc_str = " / ".join(meaningful_voc[:10])
+
+    prompt = f"""당신은 전력산업에 20년 이상 종사한 최고 고객만족도(CS) 분석 전문가입니다.
+아래 [데이터]를 바탕으로, 지사장이 즉시 액션할 수 있는 맞춤형 인사이트를 도출하세요.
+
+[데이터]
+- 대상 지사: {office}
+- 취약 업무: {biz_name}
+- 불만이 집중된 계약종별: {target_ct}
+- 실제 고객 VOC: {voc_str}
+
+[분석 및 추론 규칙]
+1. 단순 친절 교육, 매뉴얼 배포 같은 뻔하고 추상적인 액션 아이템은 절대 금지합니다.
+2. 전력산업의 도메인 지식(계절적 요인, 산업 특성, 요금제 등)과 제공된 VOC를 유기적으로 연결하여 뾰족한 인사이트를 뽑아내세요.
+3. 결과는 반드시 아래 JSON 형식으로만 출력하세요. (마크다운 등 다른 텍스트 절대 금지)
+
+{{"painpoint": "[상황/행위] + [결과/감정] 형태의 구체적 키워드 (예: 농번기 잦은 정전으로 인한 작물 피해 우려)", "context": "왜 이런 불만이 나왔는지 VOC와 전력산업 특성을 결합한 원인 추론 (2~3문장)", "action": "지사장이 당장 지시할 수 있는 구체적인 개선 조치 (1문장)"}}"""
+
+    try:
+        response = hf_client.chat_completion(
+            model="mistralai/Mixtral-8x7B-Instruct-v0.1",
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=1024,
+        )
+        res_text = response.choices[0].message.content.strip()
+
+        if res_text.startswith("```json"):
+            res_text = res_text[7:-3].strip()
+        elif res_text.startswith("```"):
+            res_text = res_text[3:-3].strip()
+
+        data = json.loads(res_text)
+        return (data.get("painpoint", "분석 오류"),
+                data.get("context", "분석 오류"),
+                data.get("action", "분석 오류"))
+    except Exception as e:
+        return ("AI 분석 일시 지연",
+                f"API 통신 중 문제가 발생했습니다. (내용: {str(e)})",
+                "잠시 후 다시 시도하거나, 데이터 양을 줄여보세요.")
+
+
+with tab11:
+    st.markdown(
+        '<p class="sec-head">🏢 지사 맞춤형 CS 솔루션 — AI 딥러닝 다차원 교차분석</p>',
+        unsafe_allow_html=True)
+
+    _need_office = M.get("office")
+    _need_score  = M.get("score")
+    _need_biz    = M.get("business")
+    _has_contract = M.get("contract")
+    _has_voc      = M.get("voc")
+
+    if _need_office and _need_score and _need_biz:
+        st.markdown(
+            f'<div class="card-blue">'
+            f'<b>🧠 AI 인사이트 도출 프로세스</b><br><br>'
+            f'<b>1차</b> 지사별 취약 업무구분 추출 → '
+            f'<b>2차</b> 취약 업무 내 타겟 계약종별 특정 → '
+            f'<b>3차</b> 실제 고객 VOC를 Hugging Face AI로 실시간 전송<br>'
+            f'Hugging Face AI가 문맥을 분석하여 <b>기존에 없던 뾰족한 원인과 맞춤형 액션 아이템</b>을 자동 창작합니다.'
+            f'</div>', unsafe_allow_html=True)
+
+        st.markdown("")
+
+        offices = sorted(df_f[_need_office].dropna().unique().tolist())
+        sel_mode = st.radio(
+            "분석 대상", ["🔍 특정 지사 선택 (API 속도를 위해 권장)", "📋 전체 지사"],
+            horizontal=True, key="tab11_sel_mode")
+
+        if "특정" in sel_mode:
+            sel_offices = st.multiselect("지사 선택", offices, default=offices[:1] if len(offices) >= 1 else offices,
+                                         key="tab11_offices")
+        else:
+            sel_offices = None
+
+        st.markdown("---")
+
+        score_col = "_점수100" if "_점수100" in df_f.columns else _need_score
+        grp = df_f.groupby([_need_office, _need_biz])[score_col].agg(["mean", "count"]).reset_index()
+        grp.columns = ["지사", "업무구분", "평균점수", "건수"]
+        grp = grp[grp["건수"] >= 3]
+
+        office_avg = df_f.groupby(_need_office)[score_col].mean().reset_index()
+        office_avg.columns = ["지사", "지사평균"]
+        office_avg = office_avg.sort_values("지사평균")
+
+        if sel_offices:
+            target_offices = [o for o in office_avg["지사"] if o in sel_offices]
+        else:
+            target_offices = office_avg["지사"].tolist()
+
+        if not target_offices:
+            st.warning("선택된 지사가 없습니다.")
+        else:
+            for office in target_offices:
+                oavg = office_avg[office_avg["지사"] == office]["지사평균"].values
+                oavg_val = oavg[0] if len(oavg) > 0 else 0
+
+                st.markdown(f'## 🏢 {office} CS 심층 분석 및 맞춤형 솔루션')
+                st.markdown(f'**전체 평균: {oavg_val:.1f}점**')
+
+                office_grp = grp[grp["지사"] == office].sort_values("평균점수").head(3)
+
+                if office_grp.empty:
+                    st.info(f"{office}: 분석 가능한 업무구분 데이터가 부족합니다 (3건 이상 필요).")
+                    st.markdown("---")
+                    continue
+
+                result_rows = []
+
+                with st.spinner(f"✨ 구글 AI가 {office}의 데이터를 심층 분석 중입니다..."):
+                    for _, biz_row in office_grp.iterrows():
+                        biz_name = biz_row["업무구분"]
+                        biz_avg  = biz_row["평균점수"]
+                        biz_cnt  = int(biz_row["건수"])
+
+                        target_ct = "-"
+                        target_ct_avg = 0
+                        if _has_contract:
+                            ct_sub = df_f[(df_f[_need_office] == office) & (df_f[_need_biz] == biz_name)]
+                            ct_grp = ct_sub.groupby(_has_contract)[score_col].agg(["mean", "count"]).reset_index()
+                            ct_grp.columns = ["계약종별", "평균", "건수"]
+                            ct_grp = ct_grp[ct_grp["건수"] >= 1].sort_values("평균")
+                            if not ct_grp.empty:
+                                target_ct = ct_grp.iloc[0]["계약종별"]
+                                target_ct_avg = ct_grp.iloc[0]["평균"]
+
+                        voc_texts = []
+                        if _has_voc:
+                            voc_filter = (df_f[_need_office] == office) & (df_f[_need_biz] == biz_name)
+                            if _has_contract and target_ct != "-":
+                                voc_sub = df_f[voc_filter & (df_f[_has_contract] == target_ct) & (df_f[score_col] <= 80)]
+                            else:
+                                voc_sub = df_f[voc_filter & (df_f[score_col] <= 80)]
+
+                            if not voc_sub.empty:
+                                voc_texts = voc_sub[_has_voc].dropna().tolist()
+
+                        painpoint, context, action = get_hf_insight(office, biz_name, target_ct, voc_texts)
+
+                        row = {
+                            "취약 업무구분": f"{biz_name} ({biz_avg:.1f}점, {biz_cnt}건)",
+                            "주요 타겟 (계약종별)": f"{target_ct}" + (f" ({target_ct_avg:.0f}점)" if target_ct != "-" else ""),
+                            "핵심 페인포인트": painpoint,
+                            "원인 분석 및 추론": context,
+                            "지사 맞춤형 Action Item": action,
+                        }
+                        result_rows.append(row)
+
+                df_result = pd.DataFrame(result_rows)
+                st.dataframe(df_result, use_container_width=True, hide_index=True)
+                st.markdown("---")
+    else:
+        missing = []
+        if not _need_office: missing.append("지사")
+        if not _need_score:  missing.append("종합점수")
+        if not _need_biz:    missing.append("업무구분")
+        st.info(f"이 분석을 수행하려면 다음 컬럼이 필요합니다: {', '.join(missing)}")
+

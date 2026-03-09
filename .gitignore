@@ -1,0 +1,13 @@
+# API 키 / 환경변수
+.env
+
+# Python
+__pycache__/
+*.pyc
+
+# IDE / editor
+.vscode/
+
+# OS files
+Thumbs.db
+Desktop.ini
