@@ -16,7 +16,27 @@ import matplotlib.pyplot as plt
 import matplotlib.font_manager as fm
 from collections import Counter
 import math
-import io, re, os, json
+import io, re, os, json, ssl
+
+# ── SSL 방화벽 우회 (사내 프록시/방화벽 환경) ──────────────────
+ssl._create_default_https_context = ssl._create_unverified_context
+os.environ["CURL_CA_BUNDLE"] = ""
+os.environ["REQUESTS_CA_BUNDLE"] = ""
+os.environ["HF_HUB_DISABLE_TELEMETRY"] = "1"
+try:
+    import urllib3
+    urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+except Exception:
+    pass
+try:
+    import requests
+    _orig_send = requests.Session.send
+    def _ssl_bypass_send(self, *args, **kwargs):
+        kwargs["verify"] = False
+        return _orig_send(self, *args, **kwargs)
+    requests.Session.send = _ssl_bypass_send
+except Exception:
+    pass
 
 # ── 선택적 라이브러리 ──────────────────────────────────────────
 try:
@@ -40,25 +60,24 @@ except Exception:
     SKLEARN_AVAILABLE = False
 
 try:
-    from huggingface_hub import InferenceClient
-    _HF_KEY = os.environ.get("HF_API_KEY", "")
-    if not _HF_KEY:
+    import requests as _req_lib
+    _GEMINI_KEY = os.environ.get("GEMINI_API_KEY", "")
+    if not _GEMINI_KEY:
         # .env 파일에서 읽기
         _env_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env")
         if os.path.exists(_env_path):
             with open(_env_path, encoding="utf-8") as _ef:
                 for _line in _ef:
                     _line = _line.strip()
-                    if _line.startswith("HF_API_KEY="):
-                        _HF_KEY = _line.split("=", 1)[1].strip().strip('"').strip("'")
+                    if _line.startswith("GEMINI_API_KEY="):
+                        _GEMINI_KEY = _line.split("=", 1)[1].strip().strip('"').strip("'")
                         break
-    if _HF_KEY:
-        hf_client = InferenceClient(token=_HF_KEY)
-        HF_AVAILABLE = True
+    if _GEMINI_KEY:
+        GEMINI_AVAILABLE = True
     else:
-        HF_AVAILABLE = False
+        GEMINI_AVAILABLE = False
 except Exception:
-    HF_AVAILABLE = False
+    GEMINI_AVAILABLE = False
 
 # ══════════════════════════════════════════════════════════════
 #  0. 한글 폰트
@@ -899,7 +918,7 @@ with st.sidebar:
         f"✅ 키워드 감성분석 (경량)  \n"
         f"{'✅ KeyBERT' if KEYBERT_AVAILABLE else '🟡 빈도 키워드'}  \n"
         f"{'✅ sklearn TF-IDF' if SKLEARN_AVAILABLE else '🟡 수동 TF-IDF'}  \n"
-        f"{'✅ Hugging Face AI' if HF_AVAILABLE else '🟡 Hugging Face 미연결'}  \n"
+        f"{'✅ Google Gemini AI' if GEMINI_AVAILABLE else '🟡 Gemini 미연결'}  \n"
         f"{'✅ 한글 폰트' if FONT_PATH else '🟡 기본 폰트'}"
     )
     st.markdown("<hr>", unsafe_allow_html=True)
@@ -2287,65 +2306,87 @@ with tab10:
         st.info("지사, VOC, 종합점수 컬럼이 모두 필요합니다.")
 
 # ─────────────────────────────────────────────────────────────
-#  TAB 11  지사 맞춤형 CS 솔루션 (Hugging Face AI 연동)
+#  TAB 11  지사 맞춤형 CS 솔루션 (Google Gemini AI 연동)
 # ─────────────────────────────────────────────────────────────
 
-# ── Hugging Face AI 인사이트 함수 ─────────────────────────────────
+# ── Gemini AI 일괄 인사이트 함수 (API 1회 호출) ─────────────
 
 @st.cache_data(show_spinner=False)
-def get_hf_insight(office, biz_name, target_ct, voc_texts):
-    """Hugging Face API를 호출하여 다차원 인사이트를 도출하는 함수"""
-    if not HF_AVAILABLE:
-        return ("AI 모듈 미설치", "huggingface_hub 패키지를 설치해주세요.", "pip install huggingface_hub")
+def get_gemini_bulk_insight(items_json):
+    """여러 지사·업무 데이터를 한 번에 보내 Gemini API 1회로 전체 인사이트를 도출"""
+    items = json.loads(items_json)
+    n = len(items)
+    if n == 0:
+        return []
 
-    if not voc_texts:
-        return ("추가 VOC 데이터 필요",
-                "서술 의견이 존재하지 않아 문맥 분석이 불가합니다.",
-                "해당 업무 불만 고객 대상 아웃바운드 콜을 통한 상세 원인 파악")
+    if not GEMINI_AVAILABLE:
+        return [("AI 미연결", ".env 파일에 GEMINI_API_KEY를 설정해주세요.",
+                 "https://aistudio.google.com 에서 무료 발급")] * n
 
-    meaningful_voc = [str(t).strip() for t in voc_texts if len(str(t).strip()) > 5]
-    if not meaningful_voc:
-        return ("단순 불만 (구체적 의견 없음)", "수집된 의견이 너무 짧아 원인 특정이 어렵습니다.", "VOC 수집 시 구체적 사유 작성 유도")
-
-    voc_str = " / ".join(meaningful_voc[:10])
+    data_lines = []
+    for i, it in enumerate(items, 1):
+        data_lines.append(
+            f"[항목{i}] 지사: {it['office']} | 취약업무: {it['biz']} | "
+            f"계약종별: {it['ct']} | VOC: {it['voc']}")
 
     prompt = f"""당신은 전력산업에 20년 이상 종사한 최고 고객만족도(CS) 분석 전문가입니다.
-아래 [데이터]를 바탕으로, 지사장이 즉시 액션할 수 있는 맞춤형 인사이트를 도출하세요.
+아래 {n}개 항목 **각각**에 대해, 지사장이 즉시 액션할 수 있는 맞춤형 인사이트를 도출하세요.
 
 [데이터]
-- 대상 지사: {office}
-- 취약 업무: {biz_name}
-- 불만이 집중된 계약종별: {target_ct}
-- 실제 고객 VOC: {voc_str}
+{chr(10).join(data_lines)}
 
 [분석 및 추론 규칙]
 1. 단순 친절 교육, 매뉴얼 배포 같은 뻔하고 추상적인 액션 아이템은 절대 금지합니다.
 2. 전력산업의 도메인 지식(계절적 요인, 산업 특성, 요금제 등)과 제공된 VOC를 유기적으로 연결하여 뾰족한 인사이트를 뽑아내세요.
-3. 결과는 반드시 아래 JSON 형식으로만 출력하세요. (마크다운 등 다른 텍스트 절대 금지)
+3. VOC가 "없음"인 항목도 업무 특성과 계약종별을 근거로 추론하세요.
+4. 결과는 반드시 아래 JSON **배열** 형식으로만 출력하세요. 항목 수는 정확히 {n}개. (마크다운·설명 등 다른 텍스트 절대 금지)
 
-{{"painpoint": "[상황/행위] + [결과/감정] 형태의 구체적 키워드 (예: 농번기 잦은 정전으로 인한 작물 피해 우려)", "context": "왜 이런 불만이 나왔는지 VOC와 전력산업 특성을 결합한 원인 추론 (2~3문장)", "action": "지사장이 당장 지시할 수 있는 구체적인 개선 조치 (1문장)"}}"""
+[{{"painpoint":"[상황/행위]+[결과/감정] 구체적 키워드","context":"원인 추론 2~3문장","action":"구체적 개선 조치 1문장"}}, ...]"""
 
     try:
-        response = hf_client.chat_completion(
-            model="mistralai/Mixtral-8x7B-Instruct-v0.1",
-            messages=[{"role": "user", "content": prompt}],
-            max_tokens=1024,
-        )
-        res_text = response.choices[0].message.content.strip()
+        import urllib.request
+        _models = ["gemini-2.0-flash", "gemma-3-12b-it", "gemma-3-27b-it"]
+        _payload = {"contents": [{"parts": [{"text": prompt}]}],
+                     "generationConfig": {"temperature": 0.7, "maxOutputTokens": 4096}}
+        _ctx = ssl._create_unverified_context()
+        _body = None
 
+        for _model in _models:
+            _api_url = f"https://generativelanguage.googleapis.com/v1beta/models/{_model}:generateContent?key={_GEMINI_KEY}"
+            _req = urllib.request.Request(_api_url, data=json.dumps(_payload).encode("utf-8"),
+                                           headers={"Content-Type": "application/json"}, method="POST")
+            try:
+                with urllib.request.urlopen(_req, context=_ctx, timeout=90) as _resp:
+                    _body = json.loads(_resp.read().decode("utf-8"))
+                break
+            except urllib.error.HTTPError as _http_err:
+                if _http_err.code == 429:
+                    continue
+                raise
+        if _body is None:
+            raise Exception("모든 AI 모델의 일일 한도가 소진되었습니다. 내일 다시 시도해주세요.")
+
+        res_text = _body["candidates"][0]["content"]["parts"][0]["text"].strip()
         if res_text.startswith("```json"):
             res_text = res_text[7:-3].strip()
         elif res_text.startswith("```"):
             res_text = res_text[3:-3].strip()
 
-        data = json.loads(res_text)
-        return (data.get("painpoint", "분석 오류"),
-                data.get("context", "분석 오류"),
-                data.get("action", "분석 오류"))
+        parsed = json.loads(res_text)
+        results = []
+        for d in parsed:
+            results.append((d.get("painpoint", "분석 오류"),
+                            d.get("context", "분석 오류"),
+                            d.get("action", "분석 오류")))
+        # 항목 수 불일치 보정
+        while len(results) < n:
+            results.append(("분석 누락", "AI 응답에서 해당 항목이 누락되었습니다.", "재분석 필요"))
+        return results[:n]
+
     except Exception as e:
-        return ("AI 분석 일시 지연",
-                f"API 통신 중 문제가 발생했습니다. (내용: {str(e)})",
-                "잠시 후 다시 시도하거나, 데이터 양을 줄여보세요.")
+        return [("AI 분석 일시 지연",
+                 f"API 통신 중 문제 발생. ({str(e)})",
+                 "잠시 후 다시 시도해주세요.")] * n
 
 
 with tab11:
@@ -2365,8 +2406,8 @@ with tab11:
             f'<b>🧠 AI 인사이트 도출 프로세스</b><br><br>'
             f'<b>1차</b> 지사별 취약 업무구분 추출 → '
             f'<b>2차</b> 취약 업무 내 타겟 계약종별 특정 → '
-            f'<b>3차</b> 실제 고객 VOC를 Hugging Face AI로 실시간 전송<br>'
-            f'Hugging Face AI가 문맥을 분석하여 <b>기존에 없던 뾰족한 원인과 맞춤형 액션 아이템</b>을 자동 창작합니다.'
+            f'<b>3차</b> 실제 고객 VOC를 Google AI(Gemini)로 실시간 전송<br>'
+            f'구글 AI가 문맥을 분석하여 <b>기존에 없던 뾰족한 원인과 맞춤형 액션 아이템</b>을 자동 창작합니다.'
             f'</div>', unsafe_allow_html=True)
 
         st.markdown("")
@@ -2401,64 +2442,89 @@ with tab11:
         if not target_offices:
             st.warning("선택된 지사가 없습니다.")
         else:
+            # ── 1단계: pandas로 전체 데이터 수집 (API 호출 없음) ──
+            all_items = []      # Gemini에 보낼 항목
+            all_meta = []       # 화면 표시용 메타데이터
+
             for office in target_offices:
                 oavg = office_avg[office_avg["지사"] == office]["지사평균"].values
                 oavg_val = oavg[0] if len(oavg) > 0 else 0
-
-                st.markdown(f'## 🏢 {office} CS 심층 분석 및 맞춤형 솔루션')
-                st.markdown(f'**전체 평균: {oavg_val:.1f}점**')
-
                 office_grp = grp[grp["지사"] == office].sort_values("평균점수").head(3)
 
                 if office_grp.empty:
-                    st.info(f"{office}: 분석 가능한 업무구분 데이터가 부족합니다 (3건 이상 필요).")
-                    st.markdown("---")
                     continue
 
-                result_rows = []
+                for _, biz_row in office_grp.iterrows():
+                    biz_name = biz_row["업무구분"]
+                    biz_avg  = biz_row["평균점수"]
+                    biz_cnt  = int(biz_row["건수"])
 
-                with st.spinner(f"✨ 구글 AI가 {office}의 데이터를 심층 분석 중입니다..."):
-                    for _, biz_row in office_grp.iterrows():
-                        biz_name = biz_row["업무구분"]
-                        biz_avg  = biz_row["평균점수"]
-                        biz_cnt  = int(biz_row["건수"])
+                    target_ct = "-"
+                    target_ct_avg = 0
+                    if _has_contract:
+                        ct_sub = df_f[(df_f[_need_office] == office) & (df_f[_need_biz] == biz_name)]
+                        ct_grp = ct_sub.groupby(_has_contract)[score_col].agg(["mean", "count"]).reset_index()
+                        ct_grp.columns = ["계약종별", "평균", "건수"]
+                        ct_grp = ct_grp[ct_grp["건수"] >= 1].sort_values("평균")
+                        if not ct_grp.empty:
+                            target_ct = ct_grp.iloc[0]["계약종별"]
+                            target_ct_avg = ct_grp.iloc[0]["평균"]
 
-                        target_ct = "-"
-                        target_ct_avg = 0
-                        if _has_contract:
-                            ct_sub = df_f[(df_f[_need_office] == office) & (df_f[_need_biz] == biz_name)]
-                            ct_grp = ct_sub.groupby(_has_contract)[score_col].agg(["mean", "count"]).reset_index()
-                            ct_grp.columns = ["계약종별", "평균", "건수"]
-                            ct_grp = ct_grp[ct_grp["건수"] >= 1].sort_values("평균")
-                            if not ct_grp.empty:
-                                target_ct = ct_grp.iloc[0]["계약종별"]
-                                target_ct_avg = ct_grp.iloc[0]["평균"]
+                    voc_str = "없음"
+                    if _has_voc:
+                        voc_filter = (df_f[_need_office] == office) & (df_f[_need_biz] == biz_name)
+                        if _has_contract and target_ct != "-":
+                            voc_sub = df_f[voc_filter & (df_f[_has_contract] == target_ct) & (df_f[score_col] <= 80)]
+                        else:
+                            voc_sub = df_f[voc_filter & (df_f[score_col] <= 80)]
+                        if not voc_sub.empty:
+                            raw = voc_sub[_has_voc].dropna().tolist()
+                            meaningful = [str(t).strip() for t in raw if len(str(t).strip()) > 5]
+                            if meaningful:
+                                voc_str = " / ".join(meaningful[:10])
 
-                        voc_texts = []
-                        if _has_voc:
-                            voc_filter = (df_f[_need_office] == office) & (df_f[_need_biz] == biz_name)
-                            if _has_contract and target_ct != "-":
-                                voc_sub = df_f[voc_filter & (df_f[_has_contract] == target_ct) & (df_f[score_col] <= 80)]
-                            else:
-                                voc_sub = df_f[voc_filter & (df_f[score_col] <= 80)]
+                    all_items.append({"office": office, "biz": biz_name,
+                                       "ct": target_ct, "voc": voc_str})
+                    all_meta.append({"office": office, "oavg": oavg_val,
+                                      "biz_label": f"{biz_name} ({biz_avg:.1f}점, {biz_cnt}건)",
+                                      "ct_label": f"{target_ct}" + (f" ({target_ct_avg:.0f}점)" if target_ct != "-" else "")})
 
-                            if not voc_sub.empty:
-                                voc_texts = voc_sub[_has_voc].dropna().tolist()
+            # ── 2단계: API 1회 호출 ──
+            if all_items:
+                st.markdown("💡 **과도한 API 호출 방지:** 데이터 세팅이 끝나면 아래 버튼을 눌러주세요.")
 
-                        painpoint, context, action = get_hf_insight(office, biz_name, target_ct, voc_texts)
+                if st.button("🚀 AI 지사 맞춤형 솔루션 분석 시작", type="primary"):
+                    with st.spinner(f"✨ 구글 AI가 {len(all_items)}개 항목을 일괄 분석 중입니다... (API 1회 호출)"):
+                        insights = get_gemini_bulk_insight(json.dumps(all_items, ensure_ascii=False))
 
-                        row = {
-                            "취약 업무구분": f"{biz_name} ({biz_avg:.1f}점, {biz_cnt}건)",
-                            "주요 타겟 (계약종별)": f"{target_ct}" + (f" ({target_ct_avg:.0f}점)" if target_ct != "-" else ""),
-                            "핵심 페인포인트": painpoint,
-                            "원인 분석 및 추론": context,
-                            "지사 맞춤형 Action Item": action,
-                        }
-                        result_rows.append(row)
+                    # ── 3단계: 지사별로 결과 표시 ──
+                    idx = 0
+                    for office in target_offices:
+                        office_meta = [m for m in all_meta if m["office"] == office]
+                        if not office_meta:
+                            st.info(f"{office}: 분석 가능한 업무구분 데이터가 부족합니다 (3건 이상 필요).")
+                            st.markdown("---")
+                            continue
 
-                df_result = pd.DataFrame(result_rows)
-                st.dataframe(df_result, use_container_width=True, hide_index=True)
-                st.markdown("---")
+                        st.markdown(f'## 🏢 {office} CS 심층 분석 및 맞춤형 솔루션')
+                        st.markdown(f'**전체 평균: {office_meta[0]["oavg"]:.1f}점**')
+
+                        result_rows = []
+                        for m in office_meta:
+                            painpoint, context, action = insights[idx]
+                            idx += 1
+                            result_rows.append({
+                                "취약 업무구분": m["biz_label"],
+                                "주요 타겟 (계약종별)": m["ct_label"],
+                                "핵심 페인포인트": painpoint,
+                                "원인 분석 및 추론": context,
+                                "지사 맞춤형 Action Item": action,
+                            })
+                        df_result = pd.DataFrame(result_rows)
+                        st.dataframe(df_result, use_container_width=True, hide_index=True)
+                        st.markdown("---")
+            else:
+                st.info("분석 가능한 데이터가 없습니다.")
     else:
         missing = []
         if not _need_office: missing.append("지사")
