@@ -1012,6 +1012,9 @@ def load_data(raw_bytes):
     df.columns = [str(c).strip() for c in df.columns]
     return df, orig
 
+if uploaded_file is None:
+    st.stop()
+
 with st.spinner("데이터를 불러오는 중…"):
     df_raw, orig_len = load_data(uploaded_file.read())
 
