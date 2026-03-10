@@ -1013,7 +1013,12 @@ def load_data(raw_bytes):
     return df, orig
 
 if uploaded_file is None:
-    st.stop()
+    st.info("📂 좌측 사이드바에서 엑셀 파일을 업로드해 주세요.")
+    st.markdown("---")
+    st.markdown("#### 사용 방법")
+    st.markdown("1. 좌측 **파일 업로드** 영역에 엑셀(.xlsx) 파일을 드래그하거나 선택하세요.\n2. 업로드가 완료되면 자동으로 분석이 시작됩니다.")
+    import sys
+    sys.exit(0)
 
 with st.spinner("데이터를 불러오는 중…"):
     df_raw, orig_len = load_data(uploaded_file.read())
