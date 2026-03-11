@@ -1785,26 +1785,80 @@ with tab3:
                     _q4_names = ", ".join(_q4_list["업무유형"].tolist())
                     st.error(f"**🚨 최우선 혁신** (건수↑ 점수↓ · 핵심 리스크): {_q4_names}\n\n→ 전사적 태스크포스(TF) 가동, 시스템 개선 및 인력 우선 배치")
 
-            # ── 4사분면 가중치 영향도 테이블 ──
-            if not _q4_list.empty:
-                st.markdown("##### 🚨 4사분면 업무 — 전체 점수 영향도 분석")
-                _q4_disp = _q4_list[["업무유형", "처리건수", "건수비중", "평균만족도", "점수갭", "가중영향", "불만족건수"]].copy()
-                _q4_disp.columns = ["업무유형", "처리건수", "건수비중(%)", "평균만족도", "평균 대비 갭", "가중 영향(점)", "불만족건수"]
-                st.dataframe(_q4_disp.reset_index(drop=True), use_container_width=True, hide_index=True)
-                _total_drag = _q4_list["가중영향"].sum()
-                st.caption(f"4사분면 업무가 본부 전체 평균을 **{_total_drag:+.2f}점** 끌어내리고 있습니다. 이 업무들의 만족도를 평균 수준으로 끌어올리면 본부 전체 점수가 약 **{abs(_total_drag):.2f}점** 상승할 수 있습니다.")
+            # ── AI 사분면 심층 분석 버튼 ──
+            if st.button("🤖 AI 사분면 심층 분석", key="ai_quadrant_btn", type="primary", use_container_width=True):
+                if not GEMINI_AVAILABLE:
+                    st.error("Gemini API 키가 설정되지 않았습니다. `.env` 파일에 `GEMINI_API_KEY`를 설정해주세요.")
+                else:
+                    # 사분면별 데이터 요약
+                    _ai_q_data = f"전체 평균 만족도: {_q_y_avg:.1f}점 / 전체 평균 처리건수: {_q_x_avg:.0f}건\n\n"
+                    for q_label in ["1사분면: 본부 견인형", "2사분면: 전문 특화형", "3사분면: 개별 개선형", "4사분면: 최우선 혁신"]:
+                        _q_sub = _bbl_grp[_bbl_grp["사분면"] == q_label]
+                        if not _q_sub.empty:
+                            _ai_q_data += f"[{q_label}]\n"
+                            for _, qr in _q_sub.iterrows():
+                                _kws = _biz_kw_map.get(qr["업무유형"], [])
+                                _kw_txt = f" / 불만 키워드: {', '.join(_kws)}" if _kws else ""
+                                _ai_q_data += f"  {qr['업무유형']}: {qr['평균만족도']:.1f}점, {int(qr['처리건수'])}건(비중 {qr['건수비중']}%), 불만족 {int(qr['불만족건수'])}건, 가중영향 {qr['가중영향']:+.2f}점{_kw_txt}\n"
+                            _ai_q_data += "\n"
 
-            # ── 우선순위 로드맵 ──
-            _road = _bbl_grp.copy()
-            _road["개선우선순위점수"] = ((_road["처리건수"] / _total_n) * abs(_road["점수갭"].clip(upper=0)) * 100).round(1)
-            _road = _road[_road["개선우선순위점수"] > 0].sort_values("개선우선순위점수", ascending=False)
-            if not _road.empty:
-                st.markdown("##### 📋 점수 향상 우선순위 로드맵 (가성비 순)")
-                for _rank, (_, rr) in enumerate(_road.iterrows(), 1):
-                    _kws = _biz_kw_map.get(rr["업무유형"], [])
-                    _kw_str = f" · 핵심 키워드: **{', '.join(_kws)}**" if _kws else ""
-                    _icon = "🔴" if _rank <= 2 else "🟡"
-                    st.markdown(f"{_icon} **{_rank}순위 — {rr['업무유형']}** | 건수 {int(rr['처리건수']):,}건({rr['건수비중']}%) · 만족도 {rr['평균만족도']:.1f}점(갭 {rr['점수갭']:+.1f}) · 불만족 {int(rr['불만족건수'])}건{_kw_str}")
+                    # 4사분면 VOC 수집
+                    _ai_q_voc = []
+                    if M.get("voc"):
+                        for _, qr in _bbl_grp[_bbl_grp["사분면"].str.contains("최우선|개별")].iterrows():
+                            _biz = qr["업무유형"]
+                            _vocs = df_f[(df_f[M["business"]] == _biz) & (df_f["_점수100"] < 70)][M["voc"]].dropna().astype(str).tolist()
+                            _vocs = [v for v in _vocs if v.strip() not in ("", "nan", "응답없음")][:5]
+                            if _vocs:
+                                _ai_q_voc.append(f"[{_biz}] ({qr['사분면']})")
+                                for v in _vocs:
+                                    _ai_q_voc.append(f"  - {v}")
+
+                    _ai_q_prompt = f"""당신은 전력산업 고객만족(CS) 전문 컨설턴트입니다.
+아래는 업무유형별 사분면 분석 결과입니다.
+
+{_ai_q_data}
+[3·4사분면 업무의 불만족 VOC 원문]
+{chr(10).join(_ai_q_voc) if _ai_q_voc else '- 해당 없음'}
+
+[분석 요청]
+1. **4사분면(최우선 혁신) 긴급 진단**: 건수가 많고 점수가 낮은 업무의 근본 원인을 VOC 근거와 함께 분석하세요. 이 업무들이 본부 전체 점수를 얼마나 끌어내리는지 구체적 수치로 제시하세요.
+
+2. **3사분면(개별 개선형) 소외 업무 점검**: 건수는 적지만 점수가 낮은 업무가 방치되면 어떤 리스크가 생기는지 분석하고, 담당자 1:1 코칭 포인트를 제시하세요.
+
+3. **1사분면(본부 견인형) 성공 사례 확산**: 잘하는 업무의 비결을 분석하고, 이 노하우를 다른 업무에 어떻게 전파할 수 있는지 구체적 방안을 제시하세요.
+
+4. **점수 향상 우선순위 로드맵**: 어떤 업무부터 개선해야 본부 전체 점수 상승 효과가 가장 큰지, 기여도 순으로 로드맵을 제시하세요. 각 업무별 구체적 액션플랜(1주/1개월/3개월)을 포함하세요.
+
+※ 추상적 제안 금지. 반드시 업무명·VOC 키워드·수치 근거를 명시하세요."""
+
+                    with st.spinner("Gemini AI가 사분면 심층 분석 중…"):
+                        try:
+                            import urllib.request
+                            _models = ["gemini-2.0-flash", "gemma-3-12b-it", "gemma-3-27b-it"]
+                            _payload = {"contents": [{"parts": [{"text": _ai_q_prompt}]}],
+                                         "generationConfig": {"temperature": 0.7, "maxOutputTokens": 4096}}
+                            _ctx = ssl._create_unverified_context()
+                            _body = None
+                            for _model in _models:
+                                _api_url = f"https://generativelanguage.googleapis.com/v1beta/models/{_model}:generateContent?key={_GEMINI_KEY}"
+                                _req = urllib.request.Request(_api_url, data=json.dumps(_payload).encode("utf-8"),
+                                                               headers={"Content-Type": "application/json"}, method="POST")
+                                try:
+                                    with urllib.request.urlopen(_req, context=_ctx, timeout=90) as _resp:
+                                        _body = json.loads(_resp.read().decode("utf-8"))
+                                    break
+                                except urllib.error.HTTPError as _http_err:
+                                    if _http_err.code == 429:
+                                        continue
+                                    raise
+                            if _body is None:
+                                st.error("모든 AI 모델의 일일 한도가 소진되었습니다. 내일 다시 시도해주세요.")
+                            else:
+                                _ai_text = _body["candidates"][0]["content"]["parts"][0]["text"].strip()
+                                st.markdown(_ai_text)
+                        except Exception as e:
+                            st.error(f"AI 분석 중 오류: {e}")
 
 
 # ─────────────────────────────────────────────────────────────
