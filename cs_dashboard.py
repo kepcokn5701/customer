@@ -2222,6 +2222,255 @@ with tab3:
                             except Exception as e:
                                 st.error(f"AI 분석 중 오류: {e}")
 
+        st.markdown("---")
+
+        # ══════════════════════════════════════════════════════════════
+        #  ⑧ 4개 차원 통합 리스크 진단 (지사 × 계약종별 × 업무유형 × 접수채널)
+        # ══════════════════════════════════════════════════════════════
+        _has_4d = M.get("office") and M.get("contract") and M.get("business") and not _df_cross.empty
+        if _has_4d:
+            st.markdown('<p class="sec-head">🔎 4개 차원 통합 리스크 진단 — 지사 × 계약종별 × 업무유형 × 접수채널</p>', unsafe_allow_html=True)
+            st.caption("4개 축을 동시에 교차 필터링하여 **독립적 리스크 구간**을 찾아내고, 본부 점수 상승 기여도 순으로 우선순위를 산정합니다.")
+
+            _MIN_4D = 5  # 표본 신뢰도 최소 건수
+
+            # ── 4차원 그룹화 ──
+            _grp4 = _df_cross.groupby([M["office"], M["contract"], M["business"], "_채널그룹_cross"])["_점수100"].agg(
+                ["mean", "count"]).reset_index()
+            _grp4.columns = ["지사", "계약종", "업무유형", "채널", "평균만족도", "응답수"]
+            _grp4["평균만족도"] = _grp4["평균만족도"].round(1)
+
+            # 유효 리스크 구간: N >= 5 & 전체 평균 -20점 이상 급락
+            _grp4_valid = _grp4[_grp4["응답수"] >= _MIN_4D].copy()
+            _grp4_valid["전체대비"] = (_grp4_valid["평균만족도"] - avg_score_100).round(1)
+            _total_4d_n = _grp4_valid["응답수"].sum()
+            _grp4_valid["건수비중"] = (_grp4_valid["응답수"] / max(_total_4d_n, 1) * 100).round(2)
+            # 점수 상승 기여도: 이 구간을 평균까지 끌어올렸을 때 전체 평균 상승분
+            _grp4_valid["기여도"] = ((_grp4_valid["응답수"] / max(_total_4d_n, 1)) *
+                                    (avg_score_100 - _grp4_valid["평균만족도"]).clip(lower=0)).round(2)
+            _grp4_valid["조합"] = (_grp4_valid["지사"] + " · " + _grp4_valid["계약종"] + " · " +
+                                   _grp4_valid["업무유형"] + " · " + _grp4_valid["채널"])
+
+            _outliers = _grp4_valid[_grp4_valid["전체대비"] <= -20].sort_values("기여도", ascending=False)
+            _risk_all = _grp4_valid[_grp4_valid["전체대비"] < 0].sort_values("기여도", ascending=False)
+
+            # ── 메트릭 카드 ──
+            _m1, _m2, _m3 = st.columns(3)
+            _m1.metric("분석 대상 조합", f"{len(_grp4_valid):,}개", help=f"응답 {_MIN_4D}건 이상 유효 조합")
+            _m2.metric("이상치 (-20점↓)", f"{len(_outliers):,}개",
+                        delta=f"{len(_outliers)}개 독립 리스크" if len(_outliers) > 0 else "없음",
+                        delta_color="inverse")
+            _potential_gain = _risk_all["기여도"].sum()
+            _m3.metric("최대 점수 상승 여력", f"+{_potential_gain:.1f}점",
+                        help="모든 리스크 구간을 평균 수준으로 끌어올렸을 때")
+
+            # ── 트리맵: 지사 > 업무유형 (색상=만족도, 호버에 계약종·채널 상세) ──
+            # 지사×업무 단위로 집계 (트리맵 최상위 레벨)
+            _tree4 = _grp4_valid.groupby(["지사", "업무유형"]).agg(
+                평균만족도=("평균만족도", lambda x: np.average(x, weights=_grp4_valid.loc[x.index, "응답수"])),
+                응답수=("응답수", "sum"),
+                기여도=("기여도", "sum"),
+            ).reset_index()
+            _tree4["평균만족도"] = _tree4["평균만족도"].round(1)
+            _tree4["기여도"] = _tree4["기여도"].round(2)
+
+            # 호버에 계약종·채널 상세 추가
+            _hover4_map = {}
+            for _, row4 in _grp4_valid.iterrows():
+                _key4 = (row4["지사"], row4["업무유형"])
+                if _key4 not in _hover4_map:
+                    _hover4_map[_key4] = []
+                _hover4_map[_key4].append(f"{row4['계약종']}·{row4['채널']}: {row4['평균만족도']:.1f}점({int(row4['응답수'])}건)")
+
+            _tree4["상세"] = _tree4.apply(
+                lambda r: "<br>".join(_hover4_map.get((r["지사"], r["업무유형"]), ["-"])), axis=1)
+            _tree4["hover_text"] = _tree4.apply(
+                lambda r: (f"<b>{r['지사']} · {r['업무유형']}</b><br>"
+                           f"평균: {r['평균만족도']:.1f}점 | 응답: {int(r['응답수'])}건<br>"
+                           f"점수 상승 기여도: +{r['기여도']:.2f}점<br><br>"
+                           f"[계약종·채널별 상세]<br>{r['상세']}"), axis=1)
+
+            fig_tree4 = px.treemap(
+                _tree4, path=["지사", "업무유형"], values="응답수",
+                color="평균만족도", color_continuous_scale="RdYlGn",
+                range_color=[max(0, _tree4["평균만족도"].min() - 5),
+                             min(100, _tree4["평균만족도"].max() + 5)],
+                template=PLOTLY_TPL,
+                title="4차원 통합 트리맵 — 지사 × 업무유형 (면적 = 건수, 색상 = 만족도, 호버 = 계약종·채널 상세)")
+            fig_tree4.update_traces(
+                hovertemplate="%{customdata[0]}<extra></extra>",
+                customdata=_tree4[["hover_text"]].values,
+                textinfo="label+value")
+            fig_tree4.update_layout(
+                height=600, margin=dict(t=60, b=20, l=10, r=10),
+                title_font=dict(size=14, color=C["navy"]))
+            st.plotly_chart(fig_tree4, use_container_width=True)
+
+            # ── 이상치 리스트 (독립 리스크 구간) ──
+            if not _outliers.empty:
+                st.markdown(f"##### 🚨 독립 리스크 구간 — 전체 평균 대비 -20점 이상 ({len(_outliers)}건)")
+
+                # 원인 유형 분류
+                _cause_diag = []
+                for _, ol in _outliers.iterrows():
+                    # 같은 업무+계약종+채널인데 다른 지사에서도 낮은지 체크
+                    _same_biz = _grp4_valid[
+                        (_grp4_valid["업무유형"] == ol["업무유형"]) &
+                        (_grp4_valid["계약종"] == ol["계약종"]) &
+                        (_grp4_valid["채널"] == ol["채널"]) &
+                        (_grp4_valid["지사"] != ol["지사"])
+                    ]
+                    _same_biz_low = _same_biz[_same_biz["전체대비"] <= -10]
+
+                    # 같은 지사+업무인데 다른 채널에서는 괜찮은지 체크
+                    _same_ofc_ch = _grp4_valid[
+                        (_grp4_valid["지사"] == ol["지사"]) &
+                        (_grp4_valid["업무유형"] == ol["업무유형"]) &
+                        (_grp4_valid["채널"] != ol["채널"])
+                    ]
+                    _same_ofc_ch_ok = _same_ofc_ch[_same_ofc_ch["전체대비"] > -5]
+
+                    if len(_same_biz_low) >= 2:
+                        _cause = "전사 프로세스"
+                        _icon = "🔴"
+                    elif not _same_ofc_ch_ok.empty:
+                        _cause = "채널 UI/응대"
+                        _icon = "🟡"
+                    else:
+                        _cause = "지사 맞춤 코칭"
+                        _icon = "🔵"
+
+                    _cause_diag.append({
+                        "원인유형": _cause, "아이콘": _icon,
+                        "조합": ol["조합"], "지사": ol["지사"], "계약종": ol["계약종"],
+                        "업무유형": ol["업무유형"], "채널": ol["채널"],
+                        "평균만족도": ol["평균만족도"], "응답수": int(ol["응답수"]),
+                        "전체대비": ol["전체대비"], "기여도": ol["기여도"],
+                    })
+
+                _cause_df = pd.DataFrame(_cause_diag)
+
+                # 원인 유형별 카운트
+                _cc1, _cc2, _cc3 = st.columns(3)
+                _n_proc = len(_cause_df[_cause_df["원인유형"] == "전사 프로세스"])
+                _n_ch = len(_cause_df[_cause_df["원인유형"] == "채널 UI/응대"])
+                _n_ofc = len(_cause_df[_cause_df["원인유형"] == "지사 맞춤 코칭"])
+                _cc1.metric("🔴 전사 프로세스", f"{_n_proc}건", help="다수 지사에서 공통으로 낮음")
+                _cc2.metric("🟡 채널 UI/응대", f"{_n_ch}건", help="특정 채널에서만 점수 급락")
+                _cc3.metric("🔵 지사 맞춤 코칭", f"{_n_ofc}건", help="특정 지사에서만 점수 급락")
+
+                # 기여도 순 테이블
+                _disp4 = _cause_df[["아이콘", "원인유형", "지사", "계약종", "업무유형", "채널",
+                                     "평균만족도", "응답수", "전체대비", "기여도"]].copy()
+                _disp4.columns = ["", "원인 유형", "지사", "계약종", "업무유형", "채널",
+                                  "평균만족도", "응답수", "전체 대비", "점수 상승 기여도"]
+                st.dataframe(_disp4.reset_index(drop=True), use_container_width=True, hide_index=True)
+            else:
+                st.success("전체 평균 대비 -20점 이상 급락한 독립 리스크 구간이 없습니다.")
+
+            # ── 점수 상승 기여도 TOP 10 (리스크 구간 전체) ──
+            _top10_contrib = _risk_all.head(10)
+            if not _top10_contrib.empty:
+                st.markdown("##### 📋 본부 점수 상승 기여도 TOP 10")
+                st.caption("해당 구간의 만족도를 본부 평균까지 끌어올렸을 때 전체 점수 상승 효과가 큰 순서입니다.")
+                _disp_top10 = _top10_contrib[["조합", "응답수", "건수비중", "평균만족도", "전체대비", "기여도"]].copy()
+                _disp_top10.columns = ["지사·계약종·업무·채널", "응답수", "건수비중(%)", "평균만족도", "전체 대비", "점수 상승 기여도"]
+                st.dataframe(_disp_top10.reset_index(drop=True), use_container_width=True, hide_index=True)
+
+            # ── AI 통합 진단 버튼 ──
+            if st.button("🤖 AI 4차원 통합 리스크 진단", key="ai_cross8_btn", type="primary", use_container_width=True):
+                if not GEMINI_AVAILABLE:
+                    st.error("Gemini API 키가 설정되지 않았습니다. `.env` 파일에 `GEMINI_API_KEY`를 설정해주세요.")
+                else:
+                    # AI 프롬프트용 데이터 수집
+                    _ai8_outlier_txt = ""
+                    if not _outliers.empty:
+                        for _, ol in _outliers.head(10).iterrows():
+                            _ai8_outlier_txt += f"  [{ol['지사']}·{ol['계약종']}·{ol['업무유형']}·{ol['채널']}] {ol['평균만족도']:.1f}점 ({int(ol['응답수'])}건, 전체 대비 {ol['전체대비']:+.1f}, 기여도 +{ol['기여도']:.2f})\n"
+
+                    _ai8_cause_txt = ""
+                    if '_cause_df' in dir() and not _cause_df.empty:
+                        for ct in ["전사 프로세스", "채널 UI/응대", "지사 맞춤 코칭"]:
+                            _ct_rows = _cause_df[_cause_df["원인유형"] == ct]
+                            if not _ct_rows.empty:
+                                _ai8_cause_txt += f"\n[{ct}] ({len(_ct_rows)}건)\n"
+                                for _, cr in _ct_rows.head(5).iterrows():
+                                    _ai8_cause_txt += f"  {cr['지사']}·{cr['계약종']}·{cr['업무유형']}·{cr['채널']}: {cr['평균만족도']:.1f}점\n"
+
+                    _ai8_voc_lines = []
+                    if M.get("voc") and not _outliers.empty:
+                        for _, ol in _outliers.head(5).iterrows():
+                            _ol_sub = _df_cross[
+                                (_df_cross[M["office"]] == ol["지사"]) &
+                                (_df_cross[M["contract"]] == ol["계약종"]) &
+                                (_df_cross[M["business"]] == ol["업무유형"]) &
+                                (_df_cross["_채널그룹_cross"] == ol["채널"]) &
+                                (_df_cross["_점수100"] < 70)
+                            ]
+                            _ol_vocs = _ol_sub[M["voc"]].dropna().astype(str).tolist()
+                            _ol_vocs = [v for v in _ol_vocs if v.strip() not in ("", "nan", "응답없음")][:3]
+                            if _ol_vocs:
+                                _ai8_voc_lines.append(f"[{ol['지사']}·{ol['계약종']}·{ol['업무유형']}·{ol['채널']}]")
+                                for v in _ol_vocs:
+                                    _ai8_voc_lines.append(f"  - {v}")
+
+                    _ai8_prompt = f"""당신은 전력산업 고객만족(CS) 전문 컨설턴트입니다.
+아래는 [지사 × 계약종별 × 업무유형 × 접수채널] 4차원 교차분석 결과입니다. 전체 평균은 {avg_score_100:.1f}점, 분석 대상 유효 조합 {len(_grp4_valid)}개입니다.
+
+[독립 리스크 구간 (전체 평균 대비 -20점↓)]
+{_ai8_outlier_txt if _ai8_outlier_txt else '  해당 없음'}
+
+[원인 유형 분류]
+{_ai8_cause_txt if _ai8_cause_txt else '  해당 없음'}
+
+[리스크 구간 VOC 원문]
+{chr(10).join(_ai8_voc_lines) if _ai8_voc_lines else '- 해당 없음'}
+
+[최대 점수 상승 여력: +{_potential_gain:.1f}점]
+
+[분석 요청]
+1. **입체적 원인 진단**:
+   - 🔴 전사 프로세스 문제: 다수 지사에서 공통으로 낮은 조합 → 전사적 프로세스 개선안
+   - 🟡 채널 UI/응대 문제: 특정 채널에서만 낮은 조합 → 디지털/전화 응대 개선안
+   - 🔵 지사 맞춤 코칭: 특정 지사에서만 낮은 조합 → 해당 지사 코칭 시나리오
+
+2. **우선순위 로드맵**: 점수 상승 기여도가 높은 순서대로 TOP 5 구간에 대해:
+   - 즉시 조치(1주 내), 중기 개선(1개월), 장기 프로세스 혁신으로 구분
+   - 예상 점수 상승 효과를 수치로 제시
+
+3. **구체적 액션플랜**: 각 리스크 유형별로 실행 가능한 해결방안을 구체적으로 제시
+   - 상담 스크립트 수정안, 채널 전환 규칙, 지사 교육 포인트 등
+
+※ 추상적 제안 금지. 반드시 지사명·계약종·업무명·채널명·VOC 근거를 명시하세요."""
+
+                    with st.spinner("Gemini AI가 4차원 통합 리스크를 진단 중…"):
+                        try:
+                            import urllib.request
+                            _models = ["gemini-2.0-flash", "gemma-3-12b-it", "gemma-3-27b-it"]
+                            _payload = {"contents": [{"parts": [{"text": _ai8_prompt}]}],
+                                         "generationConfig": {"temperature": 0.7, "maxOutputTokens": 4096}}
+                            _ctx = ssl._create_unverified_context()
+                            _body = None
+                            for _model in _models:
+                                _api_url = f"https://generativelanguage.googleapis.com/v1beta/models/{_model}:generateContent?key={_GEMINI_KEY}"
+                                _req = urllib.request.Request(_api_url, data=json.dumps(_payload).encode("utf-8"),
+                                                               headers={"Content-Type": "application/json"}, method="POST")
+                                try:
+                                    with urllib.request.urlopen(_req, context=_ctx, timeout=90) as _resp:
+                                        _body = json.loads(_resp.read().decode("utf-8"))
+                                    break
+                                except urllib.error.HTTPError as _http_err:
+                                    if _http_err.code == 429:
+                                        continue
+                                    raise
+                            if _body is None:
+                                st.error("모든 AI 모델의 일일 한도가 소진되었습니다. 내일 다시 시도해주세요.")
+                            else:
+                                _ai_text = _body["candidates"][0]["content"]["parts"][0]["text"].strip()
+                                st.markdown(_ai_text)
+                        except Exception as e:
+                            st.error(f"AI 분석 중 오류: {e}")
+
 
 # ─────────────────────────────────────────────────────────────
 #  TAB 5  민원 조기 경보 시스템
