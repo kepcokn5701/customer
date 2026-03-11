@@ -1880,6 +1880,76 @@ with tab3:
                                 f'</div>', unsafe_allow_html=True)
                 else:
                     st.success("채널 미스매치 없음: 모든 계약종 × 채널 조합이 전체 평균 대비 -5점 이내입니다.")
+
+                # ── AI 분석 버튼: 페르소나별 서비스 경로 ──
+                if st.button("🤖 AI 채널 미스매치 심층 분석", key="ai_cross5_btn", type="primary", use_container_width=True):
+                    if not GEMINI_AVAILABLE:
+                        st.error("Gemini API 키가 설정되지 않았습니다. `.env` 파일에 `GEMINI_API_KEY`를 설정해주세요.")
+                    else:
+                        # VOC 수집: 미스매치 조합의 불만 VOC
+                        _ai5_voc_lines = []
+                        if _mismatch and M.get("voc"):
+                            for mm in _mismatch[:5]:
+                                _mm_sub = _df_cross[
+                                    (_df_cross[M["contract"]] == mm["계약종"]) &
+                                    (_df_cross["_채널그룹_cross"] == mm["채널"])
+                                ]
+                                _mm_vocs = _mm_sub[_mm_sub["_점수100"] < 70][M["voc"]].dropna().astype(str).tolist()
+                                _mm_vocs = [v for v in _mm_vocs if v.strip() not in ("", "nan", "응답없음")][:5]
+                                if _mm_vocs:
+                                    _ai5_voc_lines.append(f"[{mm['계약종']} × {mm['채널']}] (평균 {mm['평균만족도']}점)")
+                                    for v in _mm_vocs:
+                                        _ai5_voc_lines.append(f"  - {v}")
+
+                        _ai5_data = "히트맵 데이터:\n"
+                        for r_idx in _pv_mean.index:
+                            for c_idx in _pv_mean.columns:
+                                _v = _pv_mean.loc[r_idx, c_idx]
+                                _cn = int(_pv_cnt.loc[r_idx, c_idx]) if r_idx in _pv_cnt.index and c_idx in _pv_cnt.columns else 0
+                                if pd.notna(_v) and _cn > 0:
+                                    _ai5_data += f"  {r_idx} × {c_idx}: {_v:.1f}점 ({_cn}건)\n"
+
+                        _ai5_prompt = f"""당신은 전력산업 고객만족(CS) 전문 컨설턴트입니다.
+아래는 '계약종별 × 접수채널' 교차분석 데이터입니다. 전체 평균은 {avg_score_100:.1f}점입니다.
+
+{_ai5_data}
+[미스매치 조합 VOC 원문]
+{chr(10).join(_ai5_voc_lines) if _ai5_voc_lines else '- 해당 없음'}
+
+[분석 요청]
+1. **채널 미스매치 원인 진단**: 특정 계약종이 특정 채널에서 만족도가 급락하는 근본 원인을 VOC 근거와 함께 구체적으로 분석하세요.
+2. **고객 페르소나별 채널 전략**: 각 계약종별 고객 특성(산업용=전문적, 주택용=민감 등)을 고려한 채널 최적화 전략을 제시하세요.
+3. **즉시 실행 가능한 액션플랜**: 각 미스매치 조합별로 72시간 내 조치 가능한 구체적 해결방안을 제시하세요.
+
+※ 추상적 제안("교육 실시", "매뉴얼 배포") 금지. 반드시 데이터에 근거한 구체적 제안만 하세요."""
+
+                        with st.spinner("Gemini AI가 채널 미스매치를 심층 분석 중…"):
+                            try:
+                                import urllib.request
+                                _models = ["gemini-2.0-flash", "gemma-3-12b-it", "gemma-3-27b-it"]
+                                _payload = {"contents": [{"parts": [{"text": _ai5_prompt}]}],
+                                             "generationConfig": {"temperature": 0.7, "maxOutputTokens": 4096}}
+                                _ctx = ssl._create_unverified_context()
+                                _body = None
+                                for _model in _models:
+                                    _api_url = f"https://generativelanguage.googleapis.com/v1beta/models/{_model}:generateContent?key={_GEMINI_KEY}"
+                                    _req = urllib.request.Request(_api_url, data=json.dumps(_payload).encode("utf-8"),
+                                                                   headers={"Content-Type": "application/json"}, method="POST")
+                                    try:
+                                        with urllib.request.urlopen(_req, context=_ctx, timeout=90) as _resp:
+                                            _body = json.loads(_resp.read().decode("utf-8"))
+                                        break
+                                    except urllib.error.HTTPError as _http_err:
+                                        if _http_err.code == 429:
+                                            continue
+                                        raise
+                                if _body is None:
+                                    st.error("모든 AI 모델의 일일 한도가 소진되었습니다. 내일 다시 시도해주세요.")
+                                else:
+                                    _ai_text = _body["candidates"][0]["content"]["parts"][0]["text"].strip()
+                                    st.markdown(_ai_text)
+                            except Exception as e:
+                                st.error(f"AI 분석 중 오류: {e}")
             st.markdown("---")
 
         # ── ⑥ 업무 성격별 채널 적합도 분석 (업무유형 × 접수채널 × 건수/점수) ──
@@ -1954,6 +2024,78 @@ with tab3:
                             f"**{_biz_name}**: {_high['채널']} {_high['평균만족도']:.1f}점 vs "
                             f"{_low['채널']} {_low['평균만족도']:.1f}점 (갭 **{gr['채널갭']:.1f}점**) "
                             f"→ {_low['채널']} 채널 프로세스 개선 또는 채널 전환 검토")
+
+                # ── AI 분석 버튼: 업무별 채널 적합도 ──
+                if st.button("🤖 AI 채널 전환 전략 분석", key="ai_cross6_btn", type="primary", use_container_width=True):
+                    if not GEMINI_AVAILABLE:
+                        st.error("Gemini API 키가 설정되지 않았습니다. `.env` 파일에 `GEMINI_API_KEY`를 설정해주세요.")
+                    else:
+                        # 업무×채널 데이터 요약
+                        _ai6_data = "업무유형 × 채널별 만족도 데이터:\n"
+                        for _, r in _biz_ch.iterrows():
+                            _ai6_data += f"  {r['업무유형']} × {r['채널']}: {r['평균만족도']:.1f}점 ({int(r['응답수'])}건)\n"
+
+                        # 갭 큰 업무의 VOC 수집
+                        _ai6_voc_lines = []
+                        if M.get("voc") and not _biz_gap.empty:
+                            for _, gr in _biz_gap.head(3).iterrows():
+                                _bname = gr["업무유형"]
+                                _detail = _biz_ch[_biz_ch["업무유형"] == _bname].sort_values("평균만족도")
+                                _low_ch = _detail.iloc[0]["채널"]
+                                _voc_sub = _df_cross[
+                                    (_df_cross[M["business"]] == _bname) &
+                                    (_df_cross["_채널그룹_cross"] == _low_ch) &
+                                    (_df_cross["_점수100"] < 70)
+                                ]
+                                _vocs = _voc_sub[M["voc"]].dropna().astype(str).tolist()
+                                _vocs = [v for v in _vocs if v.strip() not in ("", "nan", "응답없음")][:5]
+                                if _vocs:
+                                    _ai6_voc_lines.append(f"[{_bname} × {_low_ch}] (최저 채널)")
+                                    for v in _vocs:
+                                        _ai6_voc_lines.append(f"  - {v}")
+
+                        _ai6_prompt = f"""당신은 전력산업 고객만족(CS) 전문 컨설턴트입니다.
+아래는 '업무유형 × 접수채널' 교차분석 데이터입니다. 전체 평균은 {avg_score_100:.1f}점입니다.
+
+{_ai6_data}
+[채널 갭이 큰 업무의 저점수 채널 VOC 원문]
+{chr(10).join(_ai6_voc_lines) if _ai6_voc_lines else '- 해당 없음'}
+
+[분석 요청]
+1. **업무 복잡도 분석**: 각 업무의 성격(단순 조회 vs 복잡한 해지/변경 등)을 파악하고, 어떤 채널이 해당 업무에 적합/부적합한지 근거와 함께 분석하세요.
+2. **채널 전환(Call Steering) 전략**: 특정 업무를 특정 채널에서 다른 채널로 유도해야 하는 경우, 구체적인 전환 시나리오를 설계하세요.
+   - 예: "○○ 업무는 한전ON 접수 시 → 즉시 전문상담원 콜백 연결"
+3. **채널별 개선 로드맵**: UI/UX 문제인지, 상담원 전문성 문제인지, 대기시간 문제인지 VOC 근거로 가설을 세우고 각각의 해결방안을 제시하세요.
+
+※ 추상적 제안 금지. 반드시 업무명·채널명·VOC 근거를 명시하세요."""
+
+                        with st.spinner("Gemini AI가 채널 전환 전략을 분석 중…"):
+                            try:
+                                import urllib.request
+                                _models = ["gemini-2.0-flash", "gemma-3-12b-it", "gemma-3-27b-it"]
+                                _payload = {"contents": [{"parts": [{"text": _ai6_prompt}]}],
+                                             "generationConfig": {"temperature": 0.7, "maxOutputTokens": 4096}}
+                                _ctx = ssl._create_unverified_context()
+                                _body = None
+                                for _model in _models:
+                                    _api_url = f"https://generativelanguage.googleapis.com/v1beta/models/{_model}:generateContent?key={_GEMINI_KEY}"
+                                    _req = urllib.request.Request(_api_url, data=json.dumps(_payload).encode("utf-8"),
+                                                                   headers={"Content-Type": "application/json"}, method="POST")
+                                    try:
+                                        with urllib.request.urlopen(_req, context=_ctx, timeout=90) as _resp:
+                                            _body = json.loads(_resp.read().decode("utf-8"))
+                                        break
+                                    except urllib.error.HTTPError as _http_err:
+                                        if _http_err.code == 429:
+                                            continue
+                                        raise
+                                if _body is None:
+                                    st.error("모든 AI 모델의 일일 한도가 소진되었습니다. 내일 다시 시도해주세요.")
+                                else:
+                                    _ai_text = _body["candidates"][0]["content"]["parts"][0]["text"].strip()
+                                    st.markdown(_ai_text)
+                            except Exception as e:
+                                st.error(f"AI 분석 중 오류: {e}")
             st.markdown("---")
 
         # ── ⑦ 리스크 집중 구역 도출 (계약종별 × 업무유형 × 점수) ──
@@ -2012,6 +2154,73 @@ with tab3:
                     _disp_risk.columns = ["계약종 × 업무유형", "응답수", "건수비중(%)", "평균만족도", "전체 대비", "리스크 점수"]
                     _disp_risk = _disp_risk.sort_values("리스크 점수", ascending=False)
                     st.dataframe(_disp_risk.reset_index(drop=True), use_container_width=True, hide_index=True)
+
+                # ── AI 분석 버튼: 리스크 집중 구역 ──
+                if st.button("🤖 AI 리스크 타겟 심층 분석", key="ai_cross7_btn", type="primary", use_container_width=True):
+                    if not GEMINI_AVAILABLE:
+                        st.error("Gemini API 키가 설정되지 않았습니다. `.env` 파일에 `GEMINI_API_KEY`를 설정해주세요.")
+                    else:
+                        # TOP5 리스크 조합 데이터 + VOC
+                        _ai7_data = "리스크 TOP 5 조합:\n"
+                        _ai7_voc_lines = []
+                        for _, tr in _top5_risk.iterrows():
+                            _ai7_data += f"  #{int(_ + 1) if isinstance(_, int) else ''} {tr['계약종']} × {tr['업무유형']}: {tr['평균만족도']:.1f}점 ({int(tr['응답수'])}건, 전체 대비 {tr['전체대비']:+.1f}점, 리스크 {tr['리스크점수']:.2f})\n"
+                            if M.get("voc"):
+                                _risk_sub = df_f[
+                                    (df_f[M["contract"]] == tr["계약종"]) &
+                                    (df_f[M["business"]] == tr["업무유형"]) &
+                                    (df_f["_점수100"] < 70)
+                                ]
+                                _rvocs = _risk_sub[M["voc"]].dropna().astype(str).tolist()
+                                _rvocs = [v for v in _rvocs if v.strip() not in ("", "nan", "응답없음")][:5]
+                                if _rvocs:
+                                    _ai7_voc_lines.append(f"[{tr['계약종']} × {tr['업무유형']}]")
+                                    for v in _rvocs:
+                                        _ai7_voc_lines.append(f"  - {v}")
+
+                        _ai7_prompt = f"""당신은 전력산업 고객만족(CS) 전문 컨설턴트입니다.
+아래는 '계약종별 × 업무유형' 교차분석에서 도출된 리스크 TOP 5 조합입니다. 전체 평균은 {avg_score_100:.1f}점입니다.
+
+{_ai7_data}
+[리스크 조합별 불만족 VOC 원문]
+{chr(10).join(_ai7_voc_lines) if _ai7_voc_lines else '- 해당 없음'}
+
+[분석 요청]
+1. **근본 원인 진단**: 각 리스크 조합이 낮은 점수를 기록하는 근본 원인을 VOC 근거와 함께 분석하세요. 특정 지사만의 문제인지, 전사적 프로세스 문제인지 판별하세요.
+2. **사전케어 집중 타겟 전략**: TOP 5 조합 각각에 대해 구체적인 사전케어 시나리오를 설계하세요.
+   - 접수 즉시 해야 할 일 / 처리 중 주의사항 / 완료 후 팔로업 방법
+3. **프로세스 개선 제안**: 고지 방식, 응대 스크립트, 처리 절차 중 어떤 부분을 바꿔야 하는지 구체적으로 제안하세요.
+4. **우선순위 로드맵**: 리스크 점수 기준 어떤 조합부터 먼저 개선해야 효과가 큰지 순서를 매기고 근거를 제시하세요.
+
+※ 추상적 제안 금지. 반드시 계약종명·업무명·VOC 근거를 명시하세요."""
+
+                        with st.spinner("Gemini AI가 리스크 타겟을 심층 분석 중…"):
+                            try:
+                                import urllib.request
+                                _models = ["gemini-2.0-flash", "gemma-3-12b-it", "gemma-3-27b-it"]
+                                _payload = {"contents": [{"parts": [{"text": _ai7_prompt}]}],
+                                             "generationConfig": {"temperature": 0.7, "maxOutputTokens": 4096}}
+                                _ctx = ssl._create_unverified_context()
+                                _body = None
+                                for _model in _models:
+                                    _api_url = f"https://generativelanguage.googleapis.com/v1beta/models/{_model}:generateContent?key={_GEMINI_KEY}"
+                                    _req = urllib.request.Request(_api_url, data=json.dumps(_payload).encode("utf-8"),
+                                                                   headers={"Content-Type": "application/json"}, method="POST")
+                                    try:
+                                        with urllib.request.urlopen(_req, context=_ctx, timeout=90) as _resp:
+                                            _body = json.loads(_resp.read().decode("utf-8"))
+                                        break
+                                    except urllib.error.HTTPError as _http_err:
+                                        if _http_err.code == 429:
+                                            continue
+                                        raise
+                                if _body is None:
+                                    st.error("모든 AI 모델의 일일 한도가 소진되었습니다. 내일 다시 시도해주세요.")
+                                else:
+                                    _ai_text = _body["candidates"][0]["content"]["parts"][0]["text"].strip()
+                                    st.markdown(_ai_text)
+                            except Exception as e:
+                                st.error(f"AI 분석 중 오류: {e}")
 
 
 # ─────────────────────────────────────────────────────────────
