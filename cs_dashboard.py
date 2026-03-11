@@ -1346,6 +1346,30 @@ with tab1:
             fig_bp.update_layout(height=300, margin=dict(t=30, b=20, l=20, r=20), showlegend=True)
             st.plotly_chart(fig_bp, use_container_width=True)
 
+        # ── 사업소별 평균 만족도 ──
+        if M["office"]:
+            st.markdown("---")
+            st.markdown('<p class="sec-head">🏢 사업소별 평균 만족도</p>', unsafe_allow_html=True)
+            _ofc_grp_bar = df_f.groupby(M["office"])["_점수100"].agg(["mean", "count"]).reset_index()
+            _ofc_grp_bar.columns = ["사업소", "평균만족도", "응답수"]
+            _ofc_grp_bar = _sort_df_by_office(_ofc_grp_bar, "사업소")
+            _bar_avg = df_f["_점수100"].mean()
+            _ofc_grp_bar["그룹"] = _ofc_grp_bar["평균만족도"].apply(
+                lambda v: "⬆ 본부평균 이상" if v >= _bar_avg else "⬇ 본부평균 미달")
+            fig_bench = px.bar(_ofc_grp_bar, x="평균만족도", y="사업소", color="그룹",
+                               color_discrete_map={"⬆ 본부평균 이상": C["teal"], "⬇ 본부평균 미달": C["red"]},
+                               orientation="h", text="평균만족도", template=PLOTLY_TPL,
+                               title=f"사업소별 평균 만족도 — 본부 평균: {_bar_avg:.1f}점")
+            fig_bench.update_traces(texttemplate="%{text:.1f}", textposition="outside",
+                                    hovertemplate="%{y}<br>평균: %{x:.1f}점<extra></extra>")
+            fig_bench.add_vline(x=_bar_avg, line_color=C["navy"], line_dash="dash", line_width=2.5,
+                                annotation_text=f"본부 평균 {_bar_avg:.1f}",
+                                annotation_font_size=12, annotation_font_color=C["navy"])
+            fig_bench.update_layout(height=max(350, len(_ofc_grp_bar) * 35 + 80),
+                                     margin=dict(t=60, b=20, l=10, r=100), legend_title_text="",
+                                     title_font=dict(size=14, color=C["navy"]))
+            st.plotly_chart(fig_bench, use_container_width=True)
+
         # ── 지사별 박스 플롯 ──
         if M["office"]:
             st.markdown("---")
@@ -1416,7 +1440,162 @@ with tab1:
 """)
             st.markdown("---")
 
-        # ── 업무유형별 사분면 버블 차트 ──
+    # ── 분포 차트 ──
+    has_pie = any([M["age"], M["contract"], M["business"]])
+    if has_pie:
+        st.markdown('<p class="sec-head">🍩 응답 분포 현황</p>', unsafe_allow_html=True)
+        pie_cols = [c for c in [M["age"], M["contract"], M["business"]] if c]
+        pc_list = st.columns(len(pie_cols))
+        titles_map = {}
+        if M["age"]: titles_map[M["age"]] = "연령대"
+        if M["contract"]: titles_map[M["contract"]] = "계약종별"
+        if M["business"]: titles_map[M["business"]] = "업무유형"
+        for idx, col_nm in enumerate(pie_cols):
+            counts = df_f[col_nm].dropna().astype(str).value_counts()
+            _total = counts.sum()
+            with pc_list[idx]:
+                _title = titles_map.get(col_nm, col_nm)
+                if col_nm == M["business"]:
+                    # 업무유형: 가로 막대그래프, 퍼센트 높은 순 정렬
+                    _biz_df = pd.DataFrame({"유형": counts.index, "건수": counts.values})
+                    _biz_df["비율(%)"] = (_biz_df["건수"] / max(_total, 1) * 100).round(1)
+                    _biz_df = _biz_df.sort_values("비율(%)", ascending=True)
+                    fig_biz = px.bar(_biz_df, x="비율(%)", y="유형", orientation="h",
+                                     text=_biz_df["비율(%)"].apply(lambda v: f"{v:.1f}%"),
+                                     color_discrete_sequence=[C["sky"]], template=PLOTLY_TPL,
+                                     title=f"{_title} 분포")
+                    fig_biz.update_traces(textposition="outside", textfont_size=11,
+                                          hovertemplate="%{y}: %{x:.1f}% (%{customdata[0]:,}건)<extra></extra>",
+                                          customdata=_biz_df[["건수"]].values)
+                    fig_biz.update_layout(height=max(300, len(_biz_df) * 30 + 80),
+                                           margin=dict(t=50, b=20, l=20, r=60), showlegend=False,
+                                           title_font=dict(size=15, color=C["navy"]),
+                                           xaxis_title="비율(%)", yaxis_title="")
+                    st.plotly_chart(fig_biz, use_container_width=True)
+                else:
+                    # 연령대, 계약종별: 기존 파이차트 유지
+                    fig_pie = px.pie(names=counts.index, values=counts.values, color_discrete_sequence=PIE_COLORS,
+                                     hole=0.42, title=f"{_title} 분포", template=PLOTLY_TPL)
+                    fig_pie.update_traces(textposition="outside", textinfo="percent+label", textfont_size=12,
+                                           marker=dict(line=dict(color="#ffffff", width=2)),
+                                           hovertemplate="%{label}<br>%{value:,}건 (%{percent})<extra></extra>")
+                    fig_pie.update_layout(height=360, margin=dict(t=50, b=20, l=20, r=20), showlegend=False,
+                                           title_font=dict(size=15, color=C["navy"]))
+                    st.plotly_chart(fig_pie, use_container_width=True)
+
+
+# ─────────────────────────────────────────────────────────────
+#  TAB 3  계약종별 · 접수채널별 · 업무유형별 분석
+# ─────────────────────────────────────────────────────────────
+def _render_category_section(df, cat_col, cat_label, office_col, score_col, overall_avg):
+    """범주별 분석 공통 렌더링: 전체 막대 + 지사별 히트맵 + 하위 3개 카드"""
+    grp = df.groupby(cat_col)[score_col].agg(["mean","count"]).reset_index()
+    grp.columns = [cat_label, "평균만족도", "응답수"]
+    grp = grp.sort_values("평균만족도", ascending=True)
+
+    bottom3 = grp.head(3)
+    bottom3_names = bottom3[cat_label].tolist()
+    grp["구분"] = grp[cat_label].apply(lambda x: "🔴 하위 3" if x in bottom3_names else "일반")
+
+    # ── 전체 평균 막대 차트 ──
+    fig = px.bar(grp, x="평균만족도", y=cat_label, color="구분",
+                 color_discrete_map={"🔴 하위 3": C["red"], "일반": C["sky"]},
+                 orientation="h", text="평균만족도", template=PLOTLY_TPL,
+                 title=f"{cat_label}별 평균 만족도 (빨간색 = 하위 3개)")
+    fig.update_traces(texttemplate="%{text:.1f}", textposition="outside",
+                      hovertemplate="%{y}<br>평균: %{x:.1f}점<br>응답: %{customdata[0]:,}건<extra></extra>",
+                      customdata=grp[["응답수"]].values)
+    fig.add_vline(x=overall_avg, line_color=C["navy"], line_dash="dash", line_width=2,
+                  annotation_text=f"전체 평균 {overall_avg:.1f}", annotation_font_size=11)
+    fig.update_layout(height=max(300, len(grp) * 30 + 80),
+                       margin=dict(t=60, b=20, l=10, r=100), legend_title_text="",
+                       title_font=dict(size=14, color=C["navy"]))
+    st.plotly_chart(fig, use_container_width=True)
+
+    # ── 하위 3개 카드 ──
+    b3_cols = st.columns(min(3, len(bottom3)))
+    for i, (_, row) in enumerate(bottom3.iterrows()):
+        if i < len(b3_cols):
+            with b3_cols[i]:
+                st.markdown(
+                    f'<div class="card-red">'
+                    f'<b style="font-size:1.05rem;">🔴 {row[cat_label]}</b><br><br>'
+                    f'평균: <b>{row["평균만족도"]:.1f}점</b><br>'
+                    f'응답: {row["응답수"]:,}건<br>'
+                    f'전체 대비: <b style="color:{C["red"]}">{row["평균만족도"] - overall_avg:+.1f}점</b>'
+                    f'</div>', unsafe_allow_html=True)
+
+    # ── 지사별 × 범주별 점수 히트맵 ──
+    if office_col:
+        st.markdown(f'<p class="sec-head">🏢 지사별 {cat_label} 평균 만족도</p>', unsafe_allow_html=True)
+        pivot = df.pivot_table(values=score_col, index=office_col,
+                               columns=cat_col, aggfunc="mean").round(1)
+        pivot = pivot.reindex(_sort_offices(pivot.index.tolist()))
+        if not pivot.empty:
+            fig_hm = px.imshow(pivot, color_continuous_scale="RdYlGn",
+                               text_auto=".1f", aspect="auto", template=PLOTLY_TPL,
+                               title=f"지사 × {cat_label} 만족도 (초록=높음 / 빨강=낮음)")
+            fig_hm.update_traces(hovertemplate="지사: %{y}<br>" + cat_label + ": %{x}<br>점수: %{z:.1f}점<extra></extra>")
+            fig_hm.update_layout(
+                height=max(350, len(pivot.index) * 30 + 100),
+                margin=dict(t=60, b=60, l=120, r=60),
+                title_font=dict(size=14, color=C["navy"]))
+            st.plotly_chart(fig_hm, use_container_width=True)
+
+        # ── 저점수 건 상세 조회 (60점 이하 전체 표) ──
+        _uid = cat_label.replace(" ", "")
+        with st.expander(f"🔍 60점 이하 저점수 건 상세 조회 ({cat_label})"):
+            _filtered = df[df[score_col] <= 60].copy()
+            if len(_filtered) > 0:
+                _filtered = _filtered.sort_values(score_col)
+                st.markdown(
+                    f'총 <b style="color:{C["red"]}">{len(_filtered):,}건</b>이 60점 이하입니다.',
+                    unsafe_allow_html=True)
+                _show_cols = []
+                if M.get("receipt_no") and M["receipt_no"] in _filtered.columns:
+                    _show_cols.append(M["receipt_no"])
+                if office_col and office_col in _filtered.columns:
+                    _show_cols.append(office_col)
+                _show_cols.append(cat_col)
+                if score_col in _filtered.columns:
+                    _show_cols.append(score_col)
+                if M.get("voc") and M["voc"] in _filtered.columns:
+                    _show_cols.append(M["voc"])
+                _show_cols = [c for c in _show_cols if c in _filtered.columns]
+                st.dataframe(_filtered[_show_cols].reset_index(drop=True),
+                             use_container_width=True, height=400, hide_index=True)
+            else:
+                st.success("60점 이하 데이터가 없습니다.")
+
+
+with tab3:
+    if not M["score"]:
+        st.warning("만족도 점수 컬럼이 필요합니다.")
+    else:
+        # ── ① 계약종별 분석 ──
+        if M["contract"]:
+            st.markdown('<p class="sec-head">📋 계약종별 만족도 분석</p>', unsafe_allow_html=True)
+            _render_category_section(df_f, M["contract"], "계약종별",
+                                     M["office"], "_점수100", avg_score_100)
+            st.markdown("---")
+
+        # ── ② 접수채널별 분석 ──
+        if M["channel"]:
+            st.markdown('<p class="sec-head">📡 접수채널별 만족도 분석</p>', unsafe_allow_html=True)
+            df_f["_채널그룹"] = df_f[M["channel"]].apply(_group_channel)
+            df_chan = df_f[df_f["_채널그룹"].notna()].copy()
+            _render_category_section(df_chan, "_채널그룹", "접수채널",
+                                     M["office"], "_점수100", avg_score_100)
+            st.markdown("---")
+
+        # ── ③ 업무유형별 분석 ──
+        if M["business"]:
+            st.markdown('<p class="sec-head">🏢 업무유형별 만족도 분석</p>', unsafe_allow_html=True)
+            _render_category_section(df_f, M["business"], "업무유형",
+                                     M["office"], "_점수100", avg_score_100)
+            st.markdown("---")
+
+        # ── ④ 업무유형별 사분면 버블 차트 ──
         if M["business"] and M["score"]:
             st.markdown('<p class="sec-head">⭕ 업무유형별 사분면 분석 — 처리 건수 × 평균 만족도 (버블 크기 = 불만족 건수)</p>', unsafe_allow_html=True)
             _bbl_grp = df_f.groupby(M["business"]).agg(
@@ -1625,161 +1804,6 @@ with tab1:
                     _kw_str = f" · 핵심 키워드: **{', '.join(_kws)}**" if _kws else ""
                     _icon = "🔴" if _rank <= 2 else "🟡"
                     st.markdown(f"{_icon} **{_rank}순위 — {rr['업무유형']}** | 건수 {int(rr['처리건수']):,}건({rr['건수비중']}%) · 만족도 {rr['평균만족도']:.1f}점(갭 {rr['점수갭']:+.1f}) · 불만족 {int(rr['불만족건수'])}건{_kw_str}")
-            st.markdown("---")
-
-    # ── 분포 차트 ──
-    has_pie = any([M["age"], M["contract"], M["business"]])
-    if has_pie:
-        st.markdown('<p class="sec-head">🍩 응답 분포 현황</p>', unsafe_allow_html=True)
-        pie_cols = [c for c in [M["age"], M["contract"], M["business"]] if c]
-        pc_list = st.columns(len(pie_cols))
-        titles_map = {}
-        if M["age"]: titles_map[M["age"]] = "연령대"
-        if M["contract"]: titles_map[M["contract"]] = "계약종별"
-        if M["business"]: titles_map[M["business"]] = "업무유형"
-        for idx, col_nm in enumerate(pie_cols):
-            counts = df_f[col_nm].dropna().astype(str).value_counts()
-            _total = counts.sum()
-            with pc_list[idx]:
-                _title = titles_map.get(col_nm, col_nm)
-                if col_nm == M["business"]:
-                    # 업무유형: 가로 막대그래프, 퍼센트 높은 순 정렬
-                    _biz_df = pd.DataFrame({"유형": counts.index, "건수": counts.values})
-                    _biz_df["비율(%)"] = (_biz_df["건수"] / max(_total, 1) * 100).round(1)
-                    _biz_df = _biz_df.sort_values("비율(%)", ascending=True)
-                    fig_biz = px.bar(_biz_df, x="비율(%)", y="유형", orientation="h",
-                                     text=_biz_df["비율(%)"].apply(lambda v: f"{v:.1f}%"),
-                                     color_discrete_sequence=[C["sky"]], template=PLOTLY_TPL,
-                                     title=f"{_title} 분포")
-                    fig_biz.update_traces(textposition="outside", textfont_size=11,
-                                          hovertemplate="%{y}: %{x:.1f}% (%{customdata[0]:,}건)<extra></extra>",
-                                          customdata=_biz_df[["건수"]].values)
-                    fig_biz.update_layout(height=max(300, len(_biz_df) * 30 + 80),
-                                           margin=dict(t=50, b=20, l=20, r=60), showlegend=False,
-                                           title_font=dict(size=15, color=C["navy"]),
-                                           xaxis_title="비율(%)", yaxis_title="")
-                    st.plotly_chart(fig_biz, use_container_width=True)
-                else:
-                    # 연령대, 계약종별: 기존 파이차트 유지
-                    fig_pie = px.pie(names=counts.index, values=counts.values, color_discrete_sequence=PIE_COLORS,
-                                     hole=0.42, title=f"{_title} 분포", template=PLOTLY_TPL)
-                    fig_pie.update_traces(textposition="outside", textinfo="percent+label", textfont_size=12,
-                                           marker=dict(line=dict(color="#ffffff", width=2)),
-                                           hovertemplate="%{label}<br>%{value:,}건 (%{percent})<extra></extra>")
-                    fig_pie.update_layout(height=360, margin=dict(t=50, b=20, l=20, r=20), showlegend=False,
-                                           title_font=dict(size=15, color=C["navy"]))
-                    st.plotly_chart(fig_pie, use_container_width=True)
-
-
-# ─────────────────────────────────────────────────────────────
-#  TAB 3  계약종별 · 접수채널별 · 업무유형별 분석
-# ─────────────────────────────────────────────────────────────
-def _render_category_section(df, cat_col, cat_label, office_col, score_col, overall_avg):
-    """범주별 분석 공통 렌더링: 전체 막대 + 지사별 히트맵 + 하위 3개 카드"""
-    grp = df.groupby(cat_col)[score_col].agg(["mean","count"]).reset_index()
-    grp.columns = [cat_label, "평균만족도", "응답수"]
-    grp = grp.sort_values("평균만족도", ascending=True)
-
-    bottom3 = grp.head(3)
-    bottom3_names = bottom3[cat_label].tolist()
-    grp["구분"] = grp[cat_label].apply(lambda x: "🔴 하위 3" if x in bottom3_names else "일반")
-
-    # ── 전체 평균 막대 차트 ──
-    fig = px.bar(grp, x="평균만족도", y=cat_label, color="구분",
-                 color_discrete_map={"🔴 하위 3": C["red"], "일반": C["sky"]},
-                 orientation="h", text="평균만족도", template=PLOTLY_TPL,
-                 title=f"{cat_label}별 평균 만족도 (빨간색 = 하위 3개)")
-    fig.update_traces(texttemplate="%{text:.1f}", textposition="outside",
-                      hovertemplate="%{y}<br>평균: %{x:.1f}점<br>응답: %{customdata[0]:,}건<extra></extra>",
-                      customdata=grp[["응답수"]].values)
-    fig.add_vline(x=overall_avg, line_color=C["navy"], line_dash="dash", line_width=2,
-                  annotation_text=f"전체 평균 {overall_avg:.1f}", annotation_font_size=11)
-    fig.update_layout(height=max(300, len(grp) * 30 + 80),
-                       margin=dict(t=60, b=20, l=10, r=100), legend_title_text="",
-                       title_font=dict(size=14, color=C["navy"]))
-    st.plotly_chart(fig, use_container_width=True)
-
-    # ── 하위 3개 카드 ──
-    b3_cols = st.columns(min(3, len(bottom3)))
-    for i, (_, row) in enumerate(bottom3.iterrows()):
-        if i < len(b3_cols):
-            with b3_cols[i]:
-                st.markdown(
-                    f'<div class="card-red">'
-                    f'<b style="font-size:1.05rem;">🔴 {row[cat_label]}</b><br><br>'
-                    f'평균: <b>{row["평균만족도"]:.1f}점</b><br>'
-                    f'응답: {row["응답수"]:,}건<br>'
-                    f'전체 대비: <b style="color:{C["red"]}">{row["평균만족도"] - overall_avg:+.1f}점</b>'
-                    f'</div>', unsafe_allow_html=True)
-
-    # ── 지사별 × 범주별 점수 히트맵 ──
-    if office_col:
-        st.markdown(f'<p class="sec-head">🏢 지사별 {cat_label} 평균 만족도</p>', unsafe_allow_html=True)
-        pivot = df.pivot_table(values=score_col, index=office_col,
-                               columns=cat_col, aggfunc="mean").round(1)
-        pivot = pivot.reindex(_sort_offices(pivot.index.tolist()))
-        if not pivot.empty:
-            fig_hm = px.imshow(pivot, color_continuous_scale="RdYlGn",
-                               text_auto=".1f", aspect="auto", template=PLOTLY_TPL,
-                               title=f"지사 × {cat_label} 만족도 (초록=높음 / 빨강=낮음)")
-            fig_hm.update_traces(hovertemplate="지사: %{y}<br>" + cat_label + ": %{x}<br>점수: %{z:.1f}점<extra></extra>")
-            fig_hm.update_layout(
-                height=max(350, len(pivot.index) * 30 + 100),
-                margin=dict(t=60, b=60, l=120, r=60),
-                title_font=dict(size=14, color=C["navy"]))
-            st.plotly_chart(fig_hm, use_container_width=True)
-
-        # ── 저점수 건 상세 조회 (60점 이하 전체 표) ──
-        _uid = cat_label.replace(" ", "")
-        with st.expander(f"🔍 60점 이하 저점수 건 상세 조회 ({cat_label})"):
-            _filtered = df[df[score_col] <= 60].copy()
-            if len(_filtered) > 0:
-                _filtered = _filtered.sort_values(score_col)
-                st.markdown(
-                    f'총 <b style="color:{C["red"]}">{len(_filtered):,}건</b>이 60점 이하입니다.',
-                    unsafe_allow_html=True)
-                _show_cols = []
-                if M.get("receipt_no") and M["receipt_no"] in _filtered.columns:
-                    _show_cols.append(M["receipt_no"])
-                if office_col and office_col in _filtered.columns:
-                    _show_cols.append(office_col)
-                _show_cols.append(cat_col)
-                if score_col in _filtered.columns:
-                    _show_cols.append(score_col)
-                if M.get("voc") and M["voc"] in _filtered.columns:
-                    _show_cols.append(M["voc"])
-                _show_cols = [c for c in _show_cols if c in _filtered.columns]
-                st.dataframe(_filtered[_show_cols].reset_index(drop=True),
-                             use_container_width=True, height=400, hide_index=True)
-            else:
-                st.success("60점 이하 데이터가 없습니다.")
-
-
-with tab3:
-    if not M["score"]:
-        st.warning("만족도 점수 컬럼이 필요합니다.")
-    else:
-        # ── ① 계약종별 분석 ──
-        if M["contract"]:
-            st.markdown('<p class="sec-head">📋 계약종별 만족도 분석</p>', unsafe_allow_html=True)
-            _render_category_section(df_f, M["contract"], "계약종별",
-                                     M["office"], "_점수100", avg_score_100)
-            st.markdown("---")
-
-        # ── ② 접수채널별 분석 ──
-        if M["channel"]:
-            st.markdown('<p class="sec-head">📡 접수채널별 만족도 분석</p>', unsafe_allow_html=True)
-            df_f["_채널그룹"] = df_f[M["channel"]].apply(_group_channel)
-            df_chan = df_f[df_f["_채널그룹"].notna()].copy()
-            _render_category_section(df_chan, "_채널그룹", "접수채널",
-                                     M["office"], "_점수100", avg_score_100)
-            st.markdown("---")
-
-        # ── ③ 업무유형별 분석 ──
-        if M["business"]:
-            st.markdown('<p class="sec-head">🏢 업무유형별 만족도 분석</p>', unsafe_allow_html=True)
-            _render_category_section(df_f, M["business"], "업무유형",
-                                     M["office"], "_점수100", avg_score_100)
 
 
 # ─────────────────────────────────────────────────────────────
@@ -2652,124 +2676,9 @@ with tab10:
     st.markdown("---")
 
     # ══════════════════════════════════════════
-    # 3. 사업소별 벤치마킹 (OOS 제외 순수 데이터)
+    # 3. 지사별 페르소나 (OOS 제외)
     # ══════════════════════════════════════════
-    st.markdown('<p class="sec-head">3️⃣ 사업소별 벤치마킹 — 만족도 · 개별항목 · 강점/약점 자동 진단</p>',
-                unsafe_allow_html=True)
-
-    office_col_b = M.get("office")
-    if office_col_b and M["score"] and "_점수100" in df_pure.columns:
-        office_grp = df_pure.groupby(office_col_b)["_점수100"].agg(["mean", "count"]).reset_index()
-        office_grp.columns = ["사업소", "평균만족도", "응답수"]
-        office_grp = _sort_df_by_office(office_grp, "사업소")
-        _bench_avg = df_pure["_점수100"].mean()
-
-        office_grp["그룹"] = office_grp["평균만족도"].apply(
-            lambda v: "⬆ 본부평균 이상" if v >= _bench_avg else "⬇ 본부평균 미달")
-
-        # 만족도 막대 차트
-        fig_bench = px.bar(office_grp, x="평균만족도", y="사업소", color="그룹",
-                           color_discrete_map={"⬆ 본부평균 이상": C["teal"], "⬇ 본부평균 미달": C["red"]},
-                           orientation="h", text="평균만족도", template=PLOTLY_TPL,
-                           title=f"사업소별 평균 만족도 (OOS 제외) — 본부 평균: {_bench_avg:.1f}점")
-        fig_bench.update_traces(texttemplate="%{text:.1f}", textposition="outside",
-                                hovertemplate="%{y}<br>평균: %{x:.1f}점<extra></extra>")
-        fig_bench.add_vline(x=_bench_avg, line_color=C["navy"], line_dash="dash", line_width=2.5,
-                            annotation_text=f"본부 평균 {_bench_avg:.1f}",
-                            annotation_font_size=12, annotation_font_color=C["navy"])
-        fig_bench.update_layout(height=max(350, len(office_grp) * 35 + 80),
-                                 margin=dict(t=60, b=20, l=10, r=100), legend_title_text="",
-                                 title_font=dict(size=14, color=C["navy"]))
-        st.plotly_chart(fig_bench, use_container_width=True)
-
-        # 개별항목 레이더 차트 (지사별 비교)
-        _item_cols_bench = []
-        for c in df_pure.columns:
-            if c in ("_점수100", "_원본순번", "_접수일", "_is_oos") or c.startswith("_"):
-                continue
-            if c == M["score"]:
-                continue
-            vals = pd.to_numeric(df_pure[c], errors="coerce")
-            if vals.notna().sum() / max(len(df_pure), 1) > 0.1 and vals.nunique() > 2:
-                _item_cols_bench.append(c)
-
-        if _item_cols_bench and len(office_grp) >= 2:
-            st.markdown('<p class="sec-head">📊 지사별 개별항목 레이더 비교</p>', unsafe_allow_html=True)
-            # 상위 3 + 하위 3 지사 선택
-            _sorted_offices = office_grp.sort_values("평균만족도")
-            _bottom3 = _sorted_offices.head(3)["사업소"].tolist()
-            _top3 = _sorted_offices.tail(3)["사업소"].tolist()
-            _radar_offices = _bottom3 + _top3
-
-            radar_data = []
-            for ofc in _radar_offices:
-                sub = df_pure[df_pure[office_col_b] == ofc]
-                row_data = {"지사": ofc}
-                for col in _item_cols_bench:
-                    val = pd.to_numeric(sub[col], errors="coerce").mean()
-                    if pd.notna(val):
-                        row_data[col] = round(val, 1)
-                radar_data.append(row_data)
-
-            if radar_data:
-                fig_radar = go.Figure()
-                _radar_cats = [c for c in _item_cols_bench if all(c in rd for rd in radar_data)]
-                for rd in radar_data:
-                    is_bottom = rd["지사"] in _bottom3
-                    vals_r = [rd.get(c, 0) for c in _radar_cats]
-                    fig_radar.add_trace(go.Scatterpolar(
-                        r=vals_r + [vals_r[0]] if vals_r else vals_r,
-                        theta=_radar_cats + [_radar_cats[0]] if _radar_cats else _radar_cats,
-                        name=rd["지사"],
-                        line=dict(dash="dash" if is_bottom else "solid",
-                                  width=1.5 if is_bottom else 2.5),
-                        opacity=0.6 if is_bottom else 1.0,
-                        hovertemplate=rd["지사"] + "<br>%{theta}: %{r:.1f}점<extra></extra>",
-                    ))
-                fig_radar.update_layout(
-                    polar=dict(radialaxis=dict(visible=True, range=[0, 100])),
-                    height=480, template=PLOTLY_TPL,
-                    title=dict(text="하위 3개(점선) vs 상위 3개(실선) 지사 개별항목 비교",
-                               font=dict(size=14, color=C["navy"])),
-                    margin=dict(t=80, b=40, l=60, r=60))
-                st.plotly_chart(fig_radar, use_container_width=True)
-
-        # 지사별 강점/약점 자동 진단
-        st.markdown('<p class="sec-head">🔍 지사별 강점 · 약점 자동 진단</p>', unsafe_allow_html=True)
-        diag_data = []
-        for _, row_o in office_grp.iterrows():
-            ofc = row_o["사업소"]
-            sub = df_pure[df_pure[office_col_b] == ofc]
-            strengths = []
-            weaknesses = []
-            for col in _item_cols_bench:
-                ofc_val = pd.to_numeric(sub[col], errors="coerce").mean()
-                all_val = pd.to_numeric(df_pure[col], errors="coerce").mean()
-                if pd.notna(ofc_val) and pd.notna(all_val):
-                    gap = ofc_val - all_val
-                    if gap >= 2:
-                        strengths.append(f"{col}(+{gap:.1f})")
-                    elif gap <= -2:
-                        weaknesses.append(f"{col}({gap:.1f})")
-            diag_data.append({
-                "지사": ofc,
-                "평균": round(row_o["평균만족도"], 1),
-                "응답수": int(row_o["응답수"]),
-                "강점 항목": ", ".join(strengths[:3]) if strengths else "-",
-                "약점 항목": ", ".join(weaknesses[:3]) if weaknesses else "-",
-            })
-        df_diag = _sort_df_by_office(pd.DataFrame(diag_data), "지사")
-        st.dataframe(df_diag, use_container_width=True, hide_index=True)
-
-    else:
-        st.info("사업소, 종합점수 컬럼이 필요합니다.")
-
-    st.markdown("---")
-
-    # ══════════════════════════════════════════
-    # 4. 지사별 페르소나 (OOS 제외)
-    # ══════════════════════════════════════════
-    st.markdown('<p class="sec-head">4️⃣ 지사별 페르소나 — 데이터 기반 캐릭터 프로파일링 (순수 데이터)</p>',
+    st.markdown('<p class="sec-head">3️⃣ 지사별 페르소나 — 데이터 기반 캐릭터 프로파일링 (순수 데이터)</p>',
                 unsafe_allow_html=True)
 
     office_col = M.get("office")
