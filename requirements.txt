@@ -9,3 +9,4 @@ urllib3
 konlpy
 keybert
 scikit-learn
+google-generativeai
