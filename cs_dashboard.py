@@ -1310,13 +1310,22 @@ with tab1:
             st.plotly_chart(fig_gauge, use_container_width=True)
         with h_col:
             st.markdown('<p class="sec-head">📊 만족도 점수 분포 (100점 환산)</p>', unsafe_allow_html=True)
-            fig_hist = px.histogram(score_100.dropna(), nbins=20, color_discrete_sequence=[C["sky"]],
-                                    labels={"value": "만족도 점수", "count": "응답 수"}, template=PLOTLY_TPL)
+            _bins = list(range(0, 105, 5))
+            _score_clean = score_100.dropna()
+            _hist_counts, _hist_edges = np.histogram(_score_clean, bins=_bins)
+            _hist_centers = [(_hist_edges[i] + _hist_edges[i+1]) / 2 for i in range(len(_hist_counts))]
+            _hist_labels = [f"{int(_hist_edges[i])}~{int(_hist_edges[i+1])}" for i in range(len(_hist_counts))]
+            fig_hist = go.Figure(go.Bar(
+                x=_hist_centers, y=_hist_counts,
+                text=_hist_counts, textposition="outside", textfont=dict(size=9),
+                marker_color=C["sky"], marker_line_width=0,
+                hovertext=_hist_labels, hoverinfo="text+y",
+            ))
             fig_hist.add_vline(x=avg_score_100, line_color=C["gold"], line_width=2.5, line_dash="dash",
                                annotation_text=f"평균 {avg_score_100:.1f}", annotation_font_color=C["gold"])
             fig_hist.update_layout(height=300, margin=dict(t=30, b=30, l=50, r=20), showlegend=False,
-                                    xaxis_title="만족도 점수", yaxis_title="응답 수")
-            fig_hist.update_traces(marker_line_width=0)
+                                    xaxis=dict(title="만족도 점수", tickmode="linear", tick0=0, dtick=5, range=[0, 100]),
+                                    yaxis_title="응답 수", template=PLOTLY_TPL)
             st.plotly_chart(fig_hist, use_container_width=True)
         st.markdown("---")
 
@@ -1374,14 +1383,9 @@ with tab1:
                                      title_font=dict(size=14, color=C["navy"]))
             st.plotly_chart(fig_stack, use_container_width=True)
 
-            with st.expander("📋 사업소별 구간 집계표"):
-                cross_display = cross_bucket.copy()
-                cross_display["합계"] = cross_display.sum(axis=1)
-                st.dataframe(cross_display, use_container_width=True)
-
         st.markdown("---")
 
-    # ── 분포 파이 차트 ──
+    # ── 분포 차트 ──
     has_pie = any([M["age"], M["contract"], M["business"]])
     if has_pie:
         st.markdown('<p class="sec-head">🍩 응답 분포 현황</p>', unsafe_allow_html=True)
@@ -1393,18 +1397,33 @@ with tab1:
         if M["business"]: titles_map[M["business"]] = "업무유형"
         for idx, col_nm in enumerate(pie_cols):
             counts = df_f[col_nm].dropna().astype(str).value_counts()
-            fig_pie = px.pie(names=counts.index, values=counts.values, color_discrete_sequence=PIE_COLORS,
-                             hole=0.42, title=f"{titles_map.get(col_nm, col_nm)} 분포", template=PLOTLY_TPL)
-            fig_pie.update_traces(textposition="outside", textinfo="percent+label", textfont_size=12,
-                                   marker=dict(line=dict(color="#ffffff", width=2)))
-            fig_pie.update_layout(height=360, margin=dict(t=50, b=20, l=20, r=20), showlegend=False,
-                                   title_font=dict(size=15, color=C["navy"]))
+            _total = counts.sum()
             with pc_list[idx]:
-                st.plotly_chart(fig_pie, use_container_width=True)
-
-    with st.expander("📄 원본 데이터 미리보기 (상위 30건)"):
-        display_df = df_f[[c for c in df_f.columns if not c.startswith("_")]]
-        st.dataframe(display_df.head(30), use_container_width=True)
+                _title = titles_map.get(col_nm, col_nm)
+                if col_nm == M["business"]:
+                    # 업무유형: 가로 막대그래프, 퍼센트 높은 순 정렬
+                    _biz_df = pd.DataFrame({"유형": counts.index, "건수": counts.values})
+                    _biz_df["비율(%)"] = (_biz_df["건수"] / max(_total, 1) * 100).round(1)
+                    _biz_df = _biz_df.sort_values("비율(%)", ascending=True)
+                    fig_biz = px.bar(_biz_df, x="비율(%)", y="유형", orientation="h",
+                                     text=_biz_df["비율(%)"].apply(lambda v: f"{v:.1f}%"),
+                                     color_discrete_sequence=[C["sky"]], template=PLOTLY_TPL,
+                                     title=f"{_title} 분포")
+                    fig_biz.update_traces(textposition="outside", textfont_size=11)
+                    fig_biz.update_layout(height=max(300, len(_biz_df) * 30 + 80),
+                                           margin=dict(t=50, b=20, l=20, r=60), showlegend=False,
+                                           title_font=dict(size=15, color=C["navy"]),
+                                           xaxis_title="비율(%)", yaxis_title="")
+                    st.plotly_chart(fig_biz, use_container_width=True)
+                else:
+                    # 연령대, 계약종별: 기존 파이차트 유지
+                    fig_pie = px.pie(names=counts.index, values=counts.values, color_discrete_sequence=PIE_COLORS,
+                                     hole=0.42, title=f"{_title} 분포", template=PLOTLY_TPL)
+                    fig_pie.update_traces(textposition="outside", textinfo="percent+label", textfont_size=12,
+                                           marker=dict(line=dict(color="#ffffff", width=2)))
+                    fig_pie.update_layout(height=360, margin=dict(t=50, b=20, l=20, r=20), showlegend=False,
+                                           title_font=dict(size=15, color=C["navy"]))
+                    st.plotly_chart(fig_pie, use_container_width=True)
 
 
 # ─────────────────────────────────────────────────────────────
