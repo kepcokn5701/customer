@@ -1290,7 +1290,7 @@ st.markdown("<br>", unsafe_allow_html=True)
 # ══════════════════════════════════════════════════════════════
 tab1, tab3, tab5, tab9, tab10, tab11 = st.tabs([
     "📊  구간별 비중 · 종합 현황",
-    "📡  채널별 · 업무별 분석",
+    "📡  계약종별 · 접수채널별 · 업무유형별 분석",
     "🎯  민원 조기 경보 시스템",
     "🔬  지사 심층 · 패턴",
     "🧠  CXO 딥 인사이트",
@@ -1352,7 +1352,7 @@ with tab1:
             st.markdown('<p class="sec-head">🏢 사업소별 평균 만족도</p>', unsafe_allow_html=True)
             _ofc_grp_bar = df_f.groupby(M["office"])["_점수100"].agg(["mean", "count"]).reset_index()
             _ofc_grp_bar.columns = ["사업소", "평균만족도", "응답수"]
-            _ofc_grp_bar = _sort_df_by_office(_ofc_grp_bar, "사업소")
+            _ofc_grp_bar = _ofc_grp_bar.sort_values("평균만족도", ascending=True)
             _bar_avg = df_f["_점수100"].mean()
             _ofc_grp_bar["그룹"] = _ofc_grp_bar["평균만족도"].apply(
                 lambda v: "⬆ 본부평균 이상" if v >= _bar_avg else "⬇ 본부평균 미달")
@@ -1804,6 +1804,214 @@ with tab3:
                     _kw_str = f" · 핵심 키워드: **{', '.join(_kws)}**" if _kws else ""
                     _icon = "🔴" if _rank <= 2 else "🟡"
                     st.markdown(f"{_icon} **{_rank}순위 — {rr['업무유형']}** | 건수 {int(rr['처리건수']):,}건({rr['건수비중']}%) · 만족도 {rr['평균만족도']:.1f}점(갭 {rr['점수갭']:+.1f}) · 불만족 {int(rr['불만족건수'])}건{_kw_str}")
+
+        st.markdown("---")
+
+        # ══════════════════════════════════════════════════════════════
+        #  3차원 교차분석 — 계약종별 × 접수채널 × 업무유형
+        # ══════════════════════════════════════════════════════════════
+        st.markdown('<p class="sec-head">🔬 3차원 교차분석 — 계약종별 × 접수채널 × 업무유형</p>', unsafe_allow_html=True)
+
+        # 채널그룹 준비 (tab3 내에서 이미 생성된 경우도 있지만 안전하게 재생성)
+        _ch_col = M.get("channel")
+        if _ch_col and _ch_col in df_f.columns:
+            df_f["_채널그룹_cross"] = df_f[_ch_col].apply(_group_channel)
+            _df_cross = df_f[df_f["_채널그룹_cross"].notna()].copy()
+        else:
+            _df_cross = pd.DataFrame()
+
+        # ── ⑤ 페르소나별 서비스 경로 분석 (계약종별 × 접수채널 × 점수) ──
+        if M.get("contract") and not _df_cross.empty:
+            st.markdown("##### 🗺️ 페르소나별 서비스 경로 분석 (계약종별 × 접수채널)")
+            st.caption("특정 계약 고객이 어떤 채널을 이용할 때 만족도가 급락하는 **'채널 미스매치'** 지점을 찾아냅니다.")
+            _pv_mean = _df_cross.pivot_table(values="_점수100", index=M["contract"],
+                                              columns="_채널그룹_cross", aggfunc="mean").round(1)
+            _pv_cnt = _df_cross.pivot_table(values="_점수100", index=M["contract"],
+                                             columns="_채널그룹_cross", aggfunc="count").fillna(0).astype(int)
+            if not _pv_mean.empty and _pv_mean.size > 1:
+                # 히트맵
+                _hover_cross = []
+                for r_idx in _pv_mean.index:
+                    row_h = []
+                    for c_idx in _pv_mean.columns:
+                        _v = _pv_mean.loc[r_idx, c_idx] if pd.notna(_pv_mean.loc[r_idx, c_idx]) else 0
+                        _cn = int(_pv_cnt.loc[r_idx, c_idx]) if r_idx in _pv_cnt.index and c_idx in _pv_cnt.columns else 0
+                        _gap = round(_v - avg_score_100, 1) if pd.notna(_v) and _v > 0 else 0
+                        row_h.append(f"{r_idx} × {c_idx}<br>평균: {_v:.1f}점 (전체 대비 {_gap:+.1f})<br>응답: {_cn}건")
+                    _hover_cross.append(row_h)
+
+                fig_cross_hm = px.imshow(_pv_mean, color_continuous_scale="RdYlGn",
+                                          text_auto=".1f", aspect="auto", template=PLOTLY_TPL,
+                                          title="계약종별 × 접수채널 만족도 히트맵 (초록=높음 / 빨강=낮음)")
+                fig_cross_hm.update_traces(
+                    customdata=np.array(_hover_cross),
+                    hovertemplate="%{customdata}<extra></extra>")
+                fig_cross_hm.update_layout(
+                    height=max(300, len(_pv_mean.index) * 45 + 100),
+                    margin=dict(t=60, b=40, l=120, r=60),
+                    title_font=dict(size=14, color=C["navy"]),
+                    xaxis_title="접수채널", yaxis_title="계약종별")
+                st.plotly_chart(fig_cross_hm, use_container_width=True)
+
+                # 채널 미스매치 탐지 (-5점 이상 급락)
+                _mismatch = []
+                for r_idx in _pv_mean.index:
+                    for c_idx in _pv_mean.columns:
+                        _v = _pv_mean.loc[r_idx, c_idx]
+                        _cn = int(_pv_cnt.loc[r_idx, c_idx]) if r_idx in _pv_cnt.index and c_idx in _pv_cnt.columns else 0
+                        if pd.notna(_v) and _cn >= 3:
+                            _gap = _v - avg_score_100
+                            if _gap <= -5:
+                                _mismatch.append({"계약종": r_idx, "채널": c_idx,
+                                                   "평균만족도": round(_v, 1), "응답수": _cn,
+                                                   "전체대비": round(_gap, 1)})
+                if _mismatch:
+                    _mm_df = pd.DataFrame(_mismatch).sort_values("전체대비")
+                    st.markdown("**🚨 채널 미스매치 탐지** (전체 평균 대비 -5점 이상 급락 조합)")
+                    _mm_cols = st.columns(min(3, len(_mm_df)))
+                    for i, (_, mmr) in enumerate(_mm_df.head(3).iterrows()):
+                        with _mm_cols[i]:
+                            st.markdown(
+                                f'<div class="card-red">'
+                                f'<b>{mmr["계약종"]} × {mmr["채널"]}</b><br><br>'
+                                f'평균: <b>{mmr["평균만족도"]:.1f}점</b> ({mmr["전체대비"]:+.1f}점)<br>'
+                                f'응답: {mmr["응답수"]:,}건<br><br>'
+                                f'<span style="font-size:0.85em">→ 해당 고객군의 채널 상담 프로세스 점검 필요</span>'
+                                f'</div>', unsafe_allow_html=True)
+                else:
+                    st.success("채널 미스매치 없음: 모든 계약종 × 채널 조합이 전체 평균 대비 -5점 이내입니다.")
+            st.markdown("---")
+
+        # ── ⑥ 업무 성격별 채널 적합도 분석 (업무유형 × 접수채널 × 건수/점수) ──
+        if M.get("business") and not _df_cross.empty:
+            st.markdown("##### 🎯 업무 성격별 채널 적합도 분석 (업무유형 × 접수채널)")
+            st.caption("동일 업무라도 채널에 따라 만족도가 크게 달라지는 **'채널 전환(Call Steering)'** 대상 업무를 식별합니다.")
+
+            _biz_ch = _df_cross.groupby([M["business"], "_채널그룹_cross"])["_점수100"].agg(
+                ["mean", "count"]).reset_index()
+            _biz_ch.columns = ["업무유형", "채널", "평균만족도", "응답수"]
+            _biz_ch = _biz_ch[_biz_ch["응답수"] >= 5]
+            _biz_ch["평균만족도"] = _biz_ch["평균만족도"].round(1)
+
+            if len(_biz_ch) >= 2:
+                _ch_colors = {"직원": C["blue"], "고객센터": C["green"],
+                              "한전ON": C["sky"], "기타": C["gold"]}
+                _total_biz_ch = _biz_ch["응답수"].sum()
+                _biz_ch["건수비중"] = (_biz_ch["응답수"] / _total_biz_ch * 100).round(1)
+                _x_avg_bch = _biz_ch["응답수"].mean()
+                _y_avg_bch = _biz_ch["평균만족도"].mean()
+
+                fig_biz_ch = go.Figure()
+                for ch_name in ["직원", "고객센터", "한전ON", "기타"]:
+                    _sub_ch = _biz_ch[_biz_ch["채널"] == ch_name]
+                    if _sub_ch.empty:
+                        continue
+                    fig_biz_ch.add_trace(go.Scatter(
+                        x=_sub_ch["응답수"], y=_sub_ch["평균만족도"],
+                        mode="markers+text",
+                        marker=dict(size=(_sub_ch["건수비중"] * 3).clip(lower=12, upper=60),
+                                    color=_ch_colors.get(ch_name, C["navy"]), opacity=0.75,
+                                    line=dict(width=1.5, color="white")),
+                        text=_sub_ch["업무유형"], textposition="top center", textfont=dict(size=11),
+                        hovertemplate=("<b>%{text}</b> · " + ch_name +
+                                       "<br>응답수: %{x:,}건<br>만족도: %{y:.1f}점"
+                                       "<br>건수비중: %{customdata[0]:.1f}%<extra></extra>"),
+                        customdata=_sub_ch[["건수비중"]].values,
+                        name=ch_name,
+                    ))
+
+                fig_biz_ch.add_hline(y=_y_avg_bch, line_color=C["navy"], line_dash="dot", line_width=1,
+                                      annotation_text=f"평균 만족도 {_y_avg_bch:.1f}", annotation_font_size=10,
+                                      annotation_position="top left")
+                fig_biz_ch.add_vline(x=_x_avg_bch, line_color=C["navy"], line_dash="dot", line_width=1,
+                                      annotation_text=f"평균 건수 {_x_avg_bch:.0f}", annotation_font_size=10,
+                                      annotation_position="top right")
+                fig_biz_ch.update_layout(
+                    height=520, margin=dict(t=60, b=60, l=60, r=40),
+                    xaxis_title="처리 건수", yaxis_title="평균 만족도 (100점 환산)",
+                    title=dict(text="업무유형 × 채널별 만족도 버블 차트 (색상 = 채널, 크기 = 건수 비중)",
+                               font=dict(size=14, color=C["navy"])),
+                    legend=dict(orientation="h", yanchor="bottom", y=-0.18, xanchor="center", x=0.5,
+                                font=dict(size=11)),
+                    template=PLOTLY_TPL)
+                st.plotly_chart(fig_biz_ch, use_container_width=True)
+
+                # 채널 간 점수 갭이 큰 업무 TOP3
+                _biz_gap = _biz_ch.groupby("업무유형")["평균만족도"].agg(["max", "min", "count"]).reset_index()
+                _biz_gap.columns = ["업무유형", "최고채널점수", "최저채널점수", "채널수"]
+                _biz_gap = _biz_gap[_biz_gap["채널수"] >= 2]
+                _biz_gap["채널갭"] = (_biz_gap["최고채널점수"] - _biz_gap["최저채널점수"]).round(1)
+                _biz_gap = _biz_gap.sort_values("채널갭", ascending=False)
+
+                if not _biz_gap.empty:
+                    st.markdown("**📊 채널 간 만족도 갭 TOP 업무** (같은 업무, 채널에 따른 점수 차이)")
+                    for _, gr in _biz_gap.head(3).iterrows():
+                        _biz_name = gr["업무유형"]
+                        _detail = _biz_ch[_biz_ch["업무유형"] == _biz_name].sort_values("평균만족도")
+                        _low = _detail.iloc[0]
+                        _high = _detail.iloc[-1]
+                        st.warning(
+                            f"**{_biz_name}**: {_high['채널']} {_high['평균만족도']:.1f}점 vs "
+                            f"{_low['채널']} {_low['평균만족도']:.1f}점 (갭 **{gr['채널갭']:.1f}점**) "
+                            f"→ {_low['채널']} 채널 프로세스 개선 또는 채널 전환 검토")
+            st.markdown("---")
+
+        # ── ⑦ 리스크 집중 구역 도출 (계약종별 × 업무유형 × 점수) ──
+        if M.get("contract") and M.get("business"):
+            st.markdown("##### 🎯 리스크 집중 구역 (계약종별 × 업무유형)")
+            st.caption("우리 본부의 **'가장 아픈 손가락'** — 전사적 프로세스 개선이 필요한 타겟을 도출합니다.")
+
+            _risk_cross = df_f.groupby([M["contract"], M["business"]])["_점수100"].agg(
+                ["mean", "count"]).reset_index()
+            _risk_cross.columns = ["계약종", "업무유형", "평균만족도", "응답수"]
+            _risk_cross = _risk_cross[_risk_cross["응답수"] >= 3]
+            _risk_cross["평균만족도"] = _risk_cross["평균만족도"].round(1)
+
+            if len(_risk_cross) >= 2:
+                _total_risk_n = _risk_cross["응답수"].sum()
+                _risk_cross["건수비중"] = (_risk_cross["응답수"] / _total_risk_n * 100).round(1)
+                _risk_cross["전체대비"] = (_risk_cross["평균만족도"] - avg_score_100).round(1)
+                _risk_cross["리스크점수"] = (((100 - _risk_cross["평균만족도"]) / 100) * _risk_cross["건수비중"]).round(2)
+                _risk_cross["조합명"] = _risk_cross["계약종"] + " × " + _risk_cross["업무유형"]
+
+                # 트리맵
+                fig_tree = px.treemap(
+                    _risk_cross, path=["계약종", "업무유형"], values="응답수",
+                    color="평균만족도", color_continuous_scale="RdYlGn",
+                    range_color=[_risk_cross["평균만족도"].min() - 5, _risk_cross["평균만족도"].max() + 5],
+                    template=PLOTLY_TPL,
+                    title="계약종별 × 업무유형 트리맵 (면적 = 건수, 색상 = 만족도)")
+                fig_tree.update_traces(
+                    hovertemplate="<b>%{label}</b><br>응답수: %{value:,}건<br>만족도: %{color:.1f}점<extra></extra>",
+                    textinfo="label+value")
+                fig_tree.update_layout(
+                    height=520, margin=dict(t=60, b=20, l=10, r=10),
+                    title_font=dict(size=14, color=C["navy"]))
+                st.plotly_chart(fig_tree, use_container_width=True)
+
+                # TOP 5 사전케어 집중 타겟
+                _top5_risk = _risk_cross.sort_values("리스크점수", ascending=False).head(5)
+                st.markdown("**🚨 사전케어 집중 타겟 TOP 5** (리스크 점수 = 불만족도 × 건수비중)")
+                _t5_cols = st.columns(min(5, len(_top5_risk)))
+                for i, (_, tr) in enumerate(_top5_risk.iterrows()):
+                    if i < len(_t5_cols):
+                        _card_cls = "card-red" if tr["전체대비"] <= -5 else "card-blue"
+                        with _t5_cols[i]:
+                            st.markdown(
+                                f'<div class="{_card_cls}" style="min-height:170px">'
+                                f'<b style="font-size:0.95rem">#{i+1} {tr["계약종"]}<br>× {tr["업무유형"]}</b><br><br>'
+                                f'만족도: <b>{tr["평균만족도"]:.1f}점</b><br>'
+                                f'전체 대비: <b style="color:{C["red"]}">{tr["전체대비"]:+.1f}점</b><br>'
+                                f'응답: {int(tr["응답수"]):,}건 ({tr["건수비중"]:.1f}%)<br>'
+                                f'리스크: <b>{tr["리스크점수"]:.2f}</b>'
+                                f'</div>', unsafe_allow_html=True)
+
+                # 리스크 인덱스 테이블
+                with st.expander("📋 종합 리스크 인덱스 전체 보기"):
+                    _disp_risk = _risk_cross[["조합명", "응답수", "건수비중", "평균만족도", "전체대비", "리스크점수"]].copy()
+                    _disp_risk.columns = ["계약종 × 업무유형", "응답수", "건수비중(%)", "평균만족도", "전체 대비", "리스크 점수"]
+                    _disp_risk = _disp_risk.sort_values("리스크 점수", ascending=False)
+                    st.dataframe(_disp_risk.reset_index(drop=True), use_container_width=True, hide_index=True)
 
 
 # ─────────────────────────────────────────────────────────────
