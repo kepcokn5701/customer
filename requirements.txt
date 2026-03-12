@@ -1,12 +1,10 @@
 streamlit
 pandas
-numpy
 plotly
+numpy
 matplotlib
 openpyxl
-requests
-urllib3
-konlpy
-keybert
+xlrd
 scikit-learn
-google-generativeai
+keybert
+sentence-transformers
