@@ -1,10 +1,7 @@
 streamlit
 pandas
-plotly
 numpy
+plotly
 matplotlib
 openpyxl
 xlrd
-scikit-learn
-keybert
-sentence-transformers

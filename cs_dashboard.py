@@ -163,6 +163,21 @@ NEGATIVE_KEYWORDS = [
     "정전","단전","누전","위험","안전","사고",
 ]
 
+# VOC 하이라이팅 전용 — 시설·기술·제도 중심 (감정어 제외)
+VOC_HIGHLIGHT_KW = [
+    # 시설·설비
+    "정전","단전","누전","감전","고장","불량","오작동","오류",
+    "계량기","변압기","전주","전선","배전","차단기","개폐기","누수","누유",
+    # 요금·제도
+    "과금","과다","요금","청구","납부","감면","할인","연체","체납",
+    "계약","해지","이전","명의변경","폐전","신증설",
+    # 절차·처리
+    "재방문","지연","지체","방치","미처리","미흡","누락","중복",
+    "민원","접수","처리","답변","회신","약속",
+    # 안전·사고
+    "위험","안전","사고","화재","폭발","합선",
+]
+
 RUDE_KEYWORDS = [
     "불친절","무시","무성의","불쾌","반말","태도","무례","소홀","건방",
     "고압적","짜증","화남","면박","윽박","냉담","퉁명","귀찮","성의없",
@@ -1405,7 +1420,7 @@ with tab1:
 """)
                 import base64 as _b64
                 _box_guide_img = _b64.b64decode("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")
-                st.image(_box_guide_img, width=320)
+                st.image(_box_guide_img, width=640)
                 st.markdown("""
 
 ---
@@ -1456,7 +1471,7 @@ with tab1:
                     fig_biz.update_traces(textposition="outside", textfont_size=11,
                                           hovertemplate="%{y}: %{x:.1f}% (%{customdata[0]:,}건)<extra></extra>",
                                           customdata=_biz_df[["건수"]].values)
-                    fig_biz.update_layout(height=max(300, len(_biz_df) * 30 + 80),
+                    fig_biz.update_layout(height=max(360, len(_biz_df) * 30 + 80),
                                            margin=dict(t=50, b=20, l=20, r=60), showlegend=False,
                                            title_font=dict(size=15, color=C["navy"]),
                                            xaxis_title="비율(%)", yaxis_title="")
@@ -1521,12 +1536,21 @@ def _render_category_section(df, cat_col, cat_label, office_col, score_col, over
                                columns=cat_col, aggfunc="mean").round(1)
         pivot = pivot.reindex(_sort_offices(pivot.index.tolist()))
         pivot.columns.name = cat_label
-        pivot = pivot.fillna(0)
+        # fillna(0) 제거 — NaN=데이터없음(공란), 실제 0점만 빨강 표시
         if not pivot.empty:
+            # 텍스트: NaN 칸은 빈 문자열
+            _hm_text = [[f"{v:.1f}" if pd.notna(v) else "" for v in row] for row in pivot.values]
+            # 호버: NaN 칸은 "데이터 없음"
+            _hm_hover = [[f"지사: {r}<br>{cat_label}: {c}<br>점수: {pivot.loc[r,c]:.1f}점"
+                          if pd.notna(pivot.loc[r,c])
+                          else f"지사: {r}<br>{cat_label}: {c}<br>데이터 없음"
+                          for c in pivot.columns] for r in pivot.index]
             fig_hm = px.imshow(pivot, color_continuous_scale="RdYlGn",
-                               text_auto=".1f", aspect="auto", template=PLOTLY_TPL,
+                               aspect="auto", template=PLOTLY_TPL,
                                title=f"지사 × {cat_label} 만족도 (초록=높음 / 빨강=낮음)")
-            fig_hm.update_traces(hovertemplate="지사: %{y}<br>" + cat_label + ": %{x}<br>점수: %{z:.1f}점<extra></extra>")
+            fig_hm.update_traces(text=_hm_text, texttemplate="%{text}",
+                                 customdata=_hm_hover,
+                                 hovertemplate="%{customdata}<extra></extra>")
             fig_hm.update_layout(
                 height=max(350, len(pivot.index) * 30 + 100),
                 margin=dict(t=60, b=60, l=120, r=60),
@@ -2336,6 +2360,131 @@ with tab_sol:
             '</div></div>',
             unsafe_allow_html=True)
 
+        # ── 업무별 강점/약점 레이더 + 페르소나 미스매치 ──────────
+        if M.get("business"):
+            _sol_mid_l, _sol_mid_r = st.columns([1, 1])
+
+            # ── 좌측: 레이더 차트 ──────────────────────────────
+            with _sol_mid_l:
+                st.markdown("##### 🎯 업무별 강점 / 약점 — 본부 평균과 비교")
+                _biz_sel_avg = _df_sel.groupby(M["business"])["_점수100"].mean()
+                _biz_all_avg = df_f.groupby(M["business"])["_점수100"].mean()
+                _radar_cats = sorted(set(_biz_sel_avg.index) & set(_biz_all_avg.index))
+                if len(_radar_cats) >= 3:
+                    _r_sel = [round(_biz_sel_avg.get(c, 0), 1) for c in _radar_cats]
+                    _r_all = [round(_biz_all_avg.get(c, 0), 1) for c in _radar_cats]
+                    fig_radar = go.Figure()
+                    fig_radar.add_trace(go.Scatterpolar(
+                        r=_r_sel + [_r_sel[0]], theta=_radar_cats + [_radar_cats[0]],
+                        fill="toself", fillcolor="rgba(255,215,0,0.15)",
+                        line=dict(color="#FFD700", width=2.5),
+                        name=_sel_off,
+                        hovertemplate="%{theta}: %{r:.1f}점<extra></extra>"))
+                    fig_radar.add_trace(go.Scatterpolar(
+                        r=_r_all + [_r_all[0]], theta=_radar_cats + [_radar_cats[0]],
+                        fill="toself", fillcolor="rgba(144,164,174,0.08)",
+                        line=dict(color="#90a4ae", width=1.5, dash="dash"),
+                        name="본부 평균",
+                        hovertemplate="%{theta}: %{r:.1f}점<extra></extra>"))
+                    fig_radar.update_layout(
+                        polar=dict(radialaxis=dict(range=[60, 105], dtick=10, showticklabels=True, tickfont_size=9)),
+                        template=PLOTLY_TPL, height=340,
+                        margin=dict(t=30, b=30, l=60, r=60),
+                        legend=dict(orientation="h", yanchor="bottom", y=-0.15),
+                        showlegend=True)
+                    st.plotly_chart(fig_radar, use_container_width=True)
+
+                    # 강점/약점 TOP 3
+                    _biz_gap = pd.DataFrame({
+                        "업무": _radar_cats,
+                        "지사": _r_sel[:len(_radar_cats)],
+                        "본부": _r_all[:len(_radar_cats)]})
+                    _biz_gap["편차"] = _biz_gap["지사"] - _biz_gap["본부"]
+                    _strengths = _biz_gap.sort_values("편차", ascending=False).head(3)
+                    _weaknesses = _biz_gap.sort_values("편차").head(3)
+                    _sw_l, _sw_r = st.columns(2)
+                    with _sw_l:
+                        _s_html = '<div style="background:#e8f5e9;border-radius:8px;padding:10px 14px;font-size:0.88em;"><b>💪 강점 TOP 3</b><br>'
+                        for _, r in _strengths.iterrows():
+                            _s_html += f'🟢 {r["업무"]} — {r["지사"]:.1f}점 (본부 대비 <b>{r["편차"]:+.1f}</b>점)<br>'
+                        st.markdown(_s_html + '</div>', unsafe_allow_html=True)
+                    with _sw_r:
+                        _w_html = '<div style="background:#ffebee;border-radius:8px;padding:10px 14px;font-size:0.88em;"><b>🩹 약점 TOP 3</b><br>'
+                        for _, r in _weaknesses.iterrows():
+                            _w_html += f'🔴 {r["업무"]} — {r["지사"]:.1f}점 (본부 대비 <b style="color:#c62828">{r["편차"]:+.1f}</b>점)<br>'
+                        st.markdown(_w_html + '</div>', unsafe_allow_html=True)
+                else:
+                    st.info("업무유형이 3개 이상이어야 레이더 차트를 그릴 수 있습니다.")
+
+            # ── 우측: 페르소나별 미스매치 매트릭스 ──────────────
+            with _sol_mid_r:
+                _ct_col = M.get("contract")
+                if _ct_col and _ct_col in _df_sel.columns:
+                    st.markdown("##### 🎯 고객군별 미스매치 — 건수 비중 × 만족도")
+                    _pm_grp = _df_sel.groupby(_ct_col)["_점수100"].agg(["mean", "count"]).reset_index()
+                    _pm_grp.columns = ["고객군", "만족도", "건수"]
+                    _pm_grp = _pm_grp[_pm_grp["건수"] >= 2]
+                    _pm_total = _pm_grp["건수"].sum()
+                    _pm_grp["비중(%)"] = (_pm_grp["건수"] / max(_pm_total, 1) * 100).round(1)
+                    if not _pm_grp.empty:
+                        _pm_x_mid = _pm_grp["비중(%)"].mean()
+                        _pm_y_mid = avg_score_100
+                        fig_pm = go.Figure()
+                        fig_pm.add_trace(go.Scatter(
+                            x=_pm_grp["비중(%)"], y=_pm_grp["만족도"],
+                            mode="markers+text",
+                            marker=dict(
+                                size=(_pm_grp["건수"] / max(_pm_grp["건수"].max(), 1) * 40 + 12).tolist(),
+                                color=_pm_grp["만족도"].tolist(),
+                                colorscale="RdYlGn", cmin=max(60, _pm_grp["만족도"].min() - 3),
+                                cmax=min(100, _pm_grp["만족도"].max() + 3),
+                                showscale=True, colorbar=dict(title="만족도", len=0.6),
+                                line=dict(width=1, color="white")),
+                            text=_pm_grp["고객군"],
+                            textposition="top center", textfont_size=10,
+                            customdata=list(zip(_pm_grp["만족도"].round(1), _pm_grp["건수"], _pm_grp["비중(%)"])),
+                            hovertemplate="%{text}<br>만족도: %{customdata[0]:.1f}점<br>건수: %{customdata[1]}건<br>비중: %{customdata[2]:.1f}%<extra></extra>"))
+                        fig_pm.add_vline(x=_pm_x_mid, line_dash="dash", line_color="#bdbdbd", line_width=1)
+                        fig_pm.add_hline(y=_pm_y_mid, line_dash="dash", line_color="#bdbdbd", line_width=1)
+                        # 사분면 라벨
+                        _pm_x_range = [0, max(_pm_grp["비중(%)"].max() * 1.3, _pm_x_mid * 2)]
+                        _pm_y_range = [max(55, _pm_grp["만족도"].min() - 5), min(105, _pm_grp["만족도"].max() + 5)]
+                        fig_pm.add_annotation(x=_pm_x_range[1] * 0.85, y=_pm_y_range[0] + 2,
+                                              text="⚠️ 1순위 개선", showarrow=False,
+                                              font=dict(size=10, color="#c62828"))
+                        fig_pm.add_annotation(x=1, y=_pm_y_range[0] + 2,
+                                              text="🔍 특이 리스크", showarrow=False,
+                                              font=dict(size=10, color="#e65100"))
+                        fig_pm.update_layout(
+                            template=PLOTLY_TPL, height=340,
+                            margin=dict(t=30, b=50, l=50, r=20),
+                            xaxis=dict(title="건수 비중(%)", range=_pm_x_range),
+                            yaxis=dict(title="평균 만족도", range=_pm_y_range),
+                            showlegend=False)
+                        st.plotly_chart(fig_pm, use_container_width=True)
+
+                        # 우하 사분면 경고
+                        _pm_danger = _pm_grp[(_pm_grp["비중(%)"] >= _pm_x_mid) & (_pm_grp["만족도"] < _pm_y_mid)]
+                        _pm_watch  = _pm_grp[(_pm_grp["비중(%)"] < _pm_x_mid) & (_pm_grp["만족도"] < _pm_y_mid)]
+                        if not _pm_danger.empty:
+                            _d_names = ", ".join(_pm_danger["고객군"].tolist())
+                            st.markdown(
+                                f'<div style="background:#ffebee;border-radius:8px;padding:8px 12px;font-size:0.85em;">'
+                                f'🚨 <b>1순위 개선:</b> {_d_names} — 비중이 높은데 만족도가 낮습니다.</div>',
+                                unsafe_allow_html=True)
+                        if not _pm_watch.empty:
+                            _w_names = ", ".join(_pm_watch["고객군"].tolist())
+                            st.markdown(
+                                f'<div style="background:#fff8e1;border-radius:8px;padding:8px 12px;font-size:0.85em;">'
+                                f'⚡ <b>특이 리스크:</b> {_w_names} — 소수이지만 점수가 극도로 낮아 민원 위험</div>',
+                                unsafe_allow_html=True)
+                    else:
+                        st.info("계약종별 데이터가 부족합니다.")
+                else:
+                    st.info("계약종 컬럼이 설정되지 않았습니다.")
+
+        st.markdown("---")
+
         # ── 업무 × 채널 히트맵 (지사 특화) ──────────────────────
         _ch_col = M.get("channel")
         if M.get("business") and _ch_col and _ch_col in df_f.columns:
@@ -2391,25 +2540,110 @@ with tab_sol:
                     coloraxis_colorbar=dict(title="만족도"))
                 st.plotly_chart(fig_hm, use_container_width=True)
 
-                # ── 실질적 리스크 TOP 3 카드 ─────────────────────
-                _risk_rows = []
+                # ── 벤치마킹 솔루션 + 사전케어 대상 ──────────────
+                _sol_bt_l, _sol_bt_r = st.columns([1, 1])
+
+                # ── 좌측: 벤치마킹 솔루션 ──────────────────────
+                with _sol_bt_l:
+                    st.markdown("##### 📚 벤치마킹 솔루션 — 옆 지사는 어떻게?")
+                    # 약점 업무 Bottom 3 → 해당 업무 본부 1위 지사 찾기
+                    _bm_biz_sel = _df_sel.groupby(M["business"])["_점수100"].mean()
+                    _bm_biz_all = df_f.groupby(M["business"])["_점수100"].mean()
+                    _bm_gap = (_bm_biz_sel - _bm_biz_all).sort_values()
+                    _bm_weak3 = _bm_gap.head(3)
+                    _bm_ofc_biz = df_f.groupby([M["office"], M["business"]])["_점수100"].agg(
+                        ["mean", "count"]).reset_index()
+                    _bm_ofc_biz.columns = [M["office"], "업무", "점수", "건수"]
+                    _bm_ofc_biz = _bm_ofc_biz[_bm_ofc_biz["건수"] >= 3]
+                    _bm_cards = []
+                    for _bw_name, _bw_gap in _bm_weak3.items():
+                        _bw_score = round(float(_bm_biz_sel.get(_bw_name, 0)), 1)
+                        _bw_subset = _bm_ofc_biz[
+                            (_bm_ofc_biz["업무"] == _bw_name) &
+                            (_bm_ofc_biz[M["office"]] != _sel_off)]
+                        if not _bw_subset.empty:
+                            _bw_best = _bw_subset.sort_values("점수", ascending=False).iloc[0]
+                            _bm_cards.append({
+                                "업무": _bw_name,
+                                "내점수": _bw_score,
+                                "편차": round(float(_bw_gap), 1),
+                                "1위지사": _bw_best[M["office"]],
+                                "1위점수": round(float(_bw_best["점수"]), 1),
+                                "1위건수": int(_bw_best["건수"]),
+                            })
+                    if _bm_cards:
+                        for _bmc in _bm_cards:
+                            _gap_txt = f'{_bmc["1위점수"] - _bmc["내점수"]:+.1f}점 차이'
+                            st.markdown(
+                                '<div style="background:#e3f2fd;border:1px solid #90caf9;'
+                                'border-radius:8px;padding:10px 14px;margin-bottom:8px;font-size:0.88em;">'
+                                f'<b>📌 {_bmc["업무"]}</b> — 귀 지사 <b>{_bmc["내점수"]:.1f}점</b>'
+                                f' → <b style="color:#1565c0">{_bmc["1위지사"]}</b>'
+                                f' <b>{_bmc["1위점수"]:.1f}점</b> (본부 1위, {_bmc["1위건수"]}건)'
+                                f'<br><span style="color:#1565c0;font-size:0.9em;">'
+                                f'{_gap_txt} — {_bmc["1위지사"]}의 노하우를 벤치마킹하세요</span></div>',
+                                unsafe_allow_html=True)
+                    else:
+                        st.info("비교 대상 지사가 없습니다.")
+
+                # ── 우측: 미조치 사전케어 대상 ──────────────────
+                with _sol_bt_r:
+                    st.markdown("##### 🚨 사전케어 대상 — " + _sel_off + " 50점 이하")
+                    _pc_df = _df_sel[_df_sel["_점수100"] <= 50].copy()
+                    if not _pc_df.empty:
+                        _pc_df = _pc_df.sort_values("_점수100")
+                        st.caption(f"해당 지사 50점 이하 **{len(_pc_df)}건** — 해피콜 우선 대상")
+                        _pc_show_cols = []
+                        if M.get("receipt_no") and M["receipt_no"] in _pc_df.columns:
+                            _pc_show_cols.append(M["receipt_no"])
+                        if M.get("business") and M["business"] in _pc_df.columns:
+                            _pc_show_cols.append(M["business"])
+                        if M.get("channel") and M["channel"] in _pc_df.columns:
+                            _pc_show_cols.append(M["channel"])
+                        _pc_show_cols.append("_점수100")
+                        if M.get("voc") and M["voc"] in _pc_df.columns:
+                            _pc_show_cols.append(M["voc"])
+                        _pc_show = _pc_df[[c for c in _pc_show_cols if c in _pc_df.columns]].head(5)
+                        _pc_show = _pc_show.rename(columns={"_점수100": "점수(100점)"})
+                        st.dataframe(_pc_show.reset_index(drop=True), use_container_width=True, hide_index=True)
+                        if M.get("voc") and M["voc"] in _pc_df.columns:
+                            with st.expander(f"VOC 원문 보기 (상위 5건)"):
+                                for _pcv in _pc_df[M["voc"]].dropna().head(5):
+                                    _pcv_s = str(_pcv).strip()
+                                    if len(_pcv_s) > 2 and _pcv_s not in ("응답없음", "nan", ""):
+                                        st.markdown(
+                                            f'<div style="border-left:3px solid #ef9a9a;padding:4px 10px;'
+                                            f'margin-bottom:4px;font-size:0.85em;">{_pcv_s}</div>',
+                                            unsafe_allow_html=True)
+                    else:
+                        st.success("✅ 해당 지사에 50점 이하 건이 없습니다.")
+
+                st.markdown("---")
+
+                # ── 리스크 분류: 실질적 리스크 vs 급락 조합 ──────────
+                _real_risk = []   # 건수 ≥ 10 & 평균 이하 → 우선 개선
+                _drop_risk = []   # 건수 < 10 & 평균 이하 → 모니터링
                 for _bi in _hm_pivot.index:
                     for _ci in _hm_pivot.columns:
                         _sc = _hm_pivot.loc[_bi, _ci]
                         _cn = int(_hm_cnt.loc[_bi, _ci]) if (_bi in _hm_cnt.index and _ci in _hm_cnt.columns) else 0
-                        if _sc > 0 and _sc < avg_score_100 and _cn >= 2:
-                            _risk_rows.append({
-                                "업무": _bi, "채널": _ci,
-                                "점수": _sc, "건수": _cn,
-                                "impact": round((avg_score_100 - _sc) * _cn, 1)
-                            })
-                _risk_top3 = sorted(_risk_rows, key=lambda x: x["impact"], reverse=True)[:3]
+                        if pd.notna(_sc) and _sc < avg_score_100 and _cn >= 2:
+                            _item = {"업무": _bi, "채널": _ci, "점수": _sc, "건수": _cn,
+                                     "impact": round((avg_score_100 - _sc) * _cn, 1)}
+                            if _cn >= 10:
+                                _real_risk.append(_item)
+                            else:
+                                _drop_risk.append(_item)
+                _real_top3 = sorted(_real_risk, key=lambda x: x["impact"], reverse=True)[:3]
+                _drop_top3 = sorted(_drop_risk, key=lambda x: x["점수"])[:3]
 
-                if _risk_top3:
-                    st.markdown("##### 🚨 실질적 리스크 TOP 3 — 점수 향상 임팩트 기준")
-                    _rt_cols = st.columns(len(_risk_top3))
-                    for _ri, _rk in enumerate(_risk_top3):
-                        _rk_key  = f"sol_cell_{_ri}"
+                # ── 실질적 리스크 카드 ──────────────────────────
+                if _real_top3:
+                    st.markdown("##### 🚨 실질적 리스크 TOP 3 — 건수 多 & 평균 이하 (우선 개선)")
+                    st.caption("응답 건수가 충분하여 통계적으로 신뢰할 수 있는 **최우선 개선 대상**입니다.")
+                    _rt_cols = st.columns(len(_real_top3))
+                    for _ri, _rk in enumerate(_real_top3):
+                        _rk_key  = f"sol_real_{_ri}"
                         _cur_sel = st.session_state.get("sol_cell_sel")
                         _is_sel  = (_cur_sel is not None
                                     and _cur_sel.get("업무") == _rk["업무"]
@@ -2435,9 +2669,42 @@ with tab_sol:
                                     None if _is_sel else {"업무": _rk["업무"], "채널": _rk["채널"]})
                                 st.rerun()
 
-                    # ══════════════════════════════════════════
-                    # LEVEL 3 — AI 심층 진단 (Action)
-                    # ══════════════════════════════════════════
+                # ── 급락 조합 카드 ──────────────────────────────
+                if _drop_top3:
+                    st.markdown("##### ⚡ 급락 조합 TOP 3 — 건수 少 & 점수 급락 (모니터링)")
+                    st.caption("소수 응답이지만 점수가 급락한 조합입니다. 민원 전조 신호일 수 있으니 **추이를 주시**하세요.")
+                    _dt_cols = st.columns(len(_drop_top3))
+                    for _di, _dk in enumerate(_drop_top3):
+                        _dk_key  = f"sol_drop_{_di}"
+                        _cur_sel = st.session_state.get("sol_cell_sel")
+                        _is_sel  = (_cur_sel is not None
+                                    and _cur_sel.get("업무") == _dk["업무"]
+                                    and _cur_sel.get("채널") == _dk["채널"])
+                        _badge = "①②③"[_di]
+                        _bg    = "#fff3e0" if _is_sel else "#fff8e1"
+                        _bd    = "#ff8f00" if _is_sel else "#ffca28"
+                        with _dt_cols[_di]:
+                            st.markdown(
+                                f'<div style="background:{_bg};border:2px solid {_bd};'
+                                'border-radius:10px;padding:12px;margin-bottom:8px;">'
+                                f'<div style="font-size:0.78em;color:#e65100;font-weight:700;">급락 {_badge}</div>'
+                                f'<div style="font-size:1em;font-weight:800;margin:4px 0;">{_dk["업무"]} × {_dk["채널"]}</div>'
+                                f'<div style="font-size:1.4em;font-weight:900;color:#e65100;">{_dk["점수"]:.1f}점</div>'
+                                f'<div style="font-size:0.78em;color:#555;">{_dk["건수"]}건 (소량)</div>'
+                                '</div>',
+                                unsafe_allow_html=True)
+                            if st.button(
+                                    "▲ 닫기" if _is_sel else "🔍 상세 원인 분석",
+                                    key=_dk_key, use_container_width=True,
+                                    type="secondary" if _is_sel else "primary"):
+                                st.session_state["sol_cell_sel"] = (
+                                    None if _is_sel else {"업무": _dk["업무"], "채널": _dk["채널"]})
+                                st.rerun()
+
+                # ══════════════════════════════════════════
+                # LEVEL 3 — AI 심층 진단 (Action)
+                # ══════════════════════════════════════════
+                if _real_top3 or _drop_top3:
                     _cell = st.session_state.get("sol_cell_sel")
                     if _cell:
                         _c3_biz = _cell["업무"]
@@ -2455,7 +2722,104 @@ with tab_sol:
                         _c3_df = _hm_df[
                             (_hm_df[M["business"]] == _c3_biz) &
                             (_hm_df["_채널그룹_sol"] == _c3_ch)].copy()
+                        _c3_n = len(_c3_df)
 
+                        # ── 1. 데이터 신뢰도 검증 ──────────────────
+                        if _c3_n < 10:
+                            st.warning(
+                                f"⚠️ 데이터 수가 적어(**{_c3_n}건**) 특정 사례에 의한 "
+                                "왜곡 가능성이 있으니 **VOC 원문을 중심으로** 판단하세요.")
+
+                        # ── 2. 트리플 크로스 체크: 지사 간 편차 ────
+                        _cross_all = df_f.copy()
+                        _cross_all["_채널그룹_tmp"] = _cross_all[_ch_col].apply(_group_channel)
+                        _cross_all = _cross_all[
+                            (_cross_all[M["business"]] == _c3_biz) &
+                            (_cross_all["_채널그룹_tmp"] == _c3_ch)]
+                        _cross_ofc = (_cross_all.groupby(M["office"])["_점수100"]
+                                      .agg(["mean", "count"]).reset_index())
+                        _cross_ofc.columns = ["지사", "평균만족도", "건수"]
+                        _cross_ofc = _cross_ofc[_cross_ofc["건수"] >= 2]
+                        _ofc_std = round(float(_cross_ofc["평균만족도"].std()), 1) if len(_cross_ofc) >= 2 else 0.0
+                        _cross_verdict = "specific_office" if _ofc_std > 5 else "systemic"
+
+                        if not _cross_ofc.empty:
+                            _ofc_worst = _cross_ofc.sort_values("평균만족도").iloc[0]
+                            _ofc_best  = _cross_ofc.sort_values("평균만족도").iloc[-1]
+                            if _cross_verdict == "specific_office":
+                                _cross_msg = (
+                                    f'지사 간 편차 <b>큼</b> (σ={_ofc_std}점) — '
+                                    f'<b>{_ofc_worst["지사"]}</b>({_ofc_worst["평균만족도"]:.1f}점)이 '
+                                    f'특히 낮아 <b style="color:#c62828">특정 지사의 서비스 품질 이슈</b>로 판단')
+                            else:
+                                _cross_msg = (
+                                    f'지사 간 편차 <b>작음</b> (σ={_ofc_std}점) — '
+                                    f'골고루 낮으므로 <b style="color:#1565c0">본부/본사의 공통 프로세스 결함</b>으로 판단')
+                            st.markdown(
+                                '<div style="background:#e3f2fd;border:2px solid #90caf9;'
+                                'border-radius:8px;padding:12px 16px;margin-bottom:12px;font-size:0.9em;">'
+                                f'🔄 <b>지사 간 크로스 체크 ({_c3_biz} × {_c3_ch}):</b> {_cross_msg}'
+                                '</div>',
+                                unsafe_allow_html=True)
+
+                        # ── 3. 시나리오 기반 자동 처방 ──────────────
+                        _ct_skew = False
+                        _ct_worst_name = ""
+                        if M.get("contract") and M["contract"] in _c3_df.columns and not _c3_df.empty:
+                            _ct_grp = (_c3_df.groupby(M["contract"])["_점수100"]
+                                       .agg(["mean", "count"]).reset_index())
+                            _ct_grp.columns = ["계약종", "만족도", "건수"]
+                            _ct_grp = _ct_grp[_ct_grp["건수"] >= 2]
+                            if len(_ct_grp) >= 2 and _ct_grp["만족도"].std() > 5:
+                                _ct_skew = True
+                                _ct_worst_name = _ct_grp.sort_values("만족도").iloc[0]["계약종"]
+
+                        _ch_scores_all = _df_sel.copy()
+                        _ch_scores_all["_채널그룹_tmp2"] = _ch_scores_all[_ch_col].apply(_group_channel)
+                        _ch_sc = _ch_scores_all.groupby("_채널그룹_tmp2")["_점수100"].mean()
+                        _ch_gap = float(_ch_sc.max() - _ch_sc.min()) if len(_ch_sc) >= 2 else 0
+
+                        if _ct_skew or _cross_verdict == "specific_office":
+                            _rx_icon  = "🎯"
+                            _rx_label = "시나리오 A: 타겟팅 집중 교육"
+                            _rx_color = "#ffebee"
+                            _rx_border = "#ef9a9a"
+                            _target = _ct_worst_name or _sel_off
+                            _rx_body = (
+                                f"<b>[{_sel_off}]</b>의 <b>[{_target}]</b> 고객 "
+                                f"<b>[{_c3_ch}]</b> 채널 응대 매뉴얼을 점검하고, "
+                                f"해당 업무(<b>{_c3_biz}</b>) 처리 담당자 대상 집중 교육을 실시하세요.")
+                        elif _ch_gap > 8:
+                            _rx_icon  = "🔄"
+                            _rx_label = "시나리오 C: 채널 전환(Call Steering) 전략"
+                            _rx_color = "#e8f5e9"
+                            _rx_border = "#a5d6a7"
+                            _ch_best  = _ch_sc.idxmax()
+                            _ch_worst_nm = _ch_sc.idxmin()
+                            _rx_body = (
+                                f"불만이 높은 <b>[{_ch_worst_nm}]</b> 채널 대신 "
+                                f"만족도가 높은 <b>[{_ch_best}]</b> 채널 사용을 유도하고, "
+                                f"<b>[{_ch_worst_nm}]</b>의 서비스 프로세스를 "
+                                f"<b>[{_ch_best}]</b> 수준으로 표준화하세요.")
+                        else:
+                            _rx_icon  = "🏢"
+                            _rx_label = "시나리오 B: 본사 프로세스 개선 제안"
+                            _rx_color = "#e3f2fd"
+                            _rx_border = "#90caf9"
+                            _rx_body = (
+                                f"<b>[{_c3_biz}]</b> 업무의 <b>[{_c3_ch}]</b> 채널 "
+                                "처리 프로세스 전반에 걸쳐 표준화가 필요합니다. "
+                                "안내 문구, 처리 절차, 응대 스크립트를 본사 차원에서 재설계하세요.")
+
+                        st.markdown(
+                            f'<div style="background:{_rx_color};border:2px solid {_rx_border};'
+                            f'border-radius:8px;padding:12px 16px;margin-bottom:12px;">'
+                            f'<div style="font-weight:800;margin-bottom:6px;">'
+                            f'{_rx_icon} {_rx_label}</div>'
+                            f'<div style="font-size:0.9em;">{_rx_body}</div></div>',
+                            unsafe_allow_html=True)
+
+                        # ── 컬럼: 차트 + VOC ──────────────────────
                         _c3_l, _c3_r = st.columns([1, 1])
 
                         with _c3_l:
@@ -2501,17 +2865,18 @@ with tab_sol:
 
                         with _c3_r:
                             st.markdown("**📋 실제 VOC 원문**")
+                            _c3_voc_valid = pd.Series(dtype=str)
                             if M.get("voc") and not _c3_df.empty:
-                                _c3_vocs = (
+                                _c3_voc_valid = (
                                     _c3_df[M["voc"]].dropna()
                                     .apply(lambda x: str(x).strip())
-                                    .loc[lambda s: (s.str.len() > 2) & (~s.isin(["응답없음", "nan", ""]))]
-                                    .head(10))
+                                    .loc[lambda s: (s.str.len() > 2) & (~s.isin(["응답없음", "nan", ""]))])
+                                _c3_vocs = _c3_voc_valid.head(10)
                                 if not _c3_vocs.empty:
                                     with st.expander(f"VOC {len(_c3_vocs)}건 보기", expanded=True):
                                         for _cv in _c3_vocs:
                                             _cv_hl = str(_cv)
-                                            for _nkw in NEGATIVE_KEYWORDS:
+                                            for _nkw in VOC_HIGHLIGHT_KW:
                                                 if _nkw in _cv_hl:
                                                     _cv_hl = _cv_hl.replace(
                                                         _nkw,
@@ -2529,6 +2894,7 @@ with tab_sol:
 
                         # ── AI 처방전 ──────────────────────────
                         st.markdown("---")
+                        _c3_scenario_txt = f"[로직 기반 사전 진단]\n시나리오: {_rx_label}\n처방: {_rx_body}\n지사 간 편차: σ={_ofc_std}점 ({_cross_verdict})\n"
                         if st.button("🤖 AI 처방전 생성", key="sol_ai_cell_btn",
                                      type="primary", use_container_width=True):
                             if not GEMINI_AVAILABLE:
@@ -2553,10 +2919,13 @@ with tab_sol:
                                     f"당신은 전력산업 CS 전문가입니다.\n\n"
                                     f"[진단 대상]\n"
                                     f"지사: {_sel_off} | 업무: {_c3_biz} | 채널: {_c3_ch}\n"
-                                    f"지사 평균: {_sel_avg:.1f}점 (본부 {avg_score_100:.1f}점 대비 {_sel_gap:+.1f}점)\n\n"
+                                    f"지사 평균: {_sel_avg:.1f}점 (본부 {avg_score_100:.1f}점 대비 {_sel_gap:+.1f}점)\n"
+                                    f"데이터 건수: {_c3_n}건 ({'신뢰도 주의' if _c3_n < 10 else '신뢰도 충분'})\n\n"
+                                    f"{_c3_scenario_txt}\n"
                                     f"[계약종별 만족도]\n{_c3_ct_lines or '데이터 없음'}\n\n"
                                     f"[불만 VOC 원문]\n{_c3_voc_lines or '없음'}\n\n"
                                     "[분석 요청]\n"
+                                    "위의 '로직 기반 사전 진단'을 참고하되, VOC 원문을 근거로 더 구체화하세요.\n"
                                     f"1. 핵심 문제 진단: 왜 이 지사의 {_c3_biz} x {_c3_ch} 조합에서 만족도가 낮은가? (2~3문장)\n"
                                     "2. 즉시 실행 처방: 72시간 내 지사장이 실행 가능한 구체적 조치 1가지\n"
                                     "3. 근본 원인 처방: 3개월 내 구조적 개선 방안 1가지\n\n"
@@ -2786,7 +3155,7 @@ with tab10:
                     fig_hm = px.imshow(pivot_corr, text_auto=".2f", aspect="auto",
                                        color_continuous_scale="RdYlGn",
                                        title="계약종별 개별항목↔종합점수 상관관계 히트맵 (OOS 제외)")
-                    fig_hm.update_traces(hovertemplate="항목: %{y}<br>계약종: %{x}<br>상관계수: %{z:.3f}<extra></extra>")
+                    fig_hm.update_traces(hovertemplate="항목: %{y}<br>계약종별: %{x}<br>상관계수: %{z:.3f}<extra></extra>")
                     fig_hm.update_layout(height=max(350, len(score_item_cols) * 40 + 100),
                                           margin=dict(t=60, b=20, l=10, r=20),
                                           title_font=dict(size=14, color=C["navy"]))
