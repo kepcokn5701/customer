@@ -3063,8 +3063,11 @@ with tab10:
                 cause_data.append("기타")
 
         cause_counts = Counter(cause_data)
-        df_cause = pd.DataFrame([{"원인": k, "건수": v} for k, v in cause_counts.most_common()])
-        df_cause = df_cause[df_cause["건수"] > 0]
+        if cause_counts:
+            df_cause = pd.DataFrame([{"원인": k, "건수": v} for k, v in cause_counts.most_common()])
+            df_cause = df_cause[df_cause["건수"] > 0]
+        else:
+            df_cause = pd.DataFrame(columns=["원인", "건수"])
 
         if not df_cause.empty:
             fig_cause = px.bar(df_cause, x="건수", y="원인", orientation="h",
