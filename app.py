@@ -947,7 +947,7 @@ with st.sidebar:
     st.markdown("### ⚡ CS 분석 대시보드")
     st.markdown("<hr>", unsafe_allow_html=True)
     st.markdown("#### 📂 데이터 업로드")
-    uploaded_file = st.file_uploader("엑셀 파일을 여기에 드래그하세요", type=["xlsx","xls"], label_visibility="collapsed")
+    uploaded_file = st.file_uploader("파일을 여기에 드래그하세요", type=["xlsx","xls","csv"], label_visibility="collapsed")
     st.markdown("<hr>", unsafe_allow_html=True)
     st.caption("© CS 분석 시스템")
 
@@ -975,7 +975,7 @@ if uploaded_file is None:
         st.markdown('<div class="card-blue">', unsafe_allow_html=True)
         st.markdown("### 📋 사용 방법")
         st.markdown("""
-1. **왼쪽 사이드바**에서 엑셀 파일(.xlsx)을 업로드하세요.
+1. **왼쪽 사이드바**에서 엑셀(.xlsx) 또는 CSV 파일을 업로드하세요.
 2. 업로드 즉시 컬럼이 자동 인식되어 분석이 시작됩니다.
 3. 사이드바 필터(지사·채널 등)로 데이터 범위를 조정하세요.
 4. **📊 종합 현황** — 구간별 비중·사업소별 점수 등 전체 현황
@@ -1025,12 +1025,18 @@ def _detect_header_row(raw_bytes, max_scan=10):
     return 0  # 못 찾으면 첫 행을 헤더로
 
 @st.cache_data(show_spinner=False)
-def load_data(raw_bytes):
-    header_row = _detect_header_row(raw_bytes)
-    try:
-        df = pd.read_excel(io.BytesIO(raw_bytes), header=header_row, engine="openpyxl")
-    except Exception:
-        df = pd.read_excel(io.BytesIO(raw_bytes), header=header_row)
+def load_data(raw_bytes, file_name=""):
+    if file_name.lower().endswith(".csv"):
+        try:
+            df = pd.read_csv(io.BytesIO(raw_bytes), encoding="utf-8-sig")
+        except Exception:
+            df = pd.read_csv(io.BytesIO(raw_bytes), encoding="cp949")
+    else:
+        header_row = _detect_header_row(raw_bytes)
+        try:
+            df = pd.read_excel(io.BytesIO(raw_bytes), header=header_row, engine="openpyxl")
+        except Exception:
+            df = pd.read_excel(io.BytesIO(raw_bytes), header=header_row)
     orig = len(df)
     df.dropna(how="all", inplace=True)
     df.dropna(axis=1, how="all", inplace=True)
@@ -1040,15 +1046,15 @@ def load_data(raw_bytes):
     return df, orig
 
 if uploaded_file is None:
-    st.info("📂 좌측 사이드바에서 엑셀 파일을 업로드해 주세요.")
+    st.info("📂 좌측 사이드바에서 엑셀(.xlsx) 또는 CSV 파일을 업로드해 주세요.")
     st.markdown("---")
     st.markdown("#### 사용 방법")
-    st.markdown("1. 좌측 **파일 업로드** 영역에 엑셀(.xlsx) 파일을 드래그하거나 선택하세요.\n2. 업로드가 완료되면 자동으로 분석이 시작됩니다.")
+    st.markdown("1. 좌측 **파일 업로드** 영역에 엑셀(.xlsx) 또는 CSV 파일을 드래그하거나 선택하세요.\n2. 업로드가 완료되면 자동으로 분석이 시작됩니다.")
     import sys
     sys.exit(0)
 
 with st.spinner("데이터를 불러오는 중…"):
-    df_raw, orig_len = load_data(uploaded_file.read())
+    df_raw, orig_len = load_data(uploaded_file.read(), uploaded_file.name)
 
 # ══════════════════════════════════════════════════════════════
 #  9. 컬럼 자동 매핑 (엑셀 컬럼명 기반)
