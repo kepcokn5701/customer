@@ -1932,16 +1932,41 @@ with tab5:
 
         if neg_n > 0:
             st.markdown("<br>", unsafe_allow_html=True)
+            # 불만 유형별 전문 용어 우선 추출 (일반 명사 제외)
+            _DOMAIN_KW = [
+                "요금","검침","대기","절차","불친절","고지서","정전","단전","누전",
+                "과금","과다","연체","체납","감면","청구","납부",
+                "계량기","변압기","전주","전선","차단기","개폐기",
+                "재방문","지연","지체","방치","미처리","누락","중복",
+                "위험","안전","사고","화재","고장","불량","오작동",
+                "해지","폐전","명의변경","이전","신증설",
+                "민원","항의","실망","최악","부당","불합리",
+            ]
+            _GENERIC_EXCLUDE = {"문의","직원","고객","전화","상담","안내","처리",
+                                "접수","신청","확인","이용","서비스","방문","센터",
+                                "담당","답변","진행","완료","내용","빈문서","응답없음"}
             all_neg_flat = []
+            for voc_text in df_neg[M["voc"]]:
+                s = str(voc_text).strip()
+                if not s or s in ("nan", "응답없음", ""):
+                    continue
+                # 1순위: 도메인 전문 키워드 매칭
+                for dkw in _DOMAIN_KW:
+                    if dkw in s:
+                        all_neg_flat.append(dkw)
+                # 2순위: 감지된 부정키워드 중 일반명사 제외
             for kws in df_neg["감지된_부정키워드"]:
-                all_neg_flat.extend([k.strip() for k in kws.split(",") if k.strip()])
+                for k in kws.split(","):
+                    k = k.strip()
+                    if k and k not in _GENERIC_EXCLUDE:
+                        all_neg_flat.append(k)
             neg_kw_cnt = Counter(all_neg_flat).most_common(10)
             if neg_kw_cnt:
                 nkw_df = pd.DataFrame(neg_kw_cnt, columns=["부정키워드", "감지횟수"])
                 nk_l, nk_r = st.columns([3, 2])
                 with nk_l:
                     fig_neg = px.bar(nkw_df, x="부정키워드", y="감지횟수", color_discrete_sequence=[C["red"]],
-                                     text="감지횟수", template=PLOTLY_TPL, title="부정 키워드 Top 10")
+                                     text="감지횟수", template=PLOTLY_TPL, title="불만 유형별 핵심 키워드 Top 10")
                     fig_neg.update_traces(texttemplate="%{text}", textposition="outside",
                                           hovertemplate="%{x}: %{y}회<extra></extra>")
                     fig_neg.update_layout(height=340, margin=dict(t=50, b=70, l=60, r=20), xaxis_tickangle=-25,
@@ -1950,7 +1975,7 @@ with tab5:
                 with nk_r:
                     fig_don = px.pie(nkw_df.head(10), names="부정키워드", values="감지횟수", hole=0.5,
                                      color_discrete_sequence=px.colors.sequential.Reds[::-1],
-                                     title="부정 키워드 비중", template=PLOTLY_TPL)
+                                     title="불만 유형별 키워드 비중", template=PLOTLY_TPL)
                     fig_don.update_traces(textinfo="percent+label", textfont_size=11,
                                            marker=dict(line=dict(color="white", width=2)),
                                            hovertemplate="%{label}<br>%{value}회 (%{percent})<extra></extra>")
