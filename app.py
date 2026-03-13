@@ -163,6 +163,21 @@ NEGATIVE_KEYWORDS = [
     "정전","단전","누전","위험","안전","사고",
 ]
 
+# VOC 하이라이팅 전용 — 시설·기술·제도 중심 (감정어 제외)
+VOC_HIGHLIGHT_KW = [
+    # 시설·설비
+    "정전","단전","누전","감전","고장","불량","오작동","오류",
+    "계량기","변압기","전주","전선","배전","차단기","개폐기","누수","누유",
+    # 요금·제도
+    "과금","과다","요금","청구","납부","감면","할인","연체","체납",
+    "계약","해지","이전","명의변경","폐전","신증설",
+    # 절차·처리
+    "재방문","지연","지체","방치","미처리","미흡","누락","중복",
+    "민원","접수","처리","답변","회신","약속",
+    # 안전·사고
+    "위험","안전","사고","화재","폭발","합선",
+]
+
 RUDE_KEYWORDS = [
     "불친절","무시","무성의","불쾌","반말","태도","무례","소홀","건방",
     "고압적","짜증","화남","면박","윽박","냉담","퉁명","귀찮","성의없",
@@ -835,7 +850,7 @@ def find_vulnerable_group(df, cat_col, score_col, percentile=30):
 #  4. 페이지 설정 & CSS
 # ══════════════════════════════════════════════════════════════
 st.set_page_config(
-    page_title="회사 CS 분석 대시보드",
+    page_title="CS 분석 대시보드",
     page_icon="⚡",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -929,22 +944,12 @@ st.markdown(f"""
 #  5. 사이드바
 # ══════════════════════════════════════════════════════════════
 with st.sidebar:
-    st.markdown("### ⚡ 회사 CS 분석 대시보드")
+    st.markdown("### ⚡ CS 분석 대시보드")
     st.markdown("<hr>", unsafe_allow_html=True)
     st.markdown("#### 📂 데이터 업로드")
     uploaded_file = st.file_uploader("엑셀 파일을 여기에 드래그하세요", type=["xlsx","xls"], label_visibility="collapsed")
     st.markdown("<hr>", unsafe_allow_html=True)
-    st.markdown("#### ⚙️ 시스템 상태")
-    st.markdown(
-        f"{'✅ KoNLPy' if KONLPY_AVAILABLE else '🟡 기본 분석'}  \n"
-        f"✅ 키워드 감성분석 (경량)  \n"
-        f"{'✅ KeyBERT' if KEYBERT_AVAILABLE else '🟡 빈도 키워드'}  \n"
-        f"{'✅ sklearn TF-IDF' if SKLEARN_AVAILABLE else '🟡 수동 TF-IDF'}  \n"
-        f"{'✅ Google Gemini AI' if GEMINI_AVAILABLE else '🟡 Gemini 미연결'}  \n"
-        f"{'✅ 한글 폰트' if FONT_PATH else '🟡 기본 폰트'}"
-    )
-    st.markdown("<hr>", unsafe_allow_html=True)
-    st.caption("© 2025 회사 CS 분석 시스템 v3.5")
+    st.caption("© CS 분석 시스템")
 
 # ══════════════════════════════════════════════════════════════
 #  6. 헤더 배너
@@ -952,15 +957,12 @@ with st.sidebar:
 st.markdown("""
 <div class="dash-header">
   <h1>⚡ AI 활용 고객경험관리시스템 조사결과 분석</h1>
-  <p>회사 CS 리포트 양식 · 구간별 비중 · 사업소 벤치마킹 · 채널별/업무별 분석 · VOC 3단 분류 · 사전케어</p>
-  <span class="dash-badge">📊 구간별 비중</span>
-  <span class="dash-badge">🏢 사업소 벤치마킹</span>
-  <span class="dash-badge">📡 채널별 분석</span>
-  <span class="dash-badge">☁️ VOC AI 분석</span>
-  <span class="dash-badge">🎯 사전케어</span>
-  <span class="dash-badge">📈 교차분석</span>
-  <span class="dash-badge">📅 시계열</span>
-  <span class="dash-badge">🔬 패턴탐지</span>
+  <p>종합 현황 · 계약종별/채널별/업무별 분석 · 지사 맞춤형 CS 솔루션 · 민원 조기 경보 · CXO 딥 인사이트</p>
+  <span class="dash-badge">📊 종합 현황</span>
+  <span class="dash-badge">📡 계약종별·채널별 분석</span>
+  <span class="dash-badge">🏢 지사 맞춤 솔루션</span>
+  <span class="dash-badge">🎯 민원 조기 경보</span>
+  <span class="dash-badge">🧠 CXO 딥 인사이트</span>
 </div>
 """, unsafe_allow_html=True)
 
@@ -974,9 +976,13 @@ if uploaded_file is None:
         st.markdown("### 📋 사용 방법")
         st.markdown("""
 1. **왼쪽 사이드바**에서 엑셀 파일(.xlsx)을 업로드하세요.
-2. 컬럼 매핑 설정을 완료하세요.
-3. 사이드바 필터로 원하는 데이터 범위를 선택하세요.
-4. 각 **탭**을 클릭하며 분석 결과를 확인하세요.
+2. 업로드 즉시 컬럼이 자동 인식되어 분석이 시작됩니다.
+3. 사이드바 필터(지사·채널 등)로 데이터 범위를 조정하세요.
+4. **📊 종합 현황** — 구간별 비중·사업소별 점수 등 전체 현황
+5. **📡 계약종별·채널별·업무별 분석** — 교차 분석 및 사분면 비교
+6. **🏢 지사 맞춤형 CS 솔루션** — 지사 선택 후 단계별 정밀 진단
+7. **🎯 민원 조기 경보** — 잠재 민원고객 사전케어 리스트
+8. **🧠 CXO 딥 인사이트** — 경영진용 핵심 요약 및 AI 분석
         """)
         st.markdown('</div>', unsafe_allow_html=True)
     with c_r:
@@ -985,15 +991,14 @@ if uploaded_file is None:
         st.markdown("""
 | 컬럼명 예시 | 내용 |
 |---|---|
-| 고객번호 | 고객 식별 ID |
-| 고객명 | 이름 |
 | 사업소 | 직할, 진주, 마산 등 |
-| 접수채널 | 직원방문, 고객센터, 회사ON |
-| 계약종 | 주택용/일반용/산업용 |
-| 업무구분 | 요금·설치·정전 등 |
-| 만족도점수 | 숫자 (1~5, 1~10, 100점) |
+| 접수채널 | 직원, 고객센터, 한전ON |
+| 계약종별 | 주택용/일반용/산업용 등 |
+| 업무구분 | 요금·신증설·정전 등 |
+| 만족도점수 | 숫자 |
 | 주관식답변 | VOC 텍스트 |
         """)
+        st.warning("⚠️ **개인정보 주의** — 고객명·고객번호·연락처 등 개인식별 정보는 업로드 전에 반드시 제거하세요.")
         st.markdown('</div>', unsafe_allow_html=True)
     st.stop()
 
@@ -1288,14 +1293,12 @@ st.markdown("<br>", unsafe_allow_html=True)
 # ══════════════════════════════════════════════════════════════
 #  13. 탭 구성
 # ══════════════════════════════════════════════════════════════
-tab1, tab3, tab_ai, tab5, tab9, tab10, tab11 = st.tabs([
-    "📊  구간별 비중 · 종합 현황",
+tab1, tab3, tab_sol, tab5, tab10 = st.tabs([
+    "📊  종합 현황",
     "📡  계약종별 · 접수채널별 · 업무유형별 분석",
-    "🤖  AI 교차분석",
-    "🎯  민원 조기 경보 시스템",
-    "🔬  지사 심층 · 패턴",
-    "🧠  CXO 딥 인사이트",
     "🏢  지사 맞춤형 CS 솔루션",
+    "🎯  민원 조기 경보 시스템",
+    "🧠  CXO 딥 인사이트",
 ])
 
 # ─────────────────────────────────────────────────────────────
@@ -1417,7 +1420,7 @@ with tab1:
 """)
                 import base64 as _b64
                 _box_guide_img = _b64.b64decode("UklGRqArAABXRUJQVlA4IJQrAADQvgCdASr0AbMBPpFEnUulo6YhotTJ0MASCWdu8kJ6mbEBaZUJpa/zsQjEoCkwCtBty/58fSvt2PMf5zHow6JX1XPQA8ED4kv87k2XkH/F9r391/Kjzt/FPln7N+VP9z5nnWXmT/Hfsx9//w37r/4n5v/sH+h/uPiP8mv9H1Avxz+S/5v+3+uB9z/mO1B2LzAvVz5//tf7T++H+x9GH+Z/wv7u+4X5p/ZP8Z/e/3d/zX2AfyL+d/5v82f65/////9lf6bwPvrX+m/2X2pfYD/Iv6T/t/7r/lP/N/f/pe/of+f/nv9L+1/tK/Sv8p/2P9L8A/8u/q3/M/v/+b99j//+5X94f//7q/7af/8dKSePZsdlYlDVfjPJam6jGCwkqG2yv7uG2KSc0qfheuitfh+xZok1u8vDUnImZUMaAvuYvYuhW6CrOt7DE1C6Af07pk4oe+wvtclIeIkBoacEDqVrh2p2BNY1VglHMVZW39YIFRFudaanQg40D9XUrlPFdPWMmJ/J7TSs51WrHIuYtMjcC1iAkphXHJn4TcccdcyEyEBRS49JuRsFkQfScY8ZIMHdikGDnDl5khS8t0L8uoXAimeEf+TeUUSLJn4NCGhMCf1yI7fZnkWwthhoP7WTpBPjcZUQ5gORcDHl8PELcCfLfK/kH9gZf6E6NoKZ0mU+Vmb+dIyMpjHJJwaODpk0tsF9ILHKj/R81MjVff6olqwTUt2HhsoLahzXkB+//KxwpVpKiNYe/eNt8M0E705TSXbb7jO+A7OfP64LLep4jJfjLksIScA6Jt30jsEuKJuY+M63APKdRKRoSjEA8oCz8OGCba3ACQqQBVNxSdMiqw5FlGNkWEJcMOajxzgEFsOGjT4TsFy4puQAv3BUqu1t9/wZipaT97EA0tmQJKnjAztWXWcfN8CaqmIFtvzxE6nkfwES4I0bUrB1lKLPyHGZXimkN1BSJQwJPZM9j5vK+kbXbKE1izngSg+yBEOclIUdrWqb0KpbEDVLcjUMq/zg/fJM4NB4dcS0/wqxk7GriYThffvcKm7YCtirUv6NKeAIDEBrxwlJgiC/59IJqo03656hkDO3aboaZNVPeoI538eX2khc/k6ZPvNlOSSBdqV2mIMbpc67OoVv9wz9vIX8H+ejfaXzvhrCd7qaHUk/nKDdxIPr9DVICdt4ptF/pzl/eYt1OQOssvF+6Gd+wUt5x0rxnxArJ6oJnXH7iWvFkrUoq3znhyZGa2DBcB8MBuH0kCC0k6Aphe5/y6T3i0Yf3FXzYZobVwIdDaxlLlIkQNP8uLp+8zVIpuEvvyTbfttEcd/31WGiRJ0X9QZ/ZfpqaH2/lE5m2jAjJlry8R1RAwXrvC6f5/Vpw/ElOYq5lrOI4UZcGRSq1eEmWllW/TXCMY8mAn4VQLMK7nJXc6UKQfkdJHgHuFyD/dWQNYQRc22/1swz1kHZbYEm5aiK7j4VcJuYv3XGVRS3sgif5FI3LrXxn2kSQ3bM9OmNIn+8Lgu/sWlJoh32EPbtz/WARn5bwFKMbKaCfGwypSaJxIxklItO/FbGek68z8YHru9DL5X7CCSka8ysRUYD716kY0SVFzomqQSo/qfYfOgoCVS2DZN3+WqZ9/XyImDlF7Wc/JJjLN8uV3ca34ESay+1qStydMWopyQqyCo8hiaa+imZ0NKWFL3LD53Y6mxZgzP5i/GP5hPCkIFWI3ngccIe9NAxVJCRhDFFa6jdugcnLHOrBRZbS+MXd3MYNb7NnawSunj2EBRUdmMhpqSMcgUKcQlJzPuYZ6qd+GUEqPIMzOgscBUCNUFfulGxviyros+dWpPR00+RyGElFrfi0rpozBwLLhPfHPfEobDZ2AabOTVC26tGhvTAewIm08gwSd2+dHhyZgDp3mSHA2pG7IAF8U4sVAEXBevLVERE5wgvYmA9bm8nSGuDcIIJynd5hkesVPIP61EoHasRnHdVMNRCLpGp92tIX/dfBrwREdi7atBru0/BebOohLwixJTcGG/vk4lJD9izlD4PR7l9pa4HCwbHgAD+/Ir+m26UlMTiG1QBQew1fP3l/KmmJYyYtpMjbR1r634TALSi2PPDy3wEc+dGBSGtlhjdRfKHO2z6peMwpA/9HspBmOXBm+i8/I1rA6RZsvNY6vAK2eU6hIKZlkEFm9XSCzstuRQfvZ1d6+kBfdvyQL977wHizEjzSK4Tteru1mNPSPo9Jlwg+PXNjFH2wLkrvYnZxgP4WoeLh5HNNahdWwVkj1XdKZVKeKk34jokGCuroqJbOCJ/A0Nb+q8y+6s1hJKP/j8u9sytLTnKwOqZRQV1jEhKolLQDwxO9/QV2zd/IpJlhzSrvUskwXy27WxJ6fUkfxuAkSCWzQb3APXqMqylxJ9AldvfR6EXzqWJPTj+CMRLDZIBizBmWpkw1T7S9PeE7fT9ZwGTeibP3WasMS56+96mDORYhm1a68jwuQ7FuG/ePX91iZEW7yXa6rcPUn8urjHnt33QLGiEvcPvJ8bBJCE/rCgOrydMU0HwYtngS/tgn8OjQaqBcv8WwcqSXREppPBtB+h9D7cgkrlY0boUfzr2dzRreMt5KWBTbod2Faqkg+g0qWgs0cBIeOXMXPVAzCDctIrUsfIVnqa56iwY/i1ZKwLN9/cDdJapBeO5IYt5SdG5xb6IsZEXQfa50UPF+jl9otOScdH5cN03jFuWQzfJkWU4+V0y4Z99AC4fvyKR0ZFgy/Uhej00IlUT0zl1o5wBe4+QRD2UCO5aettn5jy0/ZU56T1Y6adTweWJhFUCoiJYd3/YNOw6MO9hIFgxeFsTfSWS2x8oLtQfStST05BymUyvsuegxK+2zLLfq4Md69/tbqaFthAk2a0sURemPbmFgL6uZsF+94CJqanSYMEuu70COWMy7tomqYCyqy4aIdrmVU76Y9kcOJkXJz2H/O+Iu7pDzkmdYCil7C1ycgtcmQ6TaT81FeeTgjWaXK3QvwpyweyiOqNGDfd3PizKaLv1PXiq+0X4ibv3tzkijWYkSAiaZusfMZuiR+fKWIuWnSkE7VoT9dgIxUZtknvDYjJ/KQg0jFn8QYTX8hKnPZ8vPR0UexMqC/v9chnGbg6YSNGBrNtwZtmWB9t79g/jhE+K9z3Uy8GZca4fHiXdz2/h3wNfNYet45HL3jSFwUzDRAqqZkyBzCoEYbjfyd6/7mcYrXroNUcOzVz2eWz3JBTYqFyL9WjcST4T07naytyHX/Q8tWgIm73joMFH8YhVe39z763BJEXsf5zYlKcgOtLvBhzb9tibKq+3pAZzQSyqHqV2kzWSP+f7Er0Q4X3ODOAQMrIoJIITh7wk5pqKHRvnWZYzxsKkx7KCyeZr7kbOLLTxbm4HemF2fu1AntZJP9cLuC6Tb9x6y037Iw2cUE4Q89mgZRjmi/rJ7mjmeA7G1m2gQ/fzGn6xpSkhDtA98daj0+g9jjJ9wNmQVsVdx8f26wuaarXpBAGa+LLnQYYp+4LFcP6y9xBgZ8BHWUDQ74DRNWWwNyPPWoLd9Y586LfNwcMbvpJiaNQz63D91BMSqSGHB/5CxOrLaIvw+I3YQYof4swM77doq6kZvkt5hF0MANB0ci9RLzoRs9mKQwlBvCdCQPdjyhLthA4bqhVw9e2vIpdHKLB/6Yoao97mv8J5GkOzDoelxW91g74wEtaV1KTrBBWSfbC0kbDoBPmI79D5bddhHTX+b2CG2kOOilL77Eq67QO2tJkDVSNhnw0C4U+ohq5EF9cdEe/LKOBWLchjiwfap+c8HAFeiXH2zF/g5bc2qNSn+0egvZTRq74vGUwkBdjRO8l3fWGUkyD6omFUPv6NOONVVHwVIHMgp1WEBGVGlMby1dr6auj8IuKN13B4rajB8adPS9S1UC8Pwz9+xo3O4imldnKai2/oCIrc+mpE01GLke8GC7EuvFLxgN0cHio5BFqlygupBq/8tFUu31P0jHShhlfvv5+vCWhea9MfI5wJshrLDdo1MOmIURH3/B9fXIzjKFiJV/YEzG6ofA1UraP2ZhJUDvEKev2m/L8HoG7ZBi0b5G6j+3sNKuwC+sZv4kXL3ehtoSRVpUJokaKALjj9H8VF0Nu//JHCkXyoaPQAFPlQ8sj6QgeXm+HibrbiRC9CVDyEMIihlkXq/azMJzUpZqCdwWKazvRvFEoMVk9QYA8CF/E7VRup06KJC6ukda0CtJ3QHQpw++hXOsUuwglNL2ZMH/Q/orDxLy8KXAdo5LzUCwbGEz5RrWJiDbelylKZVD1NeVHlL8rJRi+n+cPdKUnkvNcDKXEIee5LcmEiQUG8TvYlSdD/ahN176n5SK/JMWwe0A5kbhYGqEJI/qAXhX1ymVrGWJ8IoQLaHXo8PTo9yxPO2VO7R6uQmiYfH9sCOrPoZffts3h3HXNGnDLFDhg9ISyQfSOv0thbjdJCltGubNeOX9cT2gIz24m/kjJAqflt9vjKxLPuQuouHRoM2rYU+8wIb3jKfYGQRi8pNG5zC5//BnmU/uFCbwhNbfaIMmCn76kRiYpjoKcNTX+itMLbHS0dXZ0xFJwTqXOJpKHlrsFj1YE9iy1iky1xKTg4Y9RfhUtFG36cLVz/S4JG60Gn4agsTxmUethdeYEshRVY1fruB6O91O9HCorvIhP2h5V85QxGK+iVvLAIMbCbHFDBHlCvnZVVb61PSCjVUbywGPIDJECHvXPf+UEXUKJrYaN52t397IiIZ/ei6oBJecw2f4tOZfeySOXFLUFVUicf3Wwk2RCguCKVHNxJRZzkEbPKJ3mATPUT1aVhH6Mkh5WYxWLcWtHPxb99Rk3u+z+xD/pPLrxeXYVVoOktecUsckdKN7S03NBf4sWrsniqLSvkuUaT6HxhmDhkGK2c8UZWBU+mRNWOtB1SQYQGFtXafWGwsujR8H0R8WFjmyGnE8E3qtbxlS1Jk69Gd0AQehytDpQhUe/ESSwBKGyiykBIXk+NH7nabXOpfnZgm+rmu7txZ5KKDO+Liy91/daQEb2GwgvKZgWBI+gMfGqfUPuVqdoWf47S9zvMO10bteUN9NCBgpvNw+YUaJq7uFo2t/BmIk8pdu2m4nB9pOnc22zRh7NiegOx0uD+9yiqxh83KnMrH7IfSkEJNQQKWuNCUxt6b8j2D4lBwihqwZtbLtpPxKgN46jpTA2vIjY+2lsUziSAPTbxmjGvg2+L54at9q+0Sf1mYplSinAc+4XMFLkFmcC9ZudrvE5O6508zAnvGeqEtuc0+dIFw4Ea3BThmPizwcTfYJm6YHK3Av9KRB5AWXzaeP1Z4x0k3gnbXVfpVCl6EvlTq9E7ZkPAVLutmZgOSuEGxACGSIu8NkI9bWFBda3m7h+uZxwjBjK7yGnar0d7+nFYfzXpGKue0jWhwY36vNfn3LobDkGk3TVANM5+EF5slD2Jzn6+aFcCK6c8UXh58HdThgUm1ET1bvXz6RMyqMPmAywQM+nhBzBNepRZ604ZxLNAclDHsKsb3zymNUemPwHzJZ2VCGDao/7EIOjDjKTRld5P2DFPAcuG8ogjP6r5zlt8xgUZuPmAbLWp1/yjvyIKRCiN7o6ltgPuZ9eoKQn6yj9FwdKVeRLiikqOcTmVB4r6kBdKlKsQZ/9yniKxbUKo4wyLuQsibNDtHSapOlrkCxAj2RwtgVGUvagtJWFjxqA0tq8TWPhEoI7BgfnRZoNSWyRmhE+Nh2AADlypSHmMUJeYtggGQ1kWy/C9cs+IY0VMGb7AjGQBQmV4ASxGHw6UQFCSG4rr7BPRDq6SGoXhiSUvMg+iXtmL1mhBA+qLkXzIE4u3IjxIjMdlZ4ufVIbeZmlTkaX2QoY75SmomxSDgrTYczLw4I7nvseMa8I7s+5SS8EuIxM2sp3b2b0ljeLvVM8j8Y1g3o+sAkn5fXLta7F3lfekKlkT/5YgJGQgYlSlK/+1o5qjXtpstdQnWO+YenGoU2JAztzRnxzorZaJchSMH/CTw2RdXchIUyUY2DvExLZtZBHPrZx1w8ezB9BuSErn9UPjSBL+iplzEaak91vqtFIv0lyElTCnvoZm4I+IWgR78DfBx7vnCdFDTsI3iTuA4EYmh8U3ZIK6UPOFC6zhWCpLpbbS2saGH87RU3Kv7biMIhnt6BloKI8y5q32ZO1I0fThBksL/gm4g/0g+orr8WfzDbxAbvVZVah+gv44V9923Vxy9s44NFPgv91RwEfrUEH45lZuYT81p8J/Bn7WsE0CmEKa40yubAL0VSQmyC0KExHpUtTy7E1o+dnx3FlwD2gq7DgyXJ0gt7YPg5l2VfL7Ih3EP8AniWSGTmCj2YLKFx2cDpUZG6utCwmRSBoyAgCIPTTrsemVsB/odzgDfPhSnaROqY2z8Rx6bNHDt3nrgcXJKZhzh3wWq7VZSkMcyddxy/H/8BbVkFyYZ75AGIuGAWN/4iwOQtbmRFrg/UKYx9+SXs3xduH7bZsZMdpZkTp2kzRHx3IPO+JSU360oeYO35WpcABL+n1h7cOVU/YdCIogGsAfLAIK4JqgrkTW6zhC54mV7mXpCjeqYoqlv/2dnZGIpc6fohEsOBpToLC0Fokv3KtuMPfwLGeLqed4LkJvowNBWqOW6txykqoyj7R7aii5bpAauL5MtZm8QuGVtKRb2TMXepgZYVnRlrJ7UP036Se2c0hJSKC6vM1+VxPj7P6tnMqEhWWnNYkj5PxhDNvikw9bD9NRdGbmz0/G71kVdHVnAG+LwCVkAvNMl+2AoWzoP0drz71GbZb6UR5IMAglX/0TN83vcDFBNONjiTAOFKZHTZ7ArdvDdJEdoiHEb5Mb4O0g2+4PxeRRs+P7prkBhWWoE56t26hHHh0Im5GFi9HU+y00hviSr7hxmKKHPpqcFV0XBtR/1rO0FZetqhAoB2rDn8+0wxySTv9+bJbFocb02oUln/e/yff9jCQnLqoESJcZli1NFBiZEp3tyyujzSi5p19EejtxDGMFpPbPps8ac5KOT2//EBHKjM6rtdZpQ1995LZlIFCos5G07PPv7QGCz+Qs3cYtkmSh55aChTu4CF1k7XCpar7ILOHuDAPXzwP7lLivcXxXJN0teKcORgwt4kINfmfwE8rABk7XuopJkmxIwLkubLHys+dlKu4qqhK81HHSH4eRB/UspIl5FU0IfSMNuvVJG/KVhjNpoAf2MvMIwlFGiUsoPgw+bKsXioVuWJ0JYH6RHXHP5FuJWuZ/7TvDFmHSftFazCMp1Pku/muf/YMvZnqjnmhoHpRRuMtdqkvRauTzjBqnhcDne9c4sodArBi3vCP00fnSN6MCV1xFNN79UBXlmTO2wvRyZZ6Nrsqm9+b0FfSIDfMqGsuM3evEJEa+NGZrCHCHQwKQ6j82Ukzpp3WN82NjPhNmPPglZi3Nj3jrF+pO28SWBf2NfTnU6UpLhE2GU8rQjuqdugWSMYeya/2Yd22o1p22FGa3F/vAirKX75d+hXB4ipkm3p3t74sVQGk8U/6gtVSpkFS1nHk+nuglmjhTQIm7PayDrM0+sic0fCcy6wDS2WQTCWIQv5SVqvuZ87KuHz6K7G8TfaQGDo0DEv4XwSGgD3YCSJGi9NEw8ZYJ9iLSFckA02Cwh3piCDUlSorG03s3QMcYGF1r0X/xpu2lUzcexZTm7XjCGtJPkFeiv6RVOrIHdGeY5IRYQyvyiQ/oyqB5iONIU2nWrIfeJkazqu1n345K80wswKaGaq5P+WLTf75ZJ0Ak5TQgLzTNY3Y+hiCHdqBWn9u0FvPNEK418pEUqJPd9AaJ2NWcS2qF0zhuq9RfGB49OFbQ1YukVeU6JS49ZLhxvrZrEinbt29LCbjcnEOCvh/IqgYkyyudbGeEmIJlSbccuoDmWucjBFJNzzVfKaUx/RbqmPlku+d8bsgImvGw2pIf1lmYvcqk1sVllARvmWH9EnV0+4nTDGcu6QYBn3IWTEcJtKYx624ThjgdxcaChT5jCAjcWzX8PD+Og1z2W23tmc8JnG1ggAJFAEiVKQGpxWIGi9Gu708/E7Wu23eB4PN0fQEMZAMmyqGO8q9EdtfqoSIFbd9uEYH7YZDoVaAGds1erbaTNTwqRmCn3TD3YcXQftufvE44V1dTf5vORN6XEDyalbm2SK7F1MuBxtY8/SfLtX7ExJFQmajJvEZctYNTvyyRXMJ1Y2vJgEsWEUzQfoyTO6YQteNDww93n7GqxzqJZvxILme2NyH+y7bnpZB5j8vbSBNq9kZVK/0zHZ3Unmxc4HdnAdgukeOay6MmvcWBHuuWHIDwOadvicgMpojAfnpr4VrcS/zy5kN+Lng19QScmsQqmIigVQ4tnNGt0oHVJ9IWNpA4TRTcxiz7IyJkIiOIvSJ5krNb658Qsj9Vzf5mgukeOay6JPYXMCE+HpGHm42GsmgT8KUpmxpNAAnoDOdmnRZGyXNUuD+tQL7XJmE+cvAS5AZh8gLGqB8K8n7KcJS+MPAfl8AvVwBLY1V8v+CWfbkS+uPdAI8h585GEWF3Ar6qLr55AKsFqcVv3H7wOORAcEKgScFC0IyxO2wE8wIxqVcWVQ+eJF6TaJUEpVwRIR6p/iiZyfkStz/d/Mp21V/huwbONrPGt3uH6kW/BE5pN/ktS6rj9Pc+3zbSr+AkbKMbuQzNPfs3j/3Rn4GupuGpC7wcT5fyjMpa7Hfqqf0Yq6ZFCfK8Dg0mH2I8ylOjHRgILZw5bHRa0vul5ae4wICSF8sb7E7ZSfBda7riA2aonJ3eucQLeNNduhuIITvXkjvKxAr6f+WpLD6pzBd6vrpwObyLIoAAF/p8fvpY+xVDTIKQeKG9X2NOD1LIIj66O/BE1Sio19nyW8W0M3n95HSHFOgQfRMhir2doIlkslhkvnc/SVwjVlPOvUQNERBgixDNnwHDvppEW0rxjbdh/ubeD6lMuNPKhJdpBXaCOrxcnBkxIpRHeS1Zh6bE3nbs7VikuxjiHAYni3gsaauu+Du1oUys9qDiInj6gT877dQUi9ksxRa3sCd5PbVAw/lFp6g//0/mB2ePzNItnDse6o/FrBMqGe/1Ez7ezg+9zHwPg3NhdgumCclWhXp9hjdJRCTHg2yudv0/rtqvWQ03yrDxGfhDLIfjyTEGIa1smImQxsvf4FAhcMIaKqRmUdEZXEEzMsy9SXfLz0OmFFhFFL39bxZoGsRDmpw+oTlzziP7iYbcZf2+1TqQTc3TchADQ/XGMV2Z/PpqZ+8iRb+j+bPVTouVv3GtBkjThLGDQFl1e/Qw8Pq6NcnCDhlX5VYQcn+JeFuoemiuQzqUCb6QlNEHtS6tFdS0+w5qN+/0DFNUmorAzKBO8EnMwL/RPeum+nWligbo3Zf//2WulENy3/IqcdyO1uE05s/HZVJDW7ByHB01rUfJA+rc6TDpQFfVcFmMIB0XZC8Th0Qnaz319gI16Ox0x/AIX9XrRzWvGWHm6Kg0MV932JAPcaCcCqG7pzZHqqr9EG+tP/KW1s/kijZCBBjuZHoe2p1HAZP931+sX5J1leKu+zFUqBLFEOKMKxFaeLKjmLv3rXi1Bj0a9f70kOUl0b96wRwqM6e0OLCkEEHrTbd2eyntxHU3feJYzqbshg2hKlyoEfATzAhZDS4Ad8K5HVwwR7oKrVE+ye5ZAIs6lt1RBDWH1lHcoNGzj6UDJCgjd4S3oUdwGSGSUR1x/OPxoy4Xue/MzMxrsScMFgoeBgfXS6AGGvYUrMGp2ZJeOuq0WRkuYQTnINBr513IGEbGenQsGQyvs+Ii6vcPyy4h7tGx//8y//LNvVfv/HvadBTTPA9L/7YURbm7XKZBqeckASw6e81oc2s1HKzF/D1iht/uz74sPJcjmn1W5nbgIhEoXnDcYi8PAEu6bAoxdjNCuFW/PNITvyU7x21EpGTp6BiDn/D7qKcUd9udZA9dSYs21/8YqgOqMWsuZSn6zQIgRbKKlP/RCJOU5iqRQGHJKL68rjskoM6AWfxXqLB2KeTIXIn51v7cDGr0makR0x8JOAe2S6O28fvQcQ0/MsDHCryoGuKn2/5B5due7TWu/J6FAWlOG2fhaAvl4sg1viqY25DWog9jnu5QzWiVt79e+XKQzGhLQZAYdarQ7TacHJT6QR3noPVfsJv8dn1Nc0GRwLjAbmoczJZ8VvmatXD2LUihERiHZFoU4IhThXDyp4QkUODrEFfJ5Tr1Bg0njvpmYvBwdG6YdSD/ciSmAhD7aUBSdyMydZE8BChNAMI/o6Q1gBnU411sljJV2cGbNbLcbBOmhYBxtNOAhn6oL5QjUjkhjXnEVX3EKGKzQ+WnBUJ+zmKu+J/OAj5j7gZ+ySfqfEKS1f9hxVqx10rZz199l5g4x7vH1hhsDD+wT02tfnwLGFnbA0/XjkHc4oEjgZy+FdUPxxu787mmRlyQCCt3UV8CYdlW+3zzAiPtR1yxVeVCyJTkKLQZSgCvqtSejFF2sAx/nAX8qWqFM0Cboddtf4Jfgkla+iKQIcF2+xSUFNUHYFFg4xcb/eohcHp9uoTQcRehPp5YmkvGizP+6kiCAdyAZDLL17Yo28yGhpm/1HLRrPZdDXuVxSxauG+DReFeMGI9oiQDVUKMik4v9U1q8BpOZ0SmWSb6zEZV0wKB6639PFnFzoitCxlvIHRozlJ9NHR6mHOGLYq1j6467KRmAPK89RgUAkemiDlTQwz+ku+mC4I2/I8VfbuEMrXgJ9nIKxp+QW5e2lRENMZXkuMNbV8DD1Z4lujAWz+bbtp06WvVlqwFvS7chzOdkL02vXZlNuJYqUNR63tu+zACJyneIyk7wmO+o9R2RACAUcLbf6D9Ur+GC3FxzAYKQ0Tzbhb39NNkxyOz+G5WkAKGbGR8lKRCyZSZPCxgKMsn+u8T3fIqIpHVBH6vy3LtgM8uxbppKefk/ETjfYgTY3MkRCznyZFl1NOHyJhhWTA/AudGfiaRsJxAPYJGaxYW6GF0NgcGKSA30hZurEsQDtuB7j5sKNpQftkcFbBxNib9d/D4uwT5wuMyygAb6UCgi0lNrdLTQx+cBp50uOrTYPSJiFEtBpLcXBG2v+4LmBpD5C/3bP26USvmUtAJge+16zsSYChg7sGgpvKlmTIuZOEQgaGzn+A2bPMAGK5ROeWq07UVEH4VkxLT8Fp6lmTO0RCu/MBhRdGb4Ow88IsJU1D4/9Fu16bXdwFz9YjP4vqdL5f3dKJ02uXH8txHXqV8W2708EL4wKEPml1+htbWKPEJv1dqAMdRkmHdBYY2zsSN47LM7EZmnpdC1HuscX22RZYCJp9wp0ieRhIfhKZSa4tERf1UH0+538iQnmweq7qi4dqbgg3ytzheQy8RISuPicweUdzAN0ampgLiGQlFWQl+6TBG3XzJkrLPJN5LxbnO/Ht+aJdAv/mDwRN0SEHIl6GtHiXeWWxMSoneoRc2cDTbiaKorYGq4ZR0aqrj1gHkASKS6VZ03XDXMqvVwsOn5nNVTvhANn+EMKtIl1d4V3vwCV/MtivUAak8dB6TVVYjAFBJhBmbl5A7PfiWiG9gnE4dMsbXlDsSPz24ezF3BK+WyugQi5586xrsPx36NtLMRQhMV+T2HUfB1aagoiNOGLsWTrqLxVctpJkpDysepLVtwOF0vvQ+z1+IXi9LN3u8lEGe/0I7EuNFrdijp2JNHkJ7lVAdOh5++yOO7Iz/SRpimrxo82f0ruFy5tBxHynz46I2JwiF1Peru7hMPCjeaeiknu8U2uy02okP+JEZWcpNfruGS9JCa3LIuq45TSOEYU5xDQTjAKO1bNYxQLLB9yh/virLOmLk+4TbNraLgKc/rxolx32mpwRmDzKoJZKgYpemOeNh3mmLJc3MzS78kcd3OL1hd746bskHWmBPYthcqvOUHSCP9GXOz2quwXN9biNaXss81chrrjI3raPZEr/Bn/dc890iAOoUy/IFUSwPO01DZJeEFGpxWN2N8YMeGQsbcHL3Xc8xZqA7vVou57uLLpOecBxHtDqzCrLe/iMX97MgW5gYDTSkvHwqrkvEK8EErTiwDRckQDQaNb83ur7NuU0QAAECk+w+GLvWM12YYbk0GmUxQZNOt5ouDUXXGilIZLln6OcbIEURJQ7gANQscjWJmHkL+BkDSN1sCGukLN4/QiFrn4ZrYE3r1FFdFG9OUo6mSIp5LG5xaHL4CdhUN49LaqRJMxL2lUO9hUDkFvePIJhi1JDUU0VygjnHeDbiOTxaPaJMMATofJK7j0/jOta0191m95PP9wj8wRNBmWzXZsg6lQBSj8NlLgbC8LdGtdXX3tE67s/s+dSSNzaYHE1yLswxDwSxYJ9ZitWHVyO1b3gfCqONNvK7Sy/DiqPH/JbdRFeoyZa5BGcwiDAx/mdAQRhOBB6o929wxuvZbYLl+IHwtt2qYHYUAOvqm/ZXJ9Eil9ESJiFANXQqpxxdCntDrvEH/xvyWEtiKf/3wYmyjKttKF+mXW6pIrWKRgzzFGMeAdXD0H5LkDkWvoxzTPGYZ6VrFazzMU96F+k0RxNPbESYDAQCTFdlMFK7kodmXIUbOEIJwYKhaOJFWuRynRMCslRcdHtnoIKui5N6CLKm7iMBBQysQMsgaSigdlxe96YepD17bmJkys+eYi2JiSpTMZ+/QCxYH7m4/P6zZMdP/SfDuU5vzhyuHweLmiEPHt4j/SKyA/3DxvIlgDWynw8ulaP2FIhx/mVu/TRiWPTKhQgVVlhBizD8c19UR1G247ECVRZvZuq4r1m1F+zEa/jSOG6BEgIpK3K9NYWXrWYtOqq5wQOXly5JDg9uQRSLUcpQ/dYATxEJZhgD0lCes1FMu4qa7NISRlqQ6szPqDs8OgWJCyw40YNE28fc7PMdW1uUWt0A+GFTRM9uGQEb3CTvgJGpD6Ikdlc00KMoFb75uPU8D8XIZlSh2iU9+h4Pcb3IsjAKhhPWVYhRfdkKC/IHUX4AaegIMaM4Owv5zxSqkZID3SWLwd9Ui/SeRjjPdUgYReAVMpcm75ZmgtTSIUf3usb+bTIaREza/0CDjYvyid69dfzBwnVaNQX67sKmuB1xkqRd5Np/92QllwZ3NesQe/iZGXBdtkOOQYsSvc7IHI6cpIcIygP7gBu2VNhRzMHiSCWBqA+xQSTTzTiQpltB6ADZk9wrnvDxi1KnYyaGxzwL89+pDlm9wxuMNfTRsnQ369GODNNlYq+/acl0YiyHeRTucJI/cYYfELVbR8G9JCHKFbgOB64NC2mkX7dDG8gi850aoNus8Xke9773CPIqwoNRQA9dd/02ZE/VqYKKvLNz5VWXIyKb+QaMNUEzVLPwp87zCpES6kr124zYOpzG21aox/RAOnq1YJi5td3Cue804AdwZY+kkCDGy2PooAAAAadKCXBUMcrNno1it6rj/hkbMBqDDhCgLr3RfnMSUXhe+mM9640mJt/aC2IWa6lO7vtWxRblg7mwPMrfghY943+Gct1DRUpH3aBaFF/PArtWZih41zY5s8X3yXjXOC9IP4EdZwY4z7ETo7Oc7LdEY3hin+wvXa9h/hnXzzr7q2OBdVrnBEy+uR4g4T7o/SwW3yFic1JYvx0ZGWA5bEroBBfHgxpmHVeKDUsiIntj4BcawNMqKhOqUGtNYRvV3FStSa/Yz4IulIi4Cfdw0gAoq9sAykCIolQxfNEh0Jx+GZEKiDXuQh5a/mWQvitDmqG4+nYXwTUxMd1lOAoeKwwX5j4HfjO4hWzNWiDJcSrFG8JybWnyKfnjNKLK/TcsUd9qo0pHwTTsu6onw5M7yPptok4xsd5Cw118oiokE/+bVnMdvKMsH/FbxswyuRPoHQC5R+8A6nygr10RVGC3rBrW70snrk6xzTswRbxVKKpxiCNO1+8BdtmANv1ORF/aWpTQ9lNrrUqiSR/GkNQa4ABJVQR9ffMLkuYhJNLay8gLUOzPapP5Iaj0FrQhzmNgf8ig86SnslSFF3Kh3TvA/7U8jfyIA0dox5jh5VdSAl+nLtIB/S6UXTNEqVEnEMoJIhpGamCf+hPhX3p4MLo/8ZZPKbArYXBcxcZ2JVOfJZK/JwR7zD/h2glBfgiI5r9QyYDjnnaNMqffHGPajOtdIjzAELvfvoazLLjPPWQN1vFeMdyD1FLj3xrfEMfUVpCjvxZXznfji+feyodn3ZcWPaLFnrpuzXfajlMMGXaA9kdpqW5TyPzx3uN2fTQnAUtZfEprtCAPOBSw1LhgFgqin3/vTNXXuyW4cEH/sE9XUeSY5ZnHOHoa6tJCpD4qr9fQVG1TvDflQknWboI+DJ9K9JmOyZXYxu+XNVoIJuggGs+enUV59d3eS1k3stYnJ21dmSC2ml+rQw40Cs2BtQVNvcqOaCK43f2mwxqwv97kVxnhKihrHmb8n7j4r5rfC1ZoV7uB6pl7lzF7URAhXl5SNK05UPws3aBEBEoojRVO9WteKwiUz48l5+A5bWv16lsomTcZeHOK+uBSeGCsgacARjxlwFkfxitA7K8gGi8TxB0+5rvAyiflJKNOx/wN3DqPlluv975SshqdGh8dXoXKcvHrrumynbwFNzMyooG/pewjRgJiBqg/v8KNl6q76nJIZXgXheol03SavS5VMkGubMtLcudu8+T/R3T2NEM45X7o9LBPecr21zyoqTM/rHxA/MdI+p56On7FWW90qYYrxuRhT7xa4zTye2JlkfnaMwmtVqOaZ1Oo4LtD9tqMB5F6uwKQynG93qf+O91q7nJVMBcLfPV+39Nx9Rt+jeWZakwlxqXum1s6/jYNgmFwU7IFPC0DTtAanQqhhaoykuvFbedqgKTFEFeWjYtg6mH9NChClo/ZIO93CSwBF5ikAA==")
-                st.image(_box_guide_img, width=320)
+                st.image(_box_guide_img, width=640)
                 st.markdown("""
 
 ---
@@ -1468,7 +1471,7 @@ with tab1:
                     fig_biz.update_traces(textposition="outside", textfont_size=11,
                                           hovertemplate="%{y}: %{x:.1f}% (%{customdata[0]:,}건)<extra></extra>",
                                           customdata=_biz_df[["건수"]].values)
-                    fig_biz.update_layout(height=max(300, len(_biz_df) * 30 + 80),
+                    fig_biz.update_layout(height=max(360, len(_biz_df) * 30 + 80),
                                            margin=dict(t=50, b=20, l=20, r=60), showlegend=False,
                                            title_font=dict(size=15, color=C["navy"]),
                                            xaxis_title="비율(%)", yaxis_title="")
@@ -1532,11 +1535,22 @@ def _render_category_section(df, cat_col, cat_label, office_col, score_col, over
         pivot = df.pivot_table(values=score_col, index=office_col,
                                columns=cat_col, aggfunc="mean").round(1)
         pivot = pivot.reindex(_sort_offices(pivot.index.tolist()))
+        pivot.columns.name = cat_label
+        # fillna(0) 제거 — NaN=데이터없음(공란), 실제 0점만 빨강 표시
         if not pivot.empty:
+            # 텍스트: NaN 칸은 빈 문자열
+            _hm_text = [[f"{v:.1f}" if pd.notna(v) else "" for v in row] for row in pivot.values]
+            # 호버: NaN 칸은 "데이터 없음"
+            _hm_hover = [[f"지사: {r}<br>{cat_label}: {c}<br>점수: {pivot.loc[r,c]:.1f}점"
+                          if pd.notna(pivot.loc[r,c])
+                          else f"지사: {r}<br>{cat_label}: {c}<br>데이터 없음"
+                          for c in pivot.columns] for r in pivot.index]
             fig_hm = px.imshow(pivot, color_continuous_scale="RdYlGn",
-                               text_auto=".1f", aspect="auto", template=PLOTLY_TPL,
+                               aspect="auto", template=PLOTLY_TPL,
                                title=f"지사 × {cat_label} 만족도 (초록=높음 / 빨강=낮음)")
-            fig_hm.update_traces(hovertemplate="지사: %{y}<br>" + cat_label + ": %{x}<br>점수: %{z:.1f}점<extra></extra>")
+            fig_hm.update_traces(text=_hm_text, texttemplate="%{text}",
+                                 customdata=_hm_hover,
+                                 hovertemplate="%{customdata}<extra></extra>")
             fig_hm.update_layout(
                 height=max(350, len(pivot.index) * 30 + 100),
                 margin=dict(t=60, b=60, l=120, r=60),
@@ -1861,843 +1875,10 @@ with tab3:
                             st.error(f"AI 분석 중 오류: {e}")
 
 
-# ─────────────────────────────────────────────────────────────
-#  TAB AI  AI 교차분석
-# ─────────────────────────────────────────────────────────────
-with tab_ai:
-    if not M["score"]:
-        st.warning("만족도 점수 컬럼이 필요합니다.")
-    else:
-        # ══════════════════════════════════════════════════════════════
-        #  3차원 교차분석 — 계약종별 × 접수채널 × 업무유형
-        # ══════════════════════════════════════════════════════════════
-        st.markdown('<p class="sec-head">🔬 3차원 교차분석 — 계약종별 × 접수채널 × 업무유형</p>', unsafe_allow_html=True)
 
-        # 채널그룹 준비 (tab3 내에서 이미 생성된 경우도 있지만 안전하게 재생성)
-        _ch_col = M.get("channel")
-        if _ch_col and _ch_col in df_f.columns:
-            df_f["_채널그룹_cross"] = df_f[_ch_col].apply(_group_channel)
-            _df_cross = df_f[df_f["_채널그룹_cross"].notna()].copy()
-        else:
-            _df_cross = pd.DataFrame()
-
-        # ── ⑤ 페르소나별 서비스 경로 분석 (계약종별 × 접수채널 × 점수) ──
-        if M.get("contract") and not _df_cross.empty:
-            st.markdown("##### 🗺️ 페르소나별 서비스 경로 분석 (계약종별 × 접수채널)")
-            st.caption("특정 계약 고객이 어떤 채널을 이용할 때 만족도가 급락하는 **'채널 미스매치'** 지점을 찾아냅니다.")
-            _pv_mean = _df_cross.pivot_table(values="_점수100", index=M["contract"],
-                                              columns="_채널그룹_cross", aggfunc="mean").round(1)
-            _pv_cnt = _df_cross.pivot_table(values="_점수100", index=M["contract"],
-                                             columns="_채널그룹_cross", aggfunc="count").fillna(0).astype(int)
-            if not _pv_mean.empty and _pv_mean.size > 1:
-                # 히트맵
-                _hover_cross = []
-                for r_idx in _pv_mean.index:
-                    row_h = []
-                    for c_idx in _pv_mean.columns:
-                        _v = _pv_mean.loc[r_idx, c_idx] if pd.notna(_pv_mean.loc[r_idx, c_idx]) else 0
-                        _cn = int(_pv_cnt.loc[r_idx, c_idx]) if r_idx in _pv_cnt.index and c_idx in _pv_cnt.columns else 0
-                        _gap = round(_v - avg_score_100, 1) if pd.notna(_v) and _v > 0 else 0
-                        row_h.append(f"{r_idx} × {c_idx}<br>평균: {_v:.1f}점 (전체 대비 {_gap:+.1f})<br>응답: {_cn}건")
-                    _hover_cross.append(row_h)
-
-                fig_cross_hm = px.imshow(_pv_mean, color_continuous_scale="RdYlGn",
-                                          text_auto=".1f", aspect="auto", template=PLOTLY_TPL,
-                                          title="계약종별 × 접수채널 만족도 히트맵 (초록=높음 / 빨강=낮음)")
-                fig_cross_hm.update_traces(
-                    customdata=np.array(_hover_cross),
-                    hovertemplate="%{customdata}<extra></extra>")
-                fig_cross_hm.update_layout(
-                    height=max(300, len(_pv_mean.index) * 45 + 100),
-                    margin=dict(t=60, b=40, l=120, r=60),
-                    title_font=dict(size=14, color=C["navy"]),
-                    xaxis_title="접수채널", yaxis_title="계약종별")
-                st.plotly_chart(fig_cross_hm, use_container_width=True)
-
-                # 채널 미스매치 탐지 (-5점 이상 급락)
-                _mismatch = []
-                for r_idx in _pv_mean.index:
-                    for c_idx in _pv_mean.columns:
-                        _v = _pv_mean.loc[r_idx, c_idx]
-                        _cn = int(_pv_cnt.loc[r_idx, c_idx]) if r_idx in _pv_cnt.index and c_idx in _pv_cnt.columns else 0
-                        if pd.notna(_v) and _cn >= 3:
-                            _gap = _v - avg_score_100
-                            if _gap <= -5:
-                                _mismatch.append({"계약종": r_idx, "채널": c_idx,
-                                                   "평균만족도": round(_v, 1), "응답수": _cn,
-                                                   "전체대비": round(_gap, 1)})
-                if _mismatch:
-                    _mm_df = pd.DataFrame(_mismatch).sort_values("전체대비")
-                    st.markdown("**🚨 채널 미스매치 탐지** (전체 평균 대비 -5점 이상 급락 조합)")
-                    _mm_cols = st.columns(min(3, len(_mm_df)))
-                    for i, (_, mmr) in enumerate(_mm_df.head(3).iterrows()):
-                        with _mm_cols[i]:
-                            st.markdown(
-                                f'<div class="card-red">'
-                                f'<b>{mmr["계약종"]} × {mmr["채널"]}</b><br><br>'
-                                f'평균: <b>{mmr["평균만족도"]:.1f}점</b> ({mmr["전체대비"]:+.1f}점)<br>'
-                                f'응답: {mmr["응답수"]:,}건<br><br>'
-                                f'<span style="font-size:0.85em">→ 해당 고객군의 채널 상담 프로세스 점검 필요</span>'
-                                f'</div>', unsafe_allow_html=True)
-                else:
-                    st.success("채널 미스매치 없음: 모든 계약종 × 채널 조합이 전체 평균 대비 -5점 이내입니다.")
-
-                # ── AI 분석 버튼: 페르소나별 서비스 경로 ──
-                if st.button("🤖 AI 채널 미스매치 심층 분석", key="ai_cross5_btn", type="primary", use_container_width=True):
-                    if not GEMINI_AVAILABLE:
-                        st.error("Gemini API 키가 설정되지 않았습니다. `.env` 파일에 `GEMINI_API_KEY`를 설정해주세요.")
-                    else:
-                        # VOC 수집: 미스매치 조합의 불만 VOC
-                        _ai5_voc_lines = []
-                        if _mismatch and M.get("voc"):
-                            for mm in _mismatch[:5]:
-                                _mm_sub = _df_cross[
-                                    (_df_cross[M["contract"]] == mm["계약종"]) &
-                                    (_df_cross["_채널그룹_cross"] == mm["채널"])
-                                ]
-                                _mm_vocs = _mm_sub[_mm_sub["_점수100"] < 70][M["voc"]].dropna().astype(str).tolist()
-                                _mm_vocs = [v for v in _mm_vocs if v.strip() not in ("", "nan", "응답없음")][:5]
-                                if _mm_vocs:
-                                    _ai5_voc_lines.append(f"[{mm['계약종']} × {mm['채널']}] (평균 {mm['평균만족도']}점)")
-                                    for v in _mm_vocs:
-                                        _ai5_voc_lines.append(f"  - {v}")
-
-                        _ai5_data = "히트맵 데이터:\n"
-                        for r_idx in _pv_mean.index:
-                            for c_idx in _pv_mean.columns:
-                                _v = _pv_mean.loc[r_idx, c_idx]
-                                _cn = int(_pv_cnt.loc[r_idx, c_idx]) if r_idx in _pv_cnt.index and c_idx in _pv_cnt.columns else 0
-                                if pd.notna(_v) and _cn > 0:
-                                    _ai5_data += f"  {r_idx} × {c_idx}: {_v:.1f}점 ({_cn}건)\n"
-
-                        _ai5_prompt = f"""당신은 전력산업 고객만족(CS) 전문 컨설턴트입니다.
-아래는 '계약종별 × 접수채널' 교차분석 데이터입니다. 전체 평균은 {avg_score_100:.1f}점입니다.
-
-{_ai5_data}
-[미스매치 조합 VOC 원문]
-{chr(10).join(_ai5_voc_lines) if _ai5_voc_lines else '- 해당 없음'}
-
-[분석 요청]
-1. **채널 미스매치 원인 진단**: 특정 계약종이 특정 채널에서 만족도가 급락하는 근본 원인을 VOC 근거와 함께 구체적으로 분석하세요.
-2. **고객 페르소나별 채널 전략**: 각 계약종별 고객 특성(산업용=전문적, 주택용=민감 등)을 고려한 채널 최적화 전략을 제시하세요.
-3. **즉시 실행 가능한 액션플랜**: 각 미스매치 조합별로 72시간 내 조치 가능한 구체적 해결방안을 제시하세요.
-
-※ 추상적 제안("교육 실시", "매뉴얼 배포") 금지. 반드시 데이터에 근거한 구체적 제안만 하세요."""
-
-                        with st.spinner("Gemini AI가 채널 미스매치를 심층 분석 중…"):
-                            try:
-                                import urllib.request
-                                _models = ["gemini-2.0-flash", "gemma-3-12b-it", "gemma-3-27b-it"]
-                                _payload = {"contents": [{"parts": [{"text": _ai5_prompt}]}],
-                                             "generationConfig": {"temperature": 0.7, "maxOutputTokens": 4096}}
-                                _ctx = ssl._create_unverified_context()
-                                _body = None
-                                for _model in _models:
-                                    _api_url = f"https://generativelanguage.googleapis.com/v1beta/models/{_model}:generateContent?key={_GEMINI_KEY}"
-                                    _req = urllib.request.Request(_api_url, data=json.dumps(_payload).encode("utf-8"),
-                                                                   headers={"Content-Type": "application/json"}, method="POST")
-                                    try:
-                                        with urllib.request.urlopen(_req, context=_ctx, timeout=90) as _resp:
-                                            _body = json.loads(_resp.read().decode("utf-8"))
-                                        break
-                                    except urllib.error.HTTPError as _http_err:
-                                        if _http_err.code == 429:
-                                            continue
-                                        raise
-                                if _body is None:
-                                    st.error("모든 AI 모델의 일일 한도가 소진되었습니다. 내일 다시 시도해주세요.")
-                                else:
-                                    _ai_text = _body["candidates"][0]["content"]["parts"][0]["text"].strip()
-                                    st.markdown(_ai_text)
-                            except Exception as e:
-                                st.error(f"AI 분석 중 오류: {e}")
-            st.markdown("---")
-
-        # ── ⑥ 업무 성격별 채널 적합도 분석 (업무유형 × 접수채널 × 건수/점수) ──
-        if M.get("business") and not _df_cross.empty:
-            st.markdown("##### 🎯 업무 성격별 채널 적합도 분석 (업무유형 × 접수채널)")
-            st.caption("동일 업무라도 채널에 따라 만족도가 크게 달라지는 **'채널 전환(Call Steering)'** 대상 업무를 식별합니다.")
-
-            _biz_ch = _df_cross.groupby([M["business"], "_채널그룹_cross"])["_점수100"].agg(
-                ["mean", "count"]).reset_index()
-            _biz_ch.columns = ["업무유형", "채널", "평균만족도", "응답수"]
-            _biz_ch = _biz_ch[_biz_ch["응답수"] >= 5]
-            _biz_ch["평균만족도"] = _biz_ch["평균만족도"].round(1)
-
-            if len(_biz_ch) >= 2:
-                _ch_colors = {"직원": C["blue"], "고객센터": C["green"],
-                              "한전ON": C["sky"], "기타": C["gold"]}
-                _total_biz_ch = _biz_ch["응답수"].sum()
-                _biz_ch["건수비중"] = (_biz_ch["응답수"] / _total_biz_ch * 100).round(1)
-                _x_avg_bch = _biz_ch["응답수"].mean()
-                _y_avg_bch = _biz_ch["평균만족도"].mean()
-
-                fig_biz_ch = go.Figure()
-                for ch_name in ["직원", "고객센터", "한전ON", "기타"]:
-                    _sub_ch = _biz_ch[_biz_ch["채널"] == ch_name]
-                    if _sub_ch.empty:
-                        continue
-                    fig_biz_ch.add_trace(go.Scatter(
-                        x=_sub_ch["응답수"], y=_sub_ch["평균만족도"],
-                        mode="markers+text",
-                        marker=dict(size=(_sub_ch["건수비중"] * 3).clip(lower=12, upper=60),
-                                    color=_ch_colors.get(ch_name, C["navy"]), opacity=0.75,
-                                    line=dict(width=1.5, color="white")),
-                        text=_sub_ch["업무유형"], textposition="top center", textfont=dict(size=11),
-                        hovertemplate=("<b>%{text}</b> · " + ch_name +
-                                       "<br>응답수: %{x:,}건<br>만족도: %{y:.1f}점"
-                                       "<br>건수비중: %{customdata[0]:.1f}%<extra></extra>"),
-                        customdata=_sub_ch[["건수비중"]].values,
-                        name=ch_name,
-                    ))
-
-                fig_biz_ch.add_hline(y=_y_avg_bch, line_color=C["navy"], line_dash="dot", line_width=1,
-                                      annotation_text=f"평균 만족도 {_y_avg_bch:.1f}", annotation_font_size=10,
-                                      annotation_position="top left")
-                fig_biz_ch.add_vline(x=_x_avg_bch, line_color=C["navy"], line_dash="dot", line_width=1,
-                                      annotation_text=f"평균 건수 {_x_avg_bch:.0f}", annotation_font_size=10,
-                                      annotation_position="top right")
-                fig_biz_ch.update_layout(
-                    height=520, margin=dict(t=60, b=60, l=60, r=40),
-                    xaxis_title="처리 건수", yaxis_title="평균 만족도 (100점 환산)",
-                    title=dict(text="업무유형 × 채널별 만족도 버블 차트 (색상 = 채널, 크기 = 건수 비중)",
-                               font=dict(size=14, color=C["navy"])),
-                    legend=dict(orientation="h", yanchor="bottom", y=-0.18, xanchor="center", x=0.5,
-                                font=dict(size=11)),
-                    template=PLOTLY_TPL)
-                st.plotly_chart(fig_biz_ch, use_container_width=True)
-
-                # 채널 간 점수 갭이 큰 업무 TOP3
-                _biz_gap = _biz_ch.groupby("업무유형")["평균만족도"].agg(["max", "min", "count"]).reset_index()
-                _biz_gap.columns = ["업무유형", "최고채널점수", "최저채널점수", "채널수"]
-                _biz_gap = _biz_gap[_biz_gap["채널수"] >= 2]
-                _biz_gap["채널갭"] = (_biz_gap["최고채널점수"] - _biz_gap["최저채널점수"]).round(1)
-                _biz_gap = _biz_gap.sort_values("채널갭", ascending=False)
-
-                if not _biz_gap.empty:
-                    st.markdown("**📊 채널 간 만족도 갭 TOP 업무** (같은 업무, 채널에 따른 점수 차이)")
-                    for _, gr in _biz_gap.head(3).iterrows():
-                        _biz_name = gr["업무유형"]
-                        _detail = _biz_ch[_biz_ch["업무유형"] == _biz_name].sort_values("평균만족도")
-                        _low = _detail.iloc[0]
-                        _high = _detail.iloc[-1]
-                        st.warning(
-                            f"**{_biz_name}**: {_high['채널']} {_high['평균만족도']:.1f}점 vs "
-                            f"{_low['채널']} {_low['평균만족도']:.1f}점 (갭 **{gr['채널갭']:.1f}점**) "
-                            f"→ {_low['채널']} 채널 프로세스 개선 또는 채널 전환 검토")
-
-                # ── AI 분석 버튼: 업무별 채널 적합도 ──
-                if st.button("🤖 AI 채널 전환 전략 분석", key="ai_cross6_btn", type="primary", use_container_width=True):
-                    if not GEMINI_AVAILABLE:
-                        st.error("Gemini API 키가 설정되지 않았습니다. `.env` 파일에 `GEMINI_API_KEY`를 설정해주세요.")
-                    else:
-                        # 업무×채널 데이터 요약
-                        _ai6_data = "업무유형 × 채널별 만족도 데이터:\n"
-                        for _, r in _biz_ch.iterrows():
-                            _ai6_data += f"  {r['업무유형']} × {r['채널']}: {r['평균만족도']:.1f}점 ({int(r['응답수'])}건)\n"
-
-                        # 갭 큰 업무의 VOC 수집
-                        _ai6_voc_lines = []
-                        if M.get("voc") and not _biz_gap.empty:
-                            for _, gr in _biz_gap.head(3).iterrows():
-                                _bname = gr["업무유형"]
-                                _detail = _biz_ch[_biz_ch["업무유형"] == _bname].sort_values("평균만족도")
-                                _low_ch = _detail.iloc[0]["채널"]
-                                _voc_sub = _df_cross[
-                                    (_df_cross[M["business"]] == _bname) &
-                                    (_df_cross["_채널그룹_cross"] == _low_ch) &
-                                    (_df_cross["_점수100"] < 70)
-                                ]
-                                _vocs = _voc_sub[M["voc"]].dropna().astype(str).tolist()
-                                _vocs = [v for v in _vocs if v.strip() not in ("", "nan", "응답없음")][:5]
-                                if _vocs:
-                                    _ai6_voc_lines.append(f"[{_bname} × {_low_ch}] (최저 채널)")
-                                    for v in _vocs:
-                                        _ai6_voc_lines.append(f"  - {v}")
-
-                        _ai6_prompt = f"""당신은 전력산업 고객만족(CS) 전문 컨설턴트입니다.
-아래는 '업무유형 × 접수채널' 교차분석 데이터입니다. 전체 평균은 {avg_score_100:.1f}점입니다.
-
-{_ai6_data}
-[채널 갭이 큰 업무의 저점수 채널 VOC 원문]
-{chr(10).join(_ai6_voc_lines) if _ai6_voc_lines else '- 해당 없음'}
-
-[분석 요청]
-1. **업무 복잡도 분석**: 각 업무의 성격(단순 조회 vs 복잡한 해지/변경 등)을 파악하고, 어떤 채널이 해당 업무에 적합/부적합한지 근거와 함께 분석하세요.
-2. **채널 전환(Call Steering) 전략**: 특정 업무를 특정 채널에서 다른 채널로 유도해야 하는 경우, 구체적인 전환 시나리오를 설계하세요.
-   - 예: "○○ 업무는 한전ON 접수 시 → 즉시 전문상담원 콜백 연결"
-3. **채널별 개선 로드맵**: UI/UX 문제인지, 상담원 전문성 문제인지, 대기시간 문제인지 VOC 근거로 가설을 세우고 각각의 해결방안을 제시하세요.
-
-※ 추상적 제안 금지. 반드시 업무명·채널명·VOC 근거를 명시하세요."""
-
-                        with st.spinner("Gemini AI가 채널 전환 전략을 분석 중…"):
-                            try:
-                                import urllib.request
-                                _models = ["gemini-2.0-flash", "gemma-3-12b-it", "gemma-3-27b-it"]
-                                _payload = {"contents": [{"parts": [{"text": _ai6_prompt}]}],
-                                             "generationConfig": {"temperature": 0.7, "maxOutputTokens": 4096}}
-                                _ctx = ssl._create_unverified_context()
-                                _body = None
-                                for _model in _models:
-                                    _api_url = f"https://generativelanguage.googleapis.com/v1beta/models/{_model}:generateContent?key={_GEMINI_KEY}"
-                                    _req = urllib.request.Request(_api_url, data=json.dumps(_payload).encode("utf-8"),
-                                                                   headers={"Content-Type": "application/json"}, method="POST")
-                                    try:
-                                        with urllib.request.urlopen(_req, context=_ctx, timeout=90) as _resp:
-                                            _body = json.loads(_resp.read().decode("utf-8"))
-                                        break
-                                    except urllib.error.HTTPError as _http_err:
-                                        if _http_err.code == 429:
-                                            continue
-                                        raise
-                                if _body is None:
-                                    st.error("모든 AI 모델의 일일 한도가 소진되었습니다. 내일 다시 시도해주세요.")
-                                else:
-                                    _ai_text = _body["candidates"][0]["content"]["parts"][0]["text"].strip()
-                                    st.markdown(_ai_text)
-                            except Exception as e:
-                                st.error(f"AI 분석 중 오류: {e}")
-            st.markdown("---")
-
-        # ── ⑦ 리스크 집중 구역 도출 (계약종별 × 업무유형 × 점수) ──
-        if M.get("contract") and M.get("business"):
-            st.markdown("##### 🎯 리스크 집중 구역 (계약종별 × 업무유형)")
-            st.caption("우리 본부의 **'가장 아픈 손가락'** — 전사적 프로세스 개선이 필요한 타겟을 도출합니다.")
-
-            _risk_cross = df_f.groupby([M["contract"], M["business"]])["_점수100"].agg(
-                ["mean", "count"]).reset_index()
-            _risk_cross.columns = ["계약종", "업무유형", "평균만족도", "응답수"]
-            _risk_cross = _risk_cross[_risk_cross["응답수"] >= 3]
-            _risk_cross["평균만족도"] = _risk_cross["평균만족도"].round(1)
-
-            if len(_risk_cross) >= 2:
-                _total_risk_n = _risk_cross["응답수"].sum()
-                _risk_cross["건수비중"] = (_risk_cross["응답수"] / _total_risk_n * 100).round(1)
-                _risk_cross["전체대비"] = (_risk_cross["평균만족도"] - avg_score_100).round(1)
-                _risk_cross["리스크점수"] = (((100 - _risk_cross["평균만족도"]) / 100) * _risk_cross["건수비중"]).round(2)
-                _risk_cross["조합명"] = _risk_cross["계약종"] + " × " + _risk_cross["업무유형"]
-
-                # 트리맵
-                fig_tree = px.treemap(
-                    _risk_cross, path=["계약종", "업무유형"], values="응답수",
-                    color="평균만족도", color_continuous_scale="RdYlGn",
-                    range_color=[_risk_cross["평균만족도"].min() - 5, _risk_cross["평균만족도"].max() + 5],
-                    template=PLOTLY_TPL,
-                    title="계약종별 × 업무유형 트리맵 (면적 = 건수, 색상 = 만족도)")
-                fig_tree.update_traces(
-                    hovertemplate="<b>%{label}</b><br>응답수: %{value:,}건<br>만족도: %{color:.1f}점<extra></extra>",
-                    textinfo="label+value")
-                fig_tree.update_layout(
-                    height=520, margin=dict(t=60, b=20, l=10, r=10),
-                    title_font=dict(size=14, color=C["navy"]))
-                st.plotly_chart(fig_tree, use_container_width=True)
-
-                # TOP 5 사전케어 집중 타겟
-                _top5_risk = _risk_cross.sort_values("리스크점수", ascending=False).head(5)
-                st.markdown("**🚨 사전케어 집중 타겟 TOP 5** (리스크 점수 = 불만족도 × 건수비중)")
-                _t5_cols = st.columns(min(5, len(_top5_risk)))
-                for i, (_, tr) in enumerate(_top5_risk.iterrows()):
-                    if i < len(_t5_cols):
-                        _card_cls = "card-red" if tr["전체대비"] <= -5 else "card-blue"
-                        with _t5_cols[i]:
-                            st.markdown(
-                                f'<div class="{_card_cls}" style="min-height:170px">'
-                                f'<b style="font-size:0.95rem">#{i+1} {tr["계약종"]}<br>× {tr["업무유형"]}</b><br><br>'
-                                f'만족도: <b>{tr["평균만족도"]:.1f}점</b><br>'
-                                f'전체 대비: <b style="color:{C["red"]}">{tr["전체대비"]:+.1f}점</b><br>'
-                                f'응답: {int(tr["응답수"]):,}건 ({tr["건수비중"]:.1f}%)<br>'
-                                f'리스크: <b>{tr["리스크점수"]:.2f}</b>'
-                                f'</div>', unsafe_allow_html=True)
-
-                # 리스크 인덱스 테이블
-                with st.expander("📋 종합 리스크 인덱스 전체 보기"):
-                    _disp_risk = _risk_cross[["조합명", "응답수", "건수비중", "평균만족도", "전체대비", "리스크점수"]].copy()
-                    _disp_risk.columns = ["계약종 × 업무유형", "응답수", "건수비중(%)", "평균만족도", "전체 대비", "리스크 점수"]
-                    _disp_risk = _disp_risk.sort_values("리스크 점수", ascending=False)
-                    st.dataframe(_disp_risk.reset_index(drop=True), use_container_width=True, hide_index=True)
-
-                # ── AI 분석 버튼: 리스크 집중 구역 ──
-                if st.button("🤖 AI 리스크 타겟 심층 분석", key="ai_cross7_btn", type="primary", use_container_width=True):
-                    if not GEMINI_AVAILABLE:
-                        st.error("Gemini API 키가 설정되지 않았습니다. `.env` 파일에 `GEMINI_API_KEY`를 설정해주세요.")
-                    else:
-                        # TOP5 리스크 조합 데이터 + VOC
-                        _ai7_data = "리스크 TOP 5 조합:\n"
-                        _ai7_voc_lines = []
-                        for _, tr in _top5_risk.iterrows():
-                            _ai7_data += f"  #{int(_ + 1) if isinstance(_, int) else ''} {tr['계약종']} × {tr['업무유형']}: {tr['평균만족도']:.1f}점 ({int(tr['응답수'])}건, 전체 대비 {tr['전체대비']:+.1f}점, 리스크 {tr['리스크점수']:.2f})\n"
-                            if M.get("voc"):
-                                _risk_sub = df_f[
-                                    (df_f[M["contract"]] == tr["계약종"]) &
-                                    (df_f[M["business"]] == tr["업무유형"]) &
-                                    (df_f["_점수100"] < 70)
-                                ]
-                                _rvocs = _risk_sub[M["voc"]].dropna().astype(str).tolist()
-                                _rvocs = [v for v in _rvocs if v.strip() not in ("", "nan", "응답없음")][:5]
-                                if _rvocs:
-                                    _ai7_voc_lines.append(f"[{tr['계약종']} × {tr['업무유형']}]")
-                                    for v in _rvocs:
-                                        _ai7_voc_lines.append(f"  - {v}")
-
-                        _ai7_prompt = f"""당신은 전력산업 고객만족(CS) 전문 컨설턴트입니다.
-아래는 '계약종별 × 업무유형' 교차분석에서 도출된 리스크 TOP 5 조합입니다. 전체 평균은 {avg_score_100:.1f}점입니다.
-
-{_ai7_data}
-[리스크 조합별 불만족 VOC 원문]
-{chr(10).join(_ai7_voc_lines) if _ai7_voc_lines else '- 해당 없음'}
-
-[분석 요청]
-1. **근본 원인 진단**: 각 리스크 조합이 낮은 점수를 기록하는 근본 원인을 VOC 근거와 함께 분석하세요. 특정 지사만의 문제인지, 전사적 프로세스 문제인지 판별하세요.
-2. **사전케어 집중 타겟 전략**: TOP 5 조합 각각에 대해 구체적인 사전케어 시나리오를 설계하세요.
-   - 접수 즉시 해야 할 일 / 처리 중 주의사항 / 완료 후 팔로업 방법
-3. **프로세스 개선 제안**: 고지 방식, 응대 스크립트, 처리 절차 중 어떤 부분을 바꿔야 하는지 구체적으로 제안하세요.
-4. **우선순위 로드맵**: 리스크 점수 기준 어떤 조합부터 먼저 개선해야 효과가 큰지 순서를 매기고 근거를 제시하세요.
-
-※ 추상적 제안 금지. 반드시 계약종명·업무명·VOC 근거를 명시하세요."""
-
-                        with st.spinner("Gemini AI가 리스크 타겟을 심층 분석 중…"):
-                            try:
-                                import urllib.request
-                                _models = ["gemini-2.0-flash", "gemma-3-12b-it", "gemma-3-27b-it"]
-                                _payload = {"contents": [{"parts": [{"text": _ai7_prompt}]}],
-                                             "generationConfig": {"temperature": 0.7, "maxOutputTokens": 4096}}
-                                _ctx = ssl._create_unverified_context()
-                                _body = None
-                                for _model in _models:
-                                    _api_url = f"https://generativelanguage.googleapis.com/v1beta/models/{_model}:generateContent?key={_GEMINI_KEY}"
-                                    _req = urllib.request.Request(_api_url, data=json.dumps(_payload).encode("utf-8"),
-                                                                   headers={"Content-Type": "application/json"}, method="POST")
-                                    try:
-                                        with urllib.request.urlopen(_req, context=_ctx, timeout=90) as _resp:
-                                            _body = json.loads(_resp.read().decode("utf-8"))
-                                        break
-                                    except urllib.error.HTTPError as _http_err:
-                                        if _http_err.code == 429:
-                                            continue
-                                        raise
-                                if _body is None:
-                                    st.error("모든 AI 모델의 일일 한도가 소진되었습니다. 내일 다시 시도해주세요.")
-                                else:
-                                    _ai_text = _body["candidates"][0]["content"]["parts"][0]["text"].strip()
-                                    st.markdown(_ai_text)
-                            except Exception as e:
-                                st.error(f"AI 분석 중 오류: {e}")
-
-        st.markdown("---")
-
-        # ══════════════════════════════════════════════════════════════
-        #  ⑧ 4개 차원 통합 리스크 진단 (지사 × 계약종별 × 업무유형 × 접수채널)
-        # ══════════════════════════════════════════════════════════════
-        _has_4d = M.get("office") and M.get("contract") and M.get("business") and not _df_cross.empty
-        if _has_4d:
-            st.markdown('<p class="sec-head">🔎 4개 차원 통합 리스크 진단 — 지사 × 계약종별 × 업무유형 × 접수채널</p>', unsafe_allow_html=True)
-            st.caption("4개 축을 동시에 교차 필터링하여 **독립적 리스크 구간**을 찾아내고, 본부 점수 상승 기여도 순으로 우선순위를 산정합니다.")
-
-            _MIN_4D = 5  # 표본 신뢰도 최소 건수
-
-            # ── 4차원 그룹화 ──
-            _grp4 = _df_cross.groupby([M["office"], M["contract"], M["business"], "_채널그룹_cross"])["_점수100"].agg(
-                ["mean", "count"]).reset_index()
-            _grp4.columns = ["지사", "계약종", "업무유형", "채널", "평균만족도", "응답수"]
-            _grp4["평균만족도"] = _grp4["평균만족도"].round(1)
-
-            # 유효 리스크 구간: N >= 5 & 전체 평균 -20점 이상 급락
-            _grp4_valid = _grp4[_grp4["응답수"] >= _MIN_4D].copy()
-            _grp4_valid["전체대비"] = (_grp4_valid["평균만족도"] - avg_score_100).round(1)
-            _total_4d_n = _grp4_valid["응답수"].sum()
-            _grp4_valid["건수비중"] = (_grp4_valid["응답수"] / max(_total_4d_n, 1) * 100).round(2)
-            # 점수 상승 기여도: 이 구간을 평균까지 끌어올렸을 때 전체 평균 상승분
-            _grp4_valid["기여도"] = ((_grp4_valid["응답수"] / max(_total_4d_n, 1)) *
-                                    (avg_score_100 - _grp4_valid["평균만족도"]).clip(lower=0)).round(2)
-            _grp4_valid["조합"] = (_grp4_valid["지사"] + " · " + _grp4_valid["계약종"] + " · " +
-                                   _grp4_valid["업무유형"] + " · " + _grp4_valid["채널"])
-
-            _outliers = _grp4_valid[_grp4_valid["전체대비"] <= -20].sort_values("기여도", ascending=False)
-            _risk_all = _grp4_valid[_grp4_valid["전체대비"] < 0].sort_values("기여도", ascending=False)
-
-            # ── 메트릭 카드 ──
-            _m1, _m2, _m3 = st.columns(3)
-            _m1.metric("분석 대상 조합", f"{len(_grp4_valid):,}개", help=f"응답 {_MIN_4D}건 이상 유효 조합")
-            _m2.metric("이상치 (-20점↓)", f"{len(_outliers):,}개",
-                        delta=f"{len(_outliers)}개 독립 리스크" if len(_outliers) > 0 else "없음",
-                        delta_color="inverse")
-            _potential_gain = _risk_all["기여도"].sum()
-            _m3.metric("최대 점수 상승 여력", f"+{_potential_gain:.1f}점",
-                        help="모든 리스크 구간을 평균 수준으로 끌어올렸을 때")
-
-            # ── 트리맵: 지사 > 업무유형 (색상=만족도, 호버에 계약종·채널 상세) ──
-            # 지사×업무 단위로 집계 (트리맵 최상위 레벨)
-            _tree4 = _grp4_valid.groupby(["지사", "업무유형"]).agg(
-                평균만족도=("평균만족도", lambda x: np.average(x, weights=_grp4_valid.loc[x.index, "응답수"])),
-                응답수=("응답수", "sum"),
-                기여도=("기여도", "sum"),
-            ).reset_index()
-            _tree4["평균만족도"] = _tree4["평균만족도"].round(1)
-            _tree4["기여도"] = _tree4["기여도"].round(2)
-
-            # 호버에 계약종·채널 상세 추가
-            _hover4_map = {}
-            for _, row4 in _grp4_valid.iterrows():
-                _key4 = (row4["지사"], row4["업무유형"])
-                if _key4 not in _hover4_map:
-                    _hover4_map[_key4] = []
-                _hover4_map[_key4].append(f"{row4['계약종']}·{row4['채널']}: {row4['평균만족도']:.1f}점({int(row4['응답수'])}건)")
-
-            _tree4["상세"] = _tree4.apply(
-                lambda r: "<br>".join(_hover4_map.get((r["지사"], r["업무유형"]), ["-"])), axis=1)
-            _tree4["hover_text"] = _tree4.apply(
-                lambda r: (f"<b>{r['지사']} · {r['업무유형']}</b><br>"
-                           f"평균: {r['평균만족도']:.1f}점 | 응답: {int(r['응답수'])}건<br>"
-                           f"점수 상승 기여도: +{r['기여도']:.2f}점<br><br>"
-                           f"[계약종·채널별 상세]<br>{r['상세']}"), axis=1)
-
-            fig_tree4 = px.treemap(
-                _tree4, path=["지사", "업무유형"], values="응답수",
-                color="평균만족도", color_continuous_scale="RdYlGn",
-                range_color=[max(0, _tree4["평균만족도"].min() - 5),
-                             min(100, _tree4["평균만족도"].max() + 5)],
-                template=PLOTLY_TPL,
-                title="4차원 통합 트리맵 — 지사 × 업무유형 (면적 = 건수, 색상 = 만족도, 호버 = 계약종·채널 상세)")
-            fig_tree4.update_traces(
-                hovertemplate="%{customdata[0]}<extra></extra>",
-                customdata=_tree4[["hover_text"]].values,
-                textinfo="label+value")
-            fig_tree4.update_layout(
-                height=600, margin=dict(t=60, b=20, l=10, r=10),
-                title_font=dict(size=14, color=C["navy"]))
-            st.plotly_chart(fig_tree4, use_container_width=True)
-
-            # ── 이상치 리스트 (독립 리스크 구간) ──
-            if not _outliers.empty:
-                st.markdown(f"##### 🚨 독립 리스크 구간 — 전체 평균 대비 -20점 이상 ({len(_outliers)}건)")
-
-                # 원인 유형 분류
-                _cause_diag = []
-                for _, ol in _outliers.iterrows():
-                    # 같은 업무+계약종+채널인데 다른 지사에서도 낮은지 체크
-                    _same_biz = _grp4_valid[
-                        (_grp4_valid["업무유형"] == ol["업무유형"]) &
-                        (_grp4_valid["계약종"] == ol["계약종"]) &
-                        (_grp4_valid["채널"] == ol["채널"]) &
-                        (_grp4_valid["지사"] != ol["지사"])
-                    ]
-                    _same_biz_low = _same_biz[_same_biz["전체대비"] <= -10]
-
-                    # 같은 지사+업무인데 다른 채널에서는 괜찮은지 체크
-                    _same_ofc_ch = _grp4_valid[
-                        (_grp4_valid["지사"] == ol["지사"]) &
-                        (_grp4_valid["업무유형"] == ol["업무유형"]) &
-                        (_grp4_valid["채널"] != ol["채널"])
-                    ]
-                    _same_ofc_ch_ok = _same_ofc_ch[_same_ofc_ch["전체대비"] > -5]
-
-                    if len(_same_biz_low) >= 2:
-                        _cause = "전사 프로세스"
-                        _icon = "🔴"
-                    elif not _same_ofc_ch_ok.empty:
-                        _cause = "채널 UI/응대"
-                        _icon = "🟡"
-                    else:
-                        _cause = "지사 맞춤 코칭"
-                        _icon = "🔵"
-
-                    _cause_diag.append({
-                        "원인유형": _cause, "아이콘": _icon,
-                        "조합": ol["조합"], "지사": ol["지사"], "계약종": ol["계약종"],
-                        "업무유형": ol["업무유형"], "채널": ol["채널"],
-                        "평균만족도": ol["평균만족도"], "응답수": int(ol["응답수"]),
-                        "전체대비": ol["전체대비"], "기여도": ol["기여도"],
-                    })
-
-                _cause_df = pd.DataFrame(_cause_diag)
-
-                # 원인 유형별 카운트
-                _cc1, _cc2, _cc3 = st.columns(3)
-                _n_proc = len(_cause_df[_cause_df["원인유형"] == "전사 프로세스"])
-                _n_ch = len(_cause_df[_cause_df["원인유형"] == "채널 UI/응대"])
-                _n_ofc = len(_cause_df[_cause_df["원인유형"] == "지사 맞춤 코칭"])
-                _cc1.metric("🔴 전사 프로세스", f"{_n_proc}건", help="다수 지사에서 공통으로 낮음")
-                _cc2.metric("🟡 채널 UI/응대", f"{_n_ch}건", help="특정 채널에서만 점수 급락")
-                _cc3.metric("🔵 지사 맞춤 코칭", f"{_n_ofc}건", help="특정 지사에서만 점수 급락")
-
-                # 기여도 순 테이블
-                _disp4 = _cause_df[["아이콘", "원인유형", "지사", "계약종", "업무유형", "채널",
-                                     "평균만족도", "응답수", "전체대비", "기여도"]].copy()
-                _disp4.columns = ["", "원인 유형", "지사", "계약종", "업무유형", "채널",
-                                  "평균만족도", "응답수", "전체 대비", "점수 상승 기여도"]
-                st.dataframe(_disp4.reset_index(drop=True), use_container_width=True, hide_index=True)
-            else:
-                st.success("전체 평균 대비 -20점 이상 급락한 독립 리스크 구간이 없습니다.")
-
-            # ── 점수 상승 기여도 TOP 10 (리스크 구간 전체) ──
-            _top10_contrib = _risk_all.head(10)
-            if not _top10_contrib.empty:
-                st.markdown("##### 📋 본부 점수 상승 기여도 TOP 10")
-                st.caption("해당 구간의 만족도를 본부 평균까지 끌어올렸을 때 전체 점수 상승 효과가 큰 순서입니다.")
-                _disp_top10 = _top10_contrib[["조합", "응답수", "건수비중", "평균만족도", "전체대비", "기여도"]].copy()
-                _disp_top10.columns = ["지사·계약종·업무·채널", "응답수", "건수비중(%)", "평균만족도", "전체 대비", "점수 상승 기여도"]
-                st.dataframe(_disp_top10.reset_index(drop=True), use_container_width=True, hide_index=True)
-
-            # ── AI 통합 진단 버튼 ──
-            if st.button("🤖 AI 4차원 통합 리스크 진단", key="ai_cross8_btn", type="primary", use_container_width=True):
-                if not GEMINI_AVAILABLE:
-                    st.error("Gemini API 키가 설정되지 않았습니다. `.env` 파일에 `GEMINI_API_KEY`를 설정해주세요.")
-                else:
-                    # AI 프롬프트용 데이터 수집
-                    _ai8_outlier_txt = ""
-                    if not _outliers.empty:
-                        for _, ol in _outliers.head(10).iterrows():
-                            _ai8_outlier_txt += f"  [{ol['지사']}·{ol['계약종']}·{ol['업무유형']}·{ol['채널']}] {ol['평균만족도']:.1f}점 ({int(ol['응답수'])}건, 전체 대비 {ol['전체대비']:+.1f}, 기여도 +{ol['기여도']:.2f})\n"
-
-                    _ai8_cause_txt = ""
-                    if '_cause_df' in dir() and not _cause_df.empty:
-                        for ct in ["전사 프로세스", "채널 UI/응대", "지사 맞춤 코칭"]:
-                            _ct_rows = _cause_df[_cause_df["원인유형"] == ct]
-                            if not _ct_rows.empty:
-                                _ai8_cause_txt += f"\n[{ct}] ({len(_ct_rows)}건)\n"
-                                for _, cr in _ct_rows.head(5).iterrows():
-                                    _ai8_cause_txt += f"  {cr['지사']}·{cr['계약종']}·{cr['업무유형']}·{cr['채널']}: {cr['평균만족도']:.1f}점\n"
-
-                    _ai8_voc_lines = []
-                    if M.get("voc") and not _outliers.empty:
-                        for _, ol in _outliers.head(5).iterrows():
-                            _ol_sub = _df_cross[
-                                (_df_cross[M["office"]] == ol["지사"]) &
-                                (_df_cross[M["contract"]] == ol["계약종"]) &
-                                (_df_cross[M["business"]] == ol["업무유형"]) &
-                                (_df_cross["_채널그룹_cross"] == ol["채널"]) &
-                                (_df_cross["_점수100"] < 70)
-                            ]
-                            _ol_vocs = _ol_sub[M["voc"]].dropna().astype(str).tolist()
-                            _ol_vocs = [v for v in _ol_vocs if v.strip() not in ("", "nan", "응답없음")][:3]
-                            if _ol_vocs:
-                                _ai8_voc_lines.append(f"[{ol['지사']}·{ol['계약종']}·{ol['업무유형']}·{ol['채널']}]")
-                                for v in _ol_vocs:
-                                    _ai8_voc_lines.append(f"  - {v}")
-
-                    _ai8_prompt = f"""당신은 전력산업 고객만족(CS) 전문 컨설턴트입니다.
-아래는 [지사 × 계약종별 × 업무유형 × 접수채널] 4차원 교차분석 결과입니다. 전체 평균은 {avg_score_100:.1f}점, 분석 대상 유효 조합 {len(_grp4_valid)}개입니다.
-
-[독립 리스크 구간 (전체 평균 대비 -20점↓)]
-{_ai8_outlier_txt if _ai8_outlier_txt else '  해당 없음'}
-
-[원인 유형 분류]
-{_ai8_cause_txt if _ai8_cause_txt else '  해당 없음'}
-
-[리스크 구간 VOC 원문]
-{chr(10).join(_ai8_voc_lines) if _ai8_voc_lines else '- 해당 없음'}
-
-[최대 점수 상승 여력: +{_potential_gain:.1f}점]
-
-[분석 요청]
-1. **입체적 원인 진단**:
-   - 🔴 전사 프로세스 문제: 다수 지사에서 공통으로 낮은 조합 → 전사적 프로세스 개선안
-   - 🟡 채널 UI/응대 문제: 특정 채널에서만 낮은 조합 → 디지털/전화 응대 개선안
-   - 🔵 지사 맞춤 코칭: 특정 지사에서만 낮은 조합 → 해당 지사 코칭 시나리오
-
-2. **우선순위 로드맵**: 점수 상승 기여도가 높은 순서대로 TOP 5 구간에 대해:
-   - 즉시 조치(1주 내), 중기 개선(1개월), 장기 프로세스 혁신으로 구분
-   - 예상 점수 상승 효과를 수치로 제시
-
-3. **구체적 액션플랜**: 각 리스크 유형별로 실행 가능한 해결방안을 구체적으로 제시
-   - 상담 스크립트 수정안, 채널 전환 규칙, 지사 교육 포인트 등
-
-※ 추상적 제안 금지. 반드시 지사명·계약종·업무명·채널명·VOC 근거를 명시하세요."""
-
-                    with st.spinner("Gemini AI가 4차원 통합 리스크를 진단 중…"):
-                        try:
-                            import urllib.request
-                            _models = ["gemini-2.0-flash", "gemma-3-12b-it", "gemma-3-27b-it"]
-                            _payload = {"contents": [{"parts": [{"text": _ai8_prompt}]}],
-                                         "generationConfig": {"temperature": 0.7, "maxOutputTokens": 4096}}
-                            _ctx = ssl._create_unverified_context()
-                            _body = None
-                            for _model in _models:
-                                _api_url = f"https://generativelanguage.googleapis.com/v1beta/models/{_model}:generateContent?key={_GEMINI_KEY}"
-                                _req = urllib.request.Request(_api_url, data=json.dumps(_payload).encode("utf-8"),
-                                                               headers={"Content-Type": "application/json"}, method="POST")
-                                try:
-                                    with urllib.request.urlopen(_req, context=_ctx, timeout=90) as _resp:
-                                        _body = json.loads(_resp.read().decode("utf-8"))
-                                    break
-                                except urllib.error.HTTPError as _http_err:
-                                    if _http_err.code == 429:
-                                        continue
-                                    raise
-                            if _body is None:
-                                st.error("모든 AI 모델의 일일 한도가 소진되었습니다. 내일 다시 시도해주세요.")
-                            else:
-                                _ai_text = _body["candidates"][0]["content"]["parts"][0]["text"].strip()
-                                st.markdown(_ai_text)
-                        except Exception as e:
-                            st.error(f"AI 분석 중 오류: {e}")
-
-
-# ─────────────────────────────────────────────────────────────
 #  TAB 5  민원 조기 경보 시스템
 # ─────────────────────────────────────────────────────────────
 with tab5:
-    # ══════════════════════════════════════════════════════════════
-    #  SECTION A. 민원 조기 경보 대시보드
-    # ══════════════════════════════════════════════════════════════
-    st.markdown('<p class="sec-head">🚨 민원 조기 경보 대시보드</p>', unsafe_allow_html=True)
-
-    # ── A-1. 임계치 기반 경보 등급 산정 ──
-    _RISK_THRESHOLD = 3  # 50점 미만 N건 이상 → 경고
-    _alert_results = []  # (대상, 유형, 등급, 사유, 건수, 평균)
-    _CRITICAL_KW = {"법적", "소송", "고소", "고발", "언론", "보도", "기사", "국민신문고", "신문고",
-                     "감사원", "감사", "국회", "청와대", "검찰", "경찰", "변호사", "인권"}
-
-    if M.get("office") and M.get("score") and "_점수100" in df_f.columns:
-        # 30점 이하 + 강력 키워드 → [위험] 등급 (개별 건 단위)
-        _critical_alerts = []
-        if M.get("voc"):
-            _ultra_low = df_f[df_f["_점수100"] <= 30]
-            for _, row in _ultra_low.iterrows():
-                _voc_text = str(row.get(M["voc"], ""))
-                _found_critical = [kw for kw in _CRITICAL_KW if kw in _voc_text]
-                if _found_critical:
-                    _ofc_name = str(row.get(M["office"], "미상"))
-                    _biz_name = str(row.get(M["business"], "")) if M.get("business") else ""
-                    _score_val = row["_점수100"]
-                    _critical_alerts.append((_ofc_name, _biz_name, _found_critical, _score_val, _voc_text[:80]))
-
-        # 지사별 50점 미만 집중도 분석
-        for ofc in df_f[M["office"]].dropna().unique():
-            _ofc_df = df_f[df_f[M["office"]] == ofc]
-            _ofc_n = len(_ofc_df)
-            _ofc_low = (_ofc_df["_점수100"] < 50).sum()
-            _ofc_avg = _ofc_df["_점수100"].mean()
-
-            if _ofc_low >= _RISK_THRESHOLD:
-                _grade = "🔴 위험" if _ofc_low >= _RISK_THRESHOLD * 2 else "🟡 주의"
-                _alert_results.append((ofc, "지사", _grade,
-                    f"50점 미만 {_ofc_low}건 집중 (전체 {_ofc_n}건 중 {_ofc_low/_ofc_n*100:.0f}%)",
-                    _ofc_low, _ofc_avg))
-
-        # 업무유형별 분석
-        if M.get("business"):
-            for biz in df_f[M["business"]].dropna().unique():
-                _biz_df = df_f[df_f[M["business"]] == biz]
-                _biz_n = len(_biz_df)
-                _biz_low = (_biz_df["_점수100"] < 50).sum()
-                _biz_avg = _biz_df["_점수100"].mean()
-
-                if _biz_low >= _RISK_THRESHOLD:
-                    _grade = "🔴 위험" if _biz_low >= _RISK_THRESHOLD * 2 else "🟡 주의"
-                    _alert_results.append((biz, "업무", _grade,
-                        f"50점 미만 {_biz_low}건 집중 (전체 {_biz_n}건 중 {_biz_low/_biz_n*100:.0f}%)",
-                        _biz_low, _biz_avg))
-
-        # 영향력(가중치) 기준 정렬: 건수비중 × 점수갭
-        _total_n = len(df_f)
-        for i, r in enumerate(_alert_results):
-            _weight = (r[4] / max(_total_n, 1)) * abs(r[5] - df_f["_점수100"].mean())
-            _alert_results[i] = (*r, round(_weight, 2))
-        _alert_results.sort(key=lambda x: -x[6])  # 가중치 높은 순
-
-    # ── A-2. 부정 키워드 밀집도 분석 ──
-    _HIGHRISK_KW = {"고지서", "오류", "단전", "강제", "폭탄", "누전", "정전", "화재", "위험",
-                     "사고", "감전", "합선", "과금", "착오", "잘못", "엉터리", "횡포",
-                     "고지서오류", "강제단전", "폭탄요금"}
-    _kw_alerts = []
-    if M.get("voc") and M.get("office"):
-        for ofc in df_f[M["office"]].dropna().unique():
-            _ofc_vocs = df_f.loc[df_f[M["office"]] == ofc, M["voc"]].dropna().astype(str)
-            _ofc_text = " ".join(_ofc_vocs.tolist())
-            _found_kw = [kw for kw in _HIGHRISK_KW if kw in _ofc_text]
-            if len(_found_kw) >= 2:
-                _kw_alerts.append((ofc, _found_kw, len(_found_kw)))
-
-    # ── A-3. 경보 대시보드 렌더링 ──
-    _critical_cnt = len(_critical_alerts) if '_critical_alerts' in dir() else 0
-    _danger_cnt = sum(1 for r in _alert_results if "위험" in r[2])
-    _warn_cnt = sum(1 for r in _alert_results if "주의" in r[2])
-
-    # 종합 경보 등급
-    if _critical_cnt > 0 or _danger_cnt > 0:
-        _overall_grade = "🔴 위험"
-        _overall_color = C["red"]
-        _overall_msg = "즉각 대응이 필요한 위험 징후가 감지되었습니다. 30점 이하 강력 키워드 포함 건이 존재합니다." if _critical_cnt else "즉각 대응이 필요한 위험 징후가 감지되었습니다."
-    elif _warn_cnt > 0 or len(_kw_alerts) >= 1:
-        _overall_grade = "🟡 주의"
-        _overall_color = C["orange"]
-        _overall_msg = "주의가 필요한 경고 징후가 감지되었습니다."
-    else:
-        _overall_grade = "🟢 안전"
-        _overall_color = C["green"]
-        _overall_msg = "현재 특이 징후가 감지되지 않았습니다."
-
-    _g1, _g2, _g3, _g4 = st.columns(4)
-    with _g1:
-        st.markdown(f'<div style="background:{_overall_color};color:white;padding:18px;border-radius:10px;text-align:center">'
-                    f'<div style="font-size:28px;font-weight:bold">{_overall_grade}</div>'
-                    f'<div style="font-size:12px;margin-top:4px">종합 경보 등급</div></div>', unsafe_allow_html=True)
-    with _g2:
-        st.metric("🔴 위험 (30점↓+강력KW)", f"{_critical_cnt}건")
-    with _g3:
-        st.metric("🟠 임계치 초과", f"{_danger_cnt + _warn_cnt}건")
-    with _g4:
-        st.metric("⚠️ 키워드 밀집", f"{len(_kw_alerts)}건")
-
-    st.caption(_overall_msg)
-
-    # ── 30점 이하 + 강력 키워드 [위험] 건 ──
-    if _critical_cnt > 0:
-        st.markdown("---")
-        st.markdown("##### 🚨 [위험] 30점 이하 + 강력 키워드 감지 건")
-        for _ofc, _biz, _ckws, _sc, _vtxt in _critical_alerts:
-            _biz_str = f" · {_biz}" if _biz else ""
-            st.error(f"**{_ofc}{_biz_str}** | {_sc:.0f}점 | 감지 키워드: `{', '.join(_ckws)}`\n\n> \"{_vtxt}…\"")
-
-    # ── 임계치 기반 경보 테이블 (가중치 순) ──
-    if _alert_results:
-        st.markdown("---")
-        st.markdown("##### 📋 임계치 기반 경보 목록 (영향력 가중치 순)")
-        _alert_df = pd.DataFrame(_alert_results, columns=["대상", "유형", "등급", "사유", "불만족건수", "평균점수", "영향력가중치"])
-        _alert_df["평균점수"] = _alert_df["평균점수"].round(1)
-        st.dataframe(_alert_df[["등급", "유형", "대상", "사유", "불만족건수", "평균점수", "영향력가중치"]],
-                     use_container_width=True, hide_index=True)
-
-    # 키워드 밀집도 경보
-    if _kw_alerts:
-        st.markdown("---")
-        st.markdown("##### 🔍 부정 키워드 밀집도 경보")
-        st.markdown('<div class="card-red"><b>📌 고위험 키워드</b> (고지서 오류, 강제 단전, 폭탄 요금, 누전, 정전 등) 가 '
-                    '특정 지사에 집중 출현할 경우 리스크 등급을 격상합니다.</div>', unsafe_allow_html=True)
-        for ofc, kws, cnt in sorted(_kw_alerts, key=lambda x: -x[2]):
-            _grade_kw = "🔴 위험" if cnt >= 4 else "🟡 경고"
-            st.warning(f"{_grade_kw} **{ofc}** — 고위험 키워드 {cnt}종 감지: `{', '.join(kws)}`")
-
-    # 골든타임 카운터
-    if M.get("score") and "_점수100" in df_f.columns:
-        st.markdown("---")
-        st.markdown("##### ⏱ 사전케어 골든타임 관리")
-        _low_total = (df_f["_점수100"] < 50).sum()
-        _col_gt1, _col_gt2, _col_gt3 = st.columns(3)
-        with _col_gt1:
-            st.metric("📌 50점 미만 총 건수", f"{_low_total}건")
-        with _col_gt2:
-            st.metric("⏰ 골든타임 기준", "72시간 이내")
-        with _col_gt3:
-            st.metric("🎯 목표 해피콜 완료율", "100%")
-        st.markdown(
-            '<div class="card-blue">'
-            '<b>⏱ 골든타임 프로토콜</b><br>'
-            '불만족 응답 감지 → <b>24시간 이내</b> 최초 해피콜/조치 착수 → <b>72시간 이내</b> 처리 완료<br>'
-            '24시간 초과 시 팀장에게 자동 에스컬레이션 · 72시간 초과 시 지사장 직접 관리 전환</div>',
-            unsafe_allow_html=True)
-
-        # 지사별 50점 미만 건수 현황 (해피콜 대상)
-        if M.get("office"):
-            _gt_ofc = df_f[df_f["_점수100"] < 50].groupby(M["office"]).size().reset_index(name="해피콜 대상")
-            _gt_ofc = _sort_df_by_office(_gt_ofc, M["office"])
-            _gt_ofc.columns = ["지사", "해피콜 대상(건)"]
-            st.dataframe(_gt_ofc.reset_index(drop=True), use_container_width=True, hide_index=True)
-
-    st.markdown("---")
-
-    # ══════════════════════════════════════════════════════════════
     #  SECTION B. 잠재 민원고객 사전케어 리스트
     # ══════════════════════════════════════════════════════════════
     st.markdown('<p class="sec-head">📋 잠재적 민원고객 사전케어 리스트 (AI 자동 추출)</p>', unsafe_allow_html=True)
@@ -3000,160 +2181,793 @@ with tab5:
         st.info("업무유형 컬럼과 점수 컬럼이 필요합니다.")
 
 
+
 # ─────────────────────────────────────────────────────────────
-#  TAB 9  지사 심층 분석 · 패턴 탐지
+#  TAB SOL  지사별 정밀 진단 · AI 심층 분석 (3-Level UX)
 # ─────────────────────────────────────────────────────────────
-with tab9:
-    if not M["office"] or not M["score"]:
-        st.warning("지사 컬럼과 만족도 점수 컬럼이 필요합니다.")
+with tab_sol:
+
+    # ══════════════════════════════════════════════════════════
+    # LEVEL 1 — 본부 전체 조망 (Discovery)
+    # ══════════════════════════════════════════════════════════
+    st.markdown('<p class="sec-head">🔭 본부 전체 CS 현황 — 지사별 정밀 진단 엔진</p>', unsafe_allow_html=True)
+
+    if df_f.empty or avg_score_100 is None:
+        st.info("데이터를 먼저 업로드하세요.")
     else:
-        # ── 9-1. 지사별 강점/약점 자동 추출 ──
-        if individual_scores:
-            st.markdown('<p class="sec-head">💪 지사별 강점 · 약점 항목</p>', unsafe_allow_html=True)
-            st.markdown(
-                '<div class="card-blue"><b>📌 분석 방법</b> — 각 지사의 개별항목 점수를 전체 평균과 비교하여 '
-                '가장 잘하는 항목(강점)과 가장 부족한 항목(약점)을 자동 추출합니다.</div>',
-                unsafe_allow_html=True)
+        # ── KPI 상태 바 ────────────────────────────────────────
+        _sol_risk_cnt = 0
+        if M.get("business"):
+            _sol_biz_avg  = df_f.groupby(M["business"])["_점수100"].mean()
+            _sol_risk_cnt = int((_sol_biz_avg < avg_score_100).sum())
 
-            overall_means = df_f[individual_scores].mean()
-            office_detail = df_f.groupby(M["office"])[individual_scores].mean()
-            office_detail = office_detail.reindex(_sort_offices(office_detail.index.tolist()))
+        _kpi_html = (
+            '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:18px;">'
+            '<div style="background:#1a237e;color:white;border-radius:10px;padding:14px;text-align:center;">'
+            '<div style="font-size:0.78em;opacity:.8">본부 평균 만족도</div>'
+            f'<div style="font-size:2em;font-weight:900">{avg_score_100:.1f}<span style="font-size:.45em">점</span></div>'
+            '</div>'
+            '<div style="background:#1565c0;color:white;border-radius:10px;padding:14px;text-align:center;">'
+            '<div style="font-size:0.78em;opacity:.8">전체 응답 건수</div>'
+            f'<div style="font-size:2em;font-weight:900">{len(df_f):,}<span style="font-size:.45em">건</span></div>'
+            '</div>'
+            '<div style="background:#b71c1c;color:white;border-radius:10px;padding:14px;text-align:center;">'
+            '<div style="font-size:0.78em;opacity:.8">평균 이하 업무 수</div>'
+            f'<div style="font-size:2em;font-weight:900">{_sol_risk_cnt}<span style="font-size:.45em">건</span></div>'
+            '</div></div>'
+        )
+        st.markdown(_kpi_html, unsafe_allow_html=True)
 
-            # 지사별 강점/약점 카드
-            _ofc_means = df_f.groupby(M["office"])["_점수100"].mean()
-            offices_sorted = _ofc_means.reindex(_sort_offices(_ofc_means.index.tolist()))
-            card_cols = st.columns(min(3, len(offices_sorted)))
+        # ── 트리맵: 계약종별 × 업무유형 ───────────────────────
+        if M.get("contract") and M.get("business"):
+            st.markdown("##### 🗺️ 계약종별 × 업무유형 리스크 맵 (면적 = 건수, 색상 = 만족도)")
+            st.caption("면적이 크고 붉은 영역이 본부 점수를 갉아먹는 **최우선 개선 타겟**입니다.")
+            _tm_df = df_f.groupby([M["contract"], M["business"]])["_점수100"].agg(
+                ["mean", "count"]).reset_index()
+            _tm_df.columns = ["계약종", "업무유형", "평균만족도", "응답수"]
+            _tm_df = _tm_df[_tm_df["응답수"] >= 3].dropna(subset=["평균만족도"])
+            if not _tm_df.empty:
+                # 부모(계약종) 가중평균 집계 — 직접 계산해 NaN 방지
+                _tm_df["_wgt"] = _tm_df["평균만족도"] * _tm_df["응답수"]
+                _tm_par = _tm_df.groupby("계약종").agg(
+                    _wgt_sum=("_wgt", "sum"), 응답수=("응답수", "sum")).reset_index()
+                _tm_par["평균만족도"] = _tm_par["_wgt_sum"] / _tm_par["응답수"]
+                # 계층 조립 (go.Treemap: ids / labels / parents 명시)
+                _tm_ids     = _tm_par["계약종"].tolist() + \
+                              (_tm_df["계약종"] + "/" + _tm_df["업무유형"]).tolist()
+                _tm_labels  = _tm_par["계약종"].tolist() + _tm_df["업무유형"].tolist()
+                _tm_parents = [""] * len(_tm_par) + _tm_df["계약종"].tolist()
+                _tm_values  = _tm_par["응답수"].tolist() + _tm_df["응답수"].tolist()
+                _tm_colors  = _tm_par["평균만족도"].tolist() + _tm_df["평균만족도"].tolist()
+                _tm_min = min(_tm_colors)
+                _tm_max = max(_tm_colors)
+                fig_tm = go.Figure(go.Treemap(
+                    ids=_tm_ids, labels=_tm_labels,
+                    parents=_tm_parents, values=_tm_values,
+                    customdata=[[round(c, 1), v] for c, v in zip(_tm_colors, _tm_values)],
+                    marker=dict(
+                        colors=_tm_colors,
+                        colorscale="RdYlGn",
+                        cmin=max(60, _tm_min - 2),
+                        cmax=min(100, _tm_max + 2),
+                        colorbar=dict(title="만족도", len=0.6),
+                        showscale=True,
+                    ),
+                    texttemplate="<b>%{label}</b><br>%{customdata[0]:.1f}점<br>%{customdata[1]}건",
+                    hovertemplate="%{label}<br>평균: %{customdata[0]:.1f}점<br>건수: %{customdata[1]}건<extra></extra>",
+                    branchvalues="total",
+                ))
+                fig_tm.update_layout(template=PLOTLY_TPL, height=440,
+                                     margin=dict(t=10, b=10, l=10, r=10))
+                st.plotly_chart(fig_tm, use_container_width=True)
 
-            for i, (ofc, _) in enumerate(offices_sorted.items()):
-                if ofc not in office_detail.index:
-                    continue
-                row = office_detail.loc[ofc]
-                diff = row - overall_means
-                strength = diff.idxmax()
-                weakness = diff.idxmin()
-                ofc_avg = df_f[df_f[M["office"]] == ofc]["_점수100"].mean()
+        st.markdown("---")
 
-                card_class = "card-red" if ofc_avg < avg_score_100 - 3 else "card-teal" if ofc_avg >= avg_score_100 else "card"
-                with card_cols[i % len(card_cols)]:
-                    st.markdown(
-                        f'<div class="{card_class}">'
-                        f'<b>🏢 {ofc}</b> (종합 {ofc_avg:.1f}점)<br><br>'
-                        f'💪 강점: <b>{strength}</b> (평균 대비 <span style="color:{C["green"]}">{diff[strength]:+.1f}</span>)<br>'
-                        f'⚠️ 약점: <b>{weakness}</b> (평균 대비 <span style="color:{C["red"]}">{diff[weakness]:+.1f}</span>)'
-                        f'</div>', unsafe_allow_html=True)
+        # ── 지사 선택 ────────────────────────────────────────
+        _sol_offices = _sort_offices(df_f[M["office"]].dropna().unique().tolist()) if M.get("office") else []
+        if not _sol_offices:
+            st.info("지사 컬럼이 필요합니다.")
+            st.stop()
 
-            st.markdown("---")
+        st.markdown("#### 🏢 분석할 지사를 선택하세요")
+        _sel_off = st.selectbox("", _sol_offices, key="sol_office_sel", label_visibility="collapsed")
+        _df_sel  = df_f[df_f[M["office"]] == _sel_off].copy()
 
-            # ── 지사 간 격차가 큰 항목 ──
-            st.markdown('<p class="sec-head">📊 지사 간 격차가 큰 항목 (편차 Top 5)</p>', unsafe_allow_html=True)
-            office_std = office_detail.std().sort_values(ascending=False)
-            gap_items = office_std.head(5)
-            gap_df = pd.DataFrame({
-                "항목": gap_items.index,
-                "지사간 표준편차": gap_items.values.round(2),
-                "최고 지사": [office_detail[item].idxmax() for item in gap_items.index],
-                "최고 점수": [office_detail[item].max().round(1) for item in gap_items.index],
-                "최저 지사": [office_detail[item].idxmin() for item in gap_items.index],
-                "최저 점수": [office_detail[item].min().round(1) for item in gap_items.index],
-            })
-            gap_df["격차"] = gap_df["최고 점수"] - gap_df["최저 점수"]
+        if _df_sel.empty:
+            st.warning(f"{_sel_off}의 데이터가 없습니다.")
+            st.stop()
 
-            fig_gap = px.bar(gap_df, x="항목", y="격차", text="격차",
-                             color_discrete_sequence=[C["gold"]], template=PLOTLY_TPL,
-                             title="지사 간 격차가 큰 항목 (최고-최저 점수 차이)")
-            fig_gap.update_traces(texttemplate="%{text:.1f}", textposition="outside",
-                                  hovertemplate="%{x}<br>격차: %{y:.1f}점<extra></extra>")
-            fig_gap.update_layout(height=380, margin=dict(t=60, b=60, l=60, r=20),
-                                   yaxis_title="점수 격차", title_font=dict(size=14, color=C["navy"]))
-            st.plotly_chart(fig_gap, use_container_width=True)
+        # ══════════════════════════════════════════════════════
+        # LEVEL 2 — 지사별 정밀 진단 (Diagnosis)
+        # ══════════════════════════════════════════════════════
 
-            with st.expander("📋 지사 간 격차 상세 데이터"):
-                st.dataframe(gap_df, use_container_width=True, hide_index=True)
+        # ── 피어 그룹 ──────────────────────────────────────────
+        _off_counts = df_f.groupby(M["office"])["_점수100"].count().sort_values()
+        _n_off = len(_off_counts)
+        _t1 = _off_counts.iloc[_n_off // 3] if _n_off >= 3 else 0
+        _t2 = _off_counts.iloc[2 * _n_off // 3] if _n_off >= 3 else float("inf")
+        _my_cnt = int(_off_counts.get(_sel_off, 0))
+        if _my_cnt <= _t1:
+            _peer_label, _peer_tier = "소규모", 0
+        elif _my_cnt <= _t2:
+            _peer_label, _peer_tier = "중규모", 1
+        else:
+            _peer_label, _peer_tier = "대규모", 2
+        _peer_offs = [o for o in _off_counts.index
+                      if (_off_counts[o] <= _t1 if _peer_tier == 0
+                          else _off_counts[o] <= _t2 if _peer_tier == 1
+                          else _off_counts[o] > _t2)]
+        _peer_avg = df_f[df_f[M["office"]].isin(_peer_offs)]["_점수100"].mean()
 
-            # 인사이트
-            top_gap = gap_df.iloc[0]
-            st.markdown(
-                f'<div class="insight-box">📊 <b>격차 인사이트:</b> '
-                f'<b>{top_gap["항목"]}</b> 항목에서 지사 간 격차가 가장 큽니다. '
-                f'{top_gap["최고 지사"]}({top_gap["최고 점수"]}점) vs '
-                f'{top_gap["최저 지사"]}({top_gap["최저 점수"]}점), '
-                f'격차 <b>{top_gap["격차"]:.1f}점</b> — 하위 지사 대상 집중 교육이 필요합니다.</div>',
-                unsafe_allow_html=True)
+        # ── 기본 지표 ─────────────────────────────────────────
+        _sel_avg    = _df_sel["_점수100"].mean()
+        _sel_cnt    = len(_df_sel)
+        _sel_gap    = _sel_avg - avg_score_100
+        _all_avgs   = df_f.groupby(M["office"])["_점수100"].mean().sort_values(ascending=False)
+        _rank       = int(list(_all_avgs.index).index(_sel_off)) + 1 if _sel_off in _all_avgs.index else "-"
+        _total_offs = len(_all_avgs)
+        _peer_avgs_s = (df_f[df_f[M["office"]].isin(_peer_offs)]
+                        .groupby(M["office"])["_점수100"].mean().sort_values(ascending=False))
+        _peer_rank   = int(list(_peer_avgs_s.index).index(_sel_off)) + 1 if _sel_off in _peer_avgs_s.index else "-"
+        _reliability = "✅ 높음" if _sel_cnt >= 50 else "🟡 보통" if _sel_cnt >= 20 else "⚠️ 낮음"
 
-            st.markdown("---")
+        # ── 핵심 진단 ─────────────────────────────────────────
+        if M.get("business"):
+            _biz_sel  = _df_sel.groupby(M["business"])["_점수100"].agg(["mean", "count"]).reset_index()
+            _biz_sel.columns = ["업무유형", "평균만족도", "건수"]
+            _biz_sel["전체대비"] = (_biz_sel["평균만족도"] - avg_score_100).round(1)
+            _biz_worst = _biz_sel.sort_values("전체대비").iloc[0] if not _biz_sel.empty else None
+            if _biz_worst is not None and _biz_worst["전체대비"] < -3:
+                _diag = (f"전반적으로 {'우수' if _sel_gap >= 0 else '개선 필요'}하나, "
+                         f"'{_biz_worst['업무유형']}' 업무가 본부 평균보다 {abs(_biz_worst['전체대비']):.1f}점 낮아 집중 개선 필요.")
+            elif _sel_gap >= 0:
+                _diag = f"본부 평균을 {_sel_gap:.1f}점 상회하는 우수 지사입니다."
+            else:
+                _diag = f"전반적 만족도가 본부 평균을 {abs(_sel_gap):.1f}점 하회합니다. 전방위 개선이 필요합니다."
+        else:
+            _diag = f"본부 평균 {'상회' if _sel_gap >= 0 else '하회'}({_sel_gap:+.1f}점)."
 
-        # ── 9-2. 교차 패턴 탐지 (업무×채널 급락 조합) ──
-        if M["business"] and M["channel"]:
-            st.markdown('<p class="sec-head">🔍 업무 × 채널 교차 패턴 탐지</p>', unsafe_allow_html=True)
-            st.markdown(
-                '<div class="card-gold"><b>📌 분석 방법</b> — 업무와 채널의 모든 조합에서 '
-                '평균 만족도가 전체 평균 대비 크게 낮은 조합을 자동 탐지합니다.</div>',
-                unsafe_allow_html=True)
+        # ── 헤더 카드 ─────────────────────────────────────────
+        _gap_color = "#80cbc4" if _sel_gap >= 0 else "#ef9a9a"
+        st.markdown(
+            '<div style="background:linear-gradient(135deg,#1a237e 0%,#283593 60%,#1565c0 100%);'
+            'border-radius:12px;padding:20px 24px;color:white;margin-bottom:20px;">'
+            f'<div style="font-size:1.25em;font-weight:800;margin-bottom:14px;">📍 {_sel_off} · 종합 컨디션 리포트</div>'
+            '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:14px;">'
+            '<div style="background:rgba(255,255,255,0.13);border-radius:8px;padding:12px;text-align:center;">'
+            '<div style="font-size:0.72em;opacity:0.8;margin-bottom:4px;">종합 만족도</div>'
+            f'<div style="font-size:1.9em;font-weight:900;">{_sel_avg:.1f}<span style="font-size:0.45em;">점</span></div>'
+            f'<div style="font-size:0.78em;color:{_gap_color};">{_sel_gap:+.1f}점 (본부 {avg_score_100:.1f})</div>'
+            '</div>'
+            '<div style="background:rgba(255,255,255,0.13);border-radius:8px;padding:12px;text-align:center;">'
+            '<div style="font-size:0.72em;opacity:0.8;margin-bottom:4px;">본부 랭킹</div>'
+            f'<div style="font-size:1.9em;font-weight:900;">{_rank}<span style="font-size:0.45em;">위</span></div>'
+            f'<div style="font-size:0.78em;opacity:0.75;">/ {_total_offs}개 지사</div>'
+            '</div>'
+            '<div style="background:rgba(255,255,255,0.13);border-radius:8px;padding:12px;text-align:center;">'
+            f'<div style="font-size:0.72em;opacity:0.8;margin-bottom:4px;">{_peer_label} 그룹 랭킹</div>'
+            f'<div style="font-size:1.9em;font-weight:900;">{_peer_rank}<span style="font-size:0.45em;">위</span></div>'
+            f'<div style="font-size:0.78em;opacity:0.75;">/ {len(_peer_offs)}개 · 피어평균 {_peer_avg:.1f}점</div>'
+            '</div>'
+            '<div style="background:rgba(255,255,255,0.13);border-radius:8px;padding:12px;text-align:center;">'
+            '<div style="font-size:0.72em;opacity:0.8;margin-bottom:4px;">데이터 신뢰도</div>'
+            f'<div style="font-size:1.2em;font-weight:700;margin:4px 0;">{_reliability}</div>'
+            f'<div style="font-size:0.78em;opacity:0.75;">응답 {_sel_cnt:,}건</div>'
+            '</div></div>'
+            '<div style="background:rgba(255,255,255,0.1);border-radius:8px;padding:10px 14px;'
+            'font-size:0.9em;border-left:4px solid #80cbc4;">'
+            f'💡 핵심 진단: "{_diag}"'
+            '</div></div>',
+            unsafe_allow_html=True)
 
-            df_f["_채널그룹_pat"] = df_f[M["channel"]].apply(_group_channel)
-            cross_pat = df_f[df_f["_채널그룹_pat"].notna()].groupby(
-                [M["business"], "_채널그룹_pat"])["_점수100"].agg(["mean","count"]).reset_index()
-            cross_pat.columns = ["업무", "채널", "평균만족도", "응답수"]
-            cross_pat = cross_pat[cross_pat["응답수"] >= 5]  # 최소 5건 이상
+        # ── 업무별 강점/약점 레이더 + 페르소나 미스매치 ──────────
+        if M.get("business"):
+            _sol_mid_l, _sol_mid_r = st.columns([1, 1])
 
-            if not cross_pat.empty:
-                cross_pat["전체대비"] = cross_pat["평균만족도"] - avg_score_100
-                danger = cross_pat[cross_pat["전체대비"] <= -5].sort_values("전체대비")
+            # ── 좌측: 레이더 차트 ──────────────────────────────
+            with _sol_mid_l:
+                st.markdown("##### 🎯 업무별 강점 / 약점 — 본부 평균과 비교")
+                _biz_sel_avg = _df_sel.groupby(M["business"])["_점수100"].mean()
+                _biz_all_avg = df_f.groupby(M["business"])["_점수100"].mean()
+                _radar_cats = sorted(set(_biz_sel_avg.index) & set(_biz_all_avg.index))
+                if len(_radar_cats) >= 3:
+                    _r_sel = [round(_biz_sel_avg.get(c, 0), 1) for c in _radar_cats]
+                    _r_all = [round(_biz_all_avg.get(c, 0), 1) for c in _radar_cats]
+                    fig_radar = go.Figure()
+                    fig_radar.add_trace(go.Scatterpolar(
+                        r=_r_sel + [_r_sel[0]], theta=_radar_cats + [_radar_cats[0]],
+                        fill="toself", fillcolor="rgba(255,215,0,0.15)",
+                        line=dict(color="#FFD700", width=2.5),
+                        name=_sel_off,
+                        hovertemplate="%{theta}: %{r:.1f}점<extra></extra>"))
+                    fig_radar.add_trace(go.Scatterpolar(
+                        r=_r_all + [_r_all[0]], theta=_radar_cats + [_radar_cats[0]],
+                        fill="toself", fillcolor="rgba(144,164,174,0.08)",
+                        line=dict(color="#90a4ae", width=1.5, dash="dash"),
+                        name="본부 평균",
+                        hovertemplate="%{theta}: %{r:.1f}점<extra></extra>"))
+                    fig_radar.update_layout(
+                        polar=dict(radialaxis=dict(range=[60, 105], dtick=10, showticklabels=True, tickfont_size=9)),
+                        template=PLOTLY_TPL, height=340,
+                        margin=dict(t=30, b=30, l=60, r=60),
+                        legend=dict(orientation="h", yanchor="bottom", y=-0.15),
+                        showlegend=True)
+                    st.plotly_chart(fig_radar, use_container_width=True)
 
-                # 히트맵
-                pivot_pat = cross_pat.pivot_table(values="평균만족도", index="업무",
-                                                  columns="채널", aggfunc="mean").round(1)
-                fig_pat = px.imshow(pivot_pat, color_continuous_scale="RdYlGn",
-                                    text_auto=".1f", aspect="auto", template=PLOTLY_TPL,
-                                    title="업무 × 채널 평균 만족도 (빨강=낮음)")
-                fig_pat.update_traces(hovertemplate="업무: %{y}<br>채널: %{x}<br>점수: %{z:.1f}점<extra></extra>")
-                fig_pat.update_layout(
-                    height=max(350, len(pivot_pat) * 35 + 100),
-                    margin=dict(t=60, b=60, l=120, r=60),
-                    title_font=dict(size=14, color=C["navy"]))
-                st.plotly_chart(fig_pat, use_container_width=True)
-
-                if len(danger) > 0:
-                    st.markdown(
-                        f'<p class="sec-head">🚨 급락 조합 (전체 평균 대비 -5점 이상)</p>',
-                        unsafe_allow_html=True)
-                    for _, row in danger.head(5).iterrows():
-                        st.markdown(
-                            f'<div class="card-red">'
-                            f'🔴 <b>[{row["업무"]}] × [{row["채널"]}]</b> — '
-                            f'평균 {row["평균만족도"]:.1f}점 '
-                            f'(전체 대비 <b>{row["전체대비"]:+.1f}점</b>, 응답 {row["응답수"]:,}건)'
-                            f'</div>', unsafe_allow_html=True)
+                    # 강점/약점 TOP 3
+                    _biz_gap = pd.DataFrame({
+                        "업무": _radar_cats,
+                        "지사": _r_sel[:len(_radar_cats)],
+                        "본부": _r_all[:len(_radar_cats)]})
+                    _biz_gap["편차"] = _biz_gap["지사"] - _biz_gap["본부"]
+                    _strengths = _biz_gap.sort_values("편차", ascending=False).head(3)
+                    _weaknesses = _biz_gap.sort_values("편차").head(3)
+                    _sw_l, _sw_r = st.columns(2)
+                    with _sw_l:
+                        _s_html = '<div style="background:#e8f5e9;border-radius:8px;padding:10px 14px;font-size:0.88em;"><b>💪 강점 TOP 3</b><br>'
+                        for _, r in _strengths.iterrows():
+                            _s_html += f'🟢 {r["업무"]} — {r["지사"]:.1f}점 (본부 대비 <b>{r["편차"]:+.1f}</b>점)<br>'
+                        st.markdown(_s_html + '</div>', unsafe_allow_html=True)
+                    with _sw_r:
+                        _w_html = '<div style="background:#ffebee;border-radius:8px;padding:10px 14px;font-size:0.88em;"><b>🩹 약점 TOP 3</b><br>'
+                        for _, r in _weaknesses.iterrows():
+                            _w_html += f'🔴 {r["업무"]} — {r["지사"]:.1f}점 (본부 대비 <b style="color:#c62828">{r["편차"]:+.1f}</b>점)<br>'
+                        st.markdown(_w_html + '</div>', unsafe_allow_html=True)
                 else:
-                    st.success("전체 평균 대비 -5점 이상 급락한 조합이 없습니다.")
-            st.markdown("---")
+                    st.info("업무유형이 3개 이상이어야 레이더 차트를 그릴 수 있습니다.")
 
-        # ── 9-3. 범주별 개별항목 평균 히트맵 (다차원 교차분석에서 이동) ──
-        if individual_scores and available_cats:
-            st.markdown("---")
-            st.markdown('<p class="sec-head">🌡️ 범주별 개별항목 평균 히트맵</p>', unsafe_allow_html=True)
-            cat_sel_hm = st.selectbox("히트맵 기준 범주 선택", available_cats, key="hm_cat_sel_tab9")
-            pivot_cross = df_f.pivot_table(
-                values=individual_scores, index=cat_sel_hm, aggfunc="mean"
-            ).round(1)
-            if cat_sel_hm == M.get("office"):
-                pivot_cross = pivot_cross.reindex(_sort_offices(pivot_cross.index.tolist()))
-            if not pivot_cross.empty:
-                fig_hm_cross = px.imshow(
-                    pivot_cross, color_continuous_scale="RdYlGn",
-                    text_auto=".1f", aspect="auto", template=PLOTLY_TPL,
-                    labels=dict(x="항목", y="범주", color="점수"),
-                    title=f"{cat_sel_hm}별 개별항목 평균 점수 (초록=높음 / 빨강=낮음)",
-                )
-                fig_hm_cross.update_traces(hovertemplate="%{y}<br>%{x}<br>점수: %{z:.1f}점<extra></extra>")
-                fig_hm_cross.update_layout(
-                    height=max(350, len(pivot_cross) * 30 + 100),
-                    margin=dict(t=60, b=60, l=120, r=60),
-                    title_font=dict(size=14, color=C["navy"]),
-                )
-                st.plotly_chart(fig_hm_cross, use_container_width=True)
+            # ── 우측: 페르소나별 미스매치 매트릭스 ──────────────
+            with _sol_mid_r:
+                _ct_col = M.get("contract")
+                if _ct_col and _ct_col in _df_sel.columns:
+                    st.markdown("##### 🎯 고객군별 미스매치 — 건수 비중 × 만족도")
+                    _pm_grp = _df_sel.groupby(_ct_col)["_점수100"].agg(["mean", "count"]).reset_index()
+                    _pm_grp.columns = ["고객군", "만족도", "건수"]
+                    _pm_grp = _pm_grp[_pm_grp["건수"] >= 2]
+                    _pm_total = _pm_grp["건수"].sum()
+                    _pm_grp["비중(%)"] = (_pm_grp["건수"] / max(_pm_total, 1) * 100).round(1)
+                    if not _pm_grp.empty:
+                        _pm_x_mid = _pm_grp["비중(%)"].mean()
+                        _pm_y_mid = avg_score_100
+                        fig_pm = go.Figure()
+                        fig_pm.add_trace(go.Scatter(
+                            x=_pm_grp["비중(%)"], y=_pm_grp["만족도"],
+                            mode="markers+text",
+                            marker=dict(
+                                size=(_pm_grp["건수"] / max(_pm_grp["건수"].max(), 1) * 40 + 12).tolist(),
+                                color=_pm_grp["만족도"].tolist(),
+                                colorscale="RdYlGn", cmin=max(60, _pm_grp["만족도"].min() - 3),
+                                cmax=min(100, _pm_grp["만족도"].max() + 3),
+                                showscale=True, colorbar=dict(title="만족도", len=0.6),
+                                line=dict(width=1, color="white")),
+                            text=_pm_grp["고객군"],
+                            textposition="top center", textfont_size=10,
+                            customdata=list(zip(_pm_grp["만족도"].round(1), _pm_grp["건수"], _pm_grp["비중(%)"])),
+                            hovertemplate="%{text}<br>만족도: %{customdata[0]:.1f}점<br>건수: %{customdata[1]}건<br>비중: %{customdata[2]:.1f}%<extra></extra>"))
+                        fig_pm.add_vline(x=_pm_x_mid, line_dash="dash", line_color="#bdbdbd", line_width=1)
+                        fig_pm.add_hline(y=_pm_y_mid, line_dash="dash", line_color="#bdbdbd", line_width=1)
+                        # 사분면 라벨
+                        _pm_x_range = [0, max(_pm_grp["비중(%)"].max() * 1.3, _pm_x_mid * 2)]
+                        _pm_y_range = [max(55, _pm_grp["만족도"].min() - 5), min(105, _pm_grp["만족도"].max() + 5)]
+                        fig_pm.add_annotation(x=_pm_x_range[1] * 0.85, y=_pm_y_range[0] + 2,
+                                              text="⚠️ 1순위 개선", showarrow=False,
+                                              font=dict(size=10, color="#c62828"))
+                        fig_pm.add_annotation(x=1, y=_pm_y_range[0] + 2,
+                                              text="🔍 특이 리스크", showarrow=False,
+                                              font=dict(size=10, color="#e65100"))
+                        fig_pm.update_layout(
+                            template=PLOTLY_TPL, height=340,
+                            margin=dict(t=30, b=50, l=50, r=20),
+                            xaxis=dict(title="건수 비중(%)", range=_pm_x_range),
+                            yaxis=dict(title="평균 만족도", range=_pm_y_range),
+                            showlegend=False)
+                        st.plotly_chart(fig_pm, use_container_width=True)
 
-# ─────────────────────────────────────────────────────────────
+                        # 우하 사분면 경고
+                        _pm_danger = _pm_grp[(_pm_grp["비중(%)"] >= _pm_x_mid) & (_pm_grp["만족도"] < _pm_y_mid)]
+                        _pm_watch  = _pm_grp[(_pm_grp["비중(%)"] < _pm_x_mid) & (_pm_grp["만족도"] < _pm_y_mid)]
+                        if not _pm_danger.empty:
+                            _d_names = ", ".join(_pm_danger["고객군"].tolist())
+                            st.markdown(
+                                f'<div style="background:#ffebee;border-radius:8px;padding:8px 12px;font-size:0.85em;">'
+                                f'🚨 <b>1순위 개선:</b> {_d_names} — 비중이 높은데 만족도가 낮습니다.</div>',
+                                unsafe_allow_html=True)
+                        if not _pm_watch.empty:
+                            _w_names = ", ".join(_pm_watch["고객군"].tolist())
+                            st.markdown(
+                                f'<div style="background:#fff8e1;border-radius:8px;padding:8px 12px;font-size:0.85em;">'
+                                f'⚡ <b>특이 리스크:</b> {_w_names} — 소수이지만 점수가 극도로 낮아 민원 위험</div>',
+                                unsafe_allow_html=True)
+                    else:
+                        st.info("계약종별 데이터가 부족합니다.")
+                else:
+                    st.info("계약종 컬럼이 설정되지 않았습니다.")
+
+        st.markdown("---")
+
+        # ── 업무 × 채널 히트맵 (지사 특화) ──────────────────────
+        _ch_col = M.get("channel")
+        if M.get("business") and _ch_col and _ch_col in df_f.columns:
+            st.markdown("##### 🔥 업무 × 채널 리스크 히트맵 — " + _sel_off)
+            st.caption("빨간 칸이 **실질적 리스크**입니다. 하단 리스크 카드에서 [상세 원인 분석]으로 범인을 특정하세요.")
+
+            _hm_df = _df_sel.copy()
+            _hm_df["_채널그룹_sol"] = _hm_df[_ch_col].apply(_group_channel)
+            _hm_df = _hm_df[_hm_df["_채널그룹_sol"].notna()]
+
+            if not _hm_df.empty:
+                # fillna(0) 제거 — NaN=데이터없음 / 실제 0점과 구분
+                _hm_pivot = (_hm_df.groupby([M["business"], "_채널그룹_sol"])["_점수100"]
+                             .mean().round(1).reset_index()
+                             .pivot(index=M["business"], columns="_채널그룹_sol", values="_점수100"))
+                _hm_cnt = (_hm_df.groupby([M["business"], "_채널그룹_sol"])["_점수100"]
+                           .count().reset_index()
+                           .pivot(index=M["business"], columns="_채널그룹_sol", values="_점수100")
+                           .fillna(0))
+                _hm_vals = _hm_pivot.values.astype(float)
+                _hm_nonzero = _hm_vals[_hm_vals > 0]   # NaN 비교는 False → 자동 제외
+                _hm_range = [max(60, float(_hm_nonzero.min()) - 3) if len(_hm_nonzero) else 60, 100]
+
+                fig_hm = px.imshow(
+                    _hm_pivot, color_continuous_scale="RdYlGn",
+                    aspect="auto", template=PLOTLY_TPL,
+                    range_color=_hm_range,
+                    labels=dict(x="채널", y="업무유형", color="만족도"))
+                # 텍스트·호버: NaN 칸은 빈 문자열 / "데이터 없음"으로 구분
+                _hm_text  = []
+                _hm_hover = []
+                for _bi in _hm_pivot.index:
+                    _trow, _hrow = [], []
+                    for _ci in _hm_pivot.columns:
+                        _sc = _hm_pivot.loc[_bi, _ci]
+                        _cn = int(_hm_cnt.loc[_bi, _ci]) if (_bi in _hm_cnt.index and _ci in _hm_cnt.columns) else 0
+                        if pd.notna(_sc):
+                            _gp = round(float(_sc) - avg_score_100, 1)
+                            _trow.append(f"{_sc:.1f}")
+                            _hrow.append(f"{_bi} × {_ci}<br>점수: {_sc:.1f}점<br>건수: {_cn}건<br>본부 대비: {_gp:+.1f}점")
+                        else:
+                            _trow.append("")
+                            _hrow.append(f"{_bi} × {_ci}<br>데이터 없음")
+                    _hm_text.append(_trow)
+                    _hm_hover.append(_hrow)
+                fig_hm.update_traces(
+                    text=_hm_text, texttemplate="%{text}",
+                    customdata=_hm_hover,
+                    hovertemplate="%{customdata}<extra></extra>")
+                fig_hm.update_layout(
+                    height=max(320, len(_hm_pivot) * 38 + 100),
+                    margin=dict(t=10, b=60, l=120, r=20),
+                    coloraxis_colorbar=dict(title="만족도"))
+                st.plotly_chart(fig_hm, use_container_width=True)
+
+                # ── 벤치마킹 솔루션 + 사전케어 대상 ──────────────
+                _sol_bt_l, _sol_bt_r = st.columns([1, 1])
+
+                # ── 좌측: 벤치마킹 솔루션 ──────────────────────
+                with _sol_bt_l:
+                    st.markdown("##### 📚 벤치마킹 솔루션 — 옆 지사는 어떻게?")
+                    # 약점 업무 Bottom 3 → 해당 업무 본부 1위 지사 찾기
+                    _bm_biz_sel = _df_sel.groupby(M["business"])["_점수100"].mean()
+                    _bm_biz_all = df_f.groupby(M["business"])["_점수100"].mean()
+                    _bm_gap = (_bm_biz_sel - _bm_biz_all).sort_values()
+                    _bm_weak3 = _bm_gap.head(3)
+                    _bm_ofc_biz = df_f.groupby([M["office"], M["business"]])["_점수100"].agg(
+                        ["mean", "count"]).reset_index()
+                    _bm_ofc_biz.columns = [M["office"], "업무", "점수", "건수"]
+                    _bm_ofc_biz = _bm_ofc_biz[_bm_ofc_biz["건수"] >= 3]
+                    _bm_cards = []
+                    for _bw_name, _bw_gap in _bm_weak3.items():
+                        _bw_score = round(float(_bm_biz_sel.get(_bw_name, 0)), 1)
+                        _bw_subset = _bm_ofc_biz[
+                            (_bm_ofc_biz["업무"] == _bw_name) &
+                            (_bm_ofc_biz[M["office"]] != _sel_off)]
+                        if not _bw_subset.empty:
+                            _bw_best = _bw_subset.sort_values("점수", ascending=False).iloc[0]
+                            _bm_cards.append({
+                                "업무": _bw_name,
+                                "내점수": _bw_score,
+                                "편차": round(float(_bw_gap), 1),
+                                "1위지사": _bw_best[M["office"]],
+                                "1위점수": round(float(_bw_best["점수"]), 1),
+                                "1위건수": int(_bw_best["건수"]),
+                            })
+                    if _bm_cards:
+                        for _bmc in _bm_cards:
+                            _gap_txt = f'{_bmc["1위점수"] - _bmc["내점수"]:+.1f}점 차이'
+                            st.markdown(
+                                '<div style="background:#e3f2fd;border:1px solid #90caf9;'
+                                'border-radius:8px;padding:10px 14px;margin-bottom:8px;font-size:0.88em;">'
+                                f'<b>📌 {_bmc["업무"]}</b> — 귀 지사 <b>{_bmc["내점수"]:.1f}점</b>'
+                                f' → <b style="color:#1565c0">{_bmc["1위지사"]}</b>'
+                                f' <b>{_bmc["1위점수"]:.1f}점</b> (본부 1위, {_bmc["1위건수"]}건)'
+                                f'<br><span style="color:#1565c0;font-size:0.9em;">'
+                                f'{_gap_txt} — {_bmc["1위지사"]}의 노하우를 벤치마킹하세요</span></div>',
+                                unsafe_allow_html=True)
+                    else:
+                        st.info("비교 대상 지사가 없습니다.")
+
+                # ── 우측: 미조치 사전케어 대상 ──────────────────
+                with _sol_bt_r:
+                    st.markdown("##### 🚨 사전케어 대상 — " + _sel_off + " 50점 이하")
+                    _pc_df = _df_sel[_df_sel["_점수100"] <= 50].copy()
+                    if not _pc_df.empty:
+                        _pc_df = _pc_df.sort_values("_점수100")
+                        st.caption(f"해당 지사 50점 이하 **{len(_pc_df)}건** — 해피콜 우선 대상")
+                        _pc_show_cols = []
+                        if M.get("receipt_no") and M["receipt_no"] in _pc_df.columns:
+                            _pc_show_cols.append(M["receipt_no"])
+                        if M.get("business") and M["business"] in _pc_df.columns:
+                            _pc_show_cols.append(M["business"])
+                        if M.get("channel") and M["channel"] in _pc_df.columns:
+                            _pc_show_cols.append(M["channel"])
+                        _pc_show_cols.append("_점수100")
+                        if M.get("voc") and M["voc"] in _pc_df.columns:
+                            _pc_show_cols.append(M["voc"])
+                        _pc_show = _pc_df[[c for c in _pc_show_cols if c in _pc_df.columns]].head(5)
+                        _pc_show = _pc_show.rename(columns={"_점수100": "점수(100점)"})
+                        st.dataframe(_pc_show.reset_index(drop=True), use_container_width=True, hide_index=True)
+                        if M.get("voc") and M["voc"] in _pc_df.columns:
+                            with st.expander(f"VOC 원문 보기 (상위 5건)"):
+                                for _pcv in _pc_df[M["voc"]].dropna().head(5):
+                                    _pcv_s = str(_pcv).strip()
+                                    if len(_pcv_s) > 2 and _pcv_s not in ("응답없음", "nan", ""):
+                                        st.markdown(
+                                            f'<div style="border-left:3px solid #ef9a9a;padding:4px 10px;'
+                                            f'margin-bottom:4px;font-size:0.85em;">{_pcv_s}</div>',
+                                            unsafe_allow_html=True)
+                    else:
+                        st.success("✅ 해당 지사에 50점 이하 건이 없습니다.")
+
+                st.markdown("---")
+
+                # ── 리스크 분류: 실질적 리스크 vs 급락 조합 ──────────
+                _real_risk = []   # 건수 ≥ 10 & 평균 이하 → 우선 개선
+                _drop_risk = []   # 건수 < 10 & 평균 이하 → 모니터링
+                for _bi in _hm_pivot.index:
+                    for _ci in _hm_pivot.columns:
+                        _sc = _hm_pivot.loc[_bi, _ci]
+                        _cn = int(_hm_cnt.loc[_bi, _ci]) if (_bi in _hm_cnt.index and _ci in _hm_cnt.columns) else 0
+                        if pd.notna(_sc) and _sc < avg_score_100 and _cn >= 2:
+                            _item = {"업무": _bi, "채널": _ci, "점수": _sc, "건수": _cn,
+                                     "impact": round((avg_score_100 - _sc) * _cn, 1)}
+                            if _cn >= 10:
+                                _real_risk.append(_item)
+                            else:
+                                _drop_risk.append(_item)
+                _real_top3 = sorted(_real_risk, key=lambda x: x["impact"], reverse=True)[:3]
+                _drop_top3 = sorted(_drop_risk, key=lambda x: x["점수"])[:3]
+
+                # ── 실질적 리스크 카드 ──────────────────────────
+                if _real_top3:
+                    st.markdown("##### 🚨 실질적 리스크 TOP 3 — 건수 多 & 평균 이하 (우선 개선)")
+                    st.caption("응답 건수가 충분하여 통계적으로 신뢰할 수 있는 **최우선 개선 대상**입니다.")
+                    _rt_cols = st.columns(len(_real_top3))
+                    for _ri, _rk in enumerate(_real_top3):
+                        _rk_key  = f"sol_real_{_ri}"
+                        _cur_sel = st.session_state.get("sol_cell_sel")
+                        _is_sel  = (_cur_sel is not None
+                                    and _cur_sel.get("업무") == _rk["업무"]
+                                    and _cur_sel.get("채널") == _rk["채널"])
+                        _badge = "①②③"[_ri]
+                        _bg    = "#fff3e0" if _is_sel else "#ffebee"
+                        _bd    = "#ff8f00" if _is_sel else "#ef9a9a"
+                        with _rt_cols[_ri]:
+                            st.markdown(
+                                f'<div style="background:{_bg};border:2px solid {_bd};'
+                                'border-radius:10px;padding:12px;margin-bottom:8px;">'
+                                f'<div style="font-size:0.78em;color:#c62828;font-weight:700;">리스크 {_badge}</div>'
+                                f'<div style="font-size:1em;font-weight:800;margin:4px 0;">{_rk["업무"]} × {_rk["채널"]}</div>'
+                                f'<div style="font-size:1.4em;font-weight:900;color:#c62828;">{_rk["점수"]:.1f}점</div>'
+                                f'<div style="font-size:0.78em;color:#555;">{_rk["건수"]}건 · 임팩트 {_rk["impact"]:.0f}</div>'
+                                '</div>',
+                                unsafe_allow_html=True)
+                            if st.button(
+                                    "▲ 닫기" if _is_sel else "🔍 상세 원인 분석",
+                                    key=_rk_key, use_container_width=True,
+                                    type="secondary" if _is_sel else "primary"):
+                                st.session_state["sol_cell_sel"] = (
+                                    None if _is_sel else {"업무": _rk["업무"], "채널": _rk["채널"]})
+                                st.rerun()
+
+                # ── 급락 조합 카드 ──────────────────────────────
+                if _drop_top3:
+                    st.markdown("##### ⚡ 급락 조합 TOP 3 — 건수 少 & 점수 급락 (모니터링)")
+                    st.caption("소수 응답이지만 점수가 급락한 조합입니다. 민원 전조 신호일 수 있으니 **추이를 주시**하세요.")
+                    _dt_cols = st.columns(len(_drop_top3))
+                    for _di, _dk in enumerate(_drop_top3):
+                        _dk_key  = f"sol_drop_{_di}"
+                        _cur_sel = st.session_state.get("sol_cell_sel")
+                        _is_sel  = (_cur_sel is not None
+                                    and _cur_sel.get("업무") == _dk["업무"]
+                                    and _cur_sel.get("채널") == _dk["채널"])
+                        _badge = "①②③"[_di]
+                        _bg    = "#fff3e0" if _is_sel else "#fff8e1"
+                        _bd    = "#ff8f00" if _is_sel else "#ffca28"
+                        with _dt_cols[_di]:
+                            st.markdown(
+                                f'<div style="background:{_bg};border:2px solid {_bd};'
+                                'border-radius:10px;padding:12px;margin-bottom:8px;">'
+                                f'<div style="font-size:0.78em;color:#e65100;font-weight:700;">급락 {_badge}</div>'
+                                f'<div style="font-size:1em;font-weight:800;margin:4px 0;">{_dk["업무"]} × {_dk["채널"]}</div>'
+                                f'<div style="font-size:1.4em;font-weight:900;color:#e65100;">{_dk["점수"]:.1f}점</div>'
+                                f'<div style="font-size:0.78em;color:#555;">{_dk["건수"]}건 (소량)</div>'
+                                '</div>',
+                                unsafe_allow_html=True)
+                            if st.button(
+                                    "▲ 닫기" if _is_sel else "🔍 상세 원인 분석",
+                                    key=_dk_key, use_container_width=True,
+                                    type="secondary" if _is_sel else "primary"):
+                                st.session_state["sol_cell_sel"] = (
+                                    None if _is_sel else {"업무": _dk["업무"], "채널": _dk["채널"]})
+                                st.rerun()
+
+                # ══════════════════════════════════════════
+                # LEVEL 3 — AI 심층 진단 (Action)
+                # ══════════════════════════════════════════
+                if _real_top3 or _drop_top3:
+                    _cell = st.session_state.get("sol_cell_sel")
+                    if _cell:
+                        _c3_biz = _cell["업무"]
+                        _c3_ch  = _cell["채널"]
+
+                        st.markdown(
+                            '<div style="background:linear-gradient(90deg,#4a148c,#6a1b9a);'
+                            'border-radius:10px;padding:14px 20px;color:white;margin:16px 0 12px;">'
+                            f'<span style="font-size:1.1em;font-weight:800;">'
+                            f'🔬 AI 심층 진단 — {_sel_off} · {_c3_biz} × {_c3_ch}</span>'
+                            '<span style="font-size:0.82em;opacity:.8;margin-left:10px;">계약종별 세부 원인 규명</span>'
+                            '</div>',
+                            unsafe_allow_html=True)
+
+                        _c3_df = _hm_df[
+                            (_hm_df[M["business"]] == _c3_biz) &
+                            (_hm_df["_채널그룹_sol"] == _c3_ch)].copy()
+                        _c3_n = len(_c3_df)
+
+                        # ── 1. 데이터 신뢰도 검증 ──────────────────
+                        if _c3_n < 10:
+                            st.warning(
+                                f"⚠️ 데이터 수가 적어(**{_c3_n}건**) 특정 사례에 의한 "
+                                "왜곡 가능성이 있으니 **VOC 원문을 중심으로** 판단하세요.")
+
+                        # ── 2. 트리플 크로스 체크: 지사 간 편차 ────
+                        _cross_all = df_f.copy()
+                        _cross_all["_채널그룹_tmp"] = _cross_all[_ch_col].apply(_group_channel)
+                        _cross_all = _cross_all[
+                            (_cross_all[M["business"]] == _c3_biz) &
+                            (_cross_all["_채널그룹_tmp"] == _c3_ch)]
+                        _cross_ofc = (_cross_all.groupby(M["office"])["_점수100"]
+                                      .agg(["mean", "count"]).reset_index())
+                        _cross_ofc.columns = ["지사", "평균만족도", "건수"]
+                        _cross_ofc = _cross_ofc[_cross_ofc["건수"] >= 2]
+                        _ofc_std = round(float(_cross_ofc["평균만족도"].std()), 1) if len(_cross_ofc) >= 2 else 0.0
+                        _cross_verdict = "specific_office" if _ofc_std > 5 else "systemic"
+
+                        if not _cross_ofc.empty:
+                            _ofc_worst = _cross_ofc.sort_values("평균만족도").iloc[0]
+                            _ofc_best  = _cross_ofc.sort_values("평균만족도").iloc[-1]
+                            if _cross_verdict == "specific_office":
+                                _cross_msg = (
+                                    f'지사 간 편차 <b>큼</b> (σ={_ofc_std}점) — '
+                                    f'<b>{_ofc_worst["지사"]}</b>({_ofc_worst["평균만족도"]:.1f}점)이 '
+                                    f'특히 낮아 <b style="color:#c62828">특정 지사의 서비스 품질 이슈</b>로 판단')
+                            else:
+                                _cross_msg = (
+                                    f'지사 간 편차 <b>작음</b> (σ={_ofc_std}점) — '
+                                    f'골고루 낮으므로 <b style="color:#1565c0">본부/본사의 공통 프로세스 결함</b>으로 판단')
+                            st.markdown(
+                                '<div style="background:#e3f2fd;border:2px solid #90caf9;'
+                                'border-radius:8px;padding:12px 16px;margin-bottom:12px;font-size:0.9em;">'
+                                f'🔄 <b>지사 간 크로스 체크 ({_c3_biz} × {_c3_ch}):</b> {_cross_msg}'
+                                '</div>',
+                                unsafe_allow_html=True)
+
+                        # ── 3. 시나리오 기반 자동 처방 ──────────────
+                        _ct_skew = False
+                        _ct_worst_name = ""
+                        if M.get("contract") and M["contract"] in _c3_df.columns and not _c3_df.empty:
+                            _ct_grp = (_c3_df.groupby(M["contract"])["_점수100"]
+                                       .agg(["mean", "count"]).reset_index())
+                            _ct_grp.columns = ["계약종", "만족도", "건수"]
+                            _ct_grp = _ct_grp[_ct_grp["건수"] >= 2]
+                            if len(_ct_grp) >= 2 and _ct_grp["만족도"].std() > 5:
+                                _ct_skew = True
+                                _ct_worst_name = _ct_grp.sort_values("만족도").iloc[0]["계약종"]
+
+                        _ch_scores_all = _df_sel.copy()
+                        _ch_scores_all["_채널그룹_tmp2"] = _ch_scores_all[_ch_col].apply(_group_channel)
+                        _ch_sc = _ch_scores_all.groupby("_채널그룹_tmp2")["_점수100"].mean()
+                        _ch_gap = float(_ch_sc.max() - _ch_sc.min()) if len(_ch_sc) >= 2 else 0
+
+                        if _ct_skew or _cross_verdict == "specific_office":
+                            _rx_icon  = "🎯"
+                            _rx_label = "시나리오 A: 타겟팅 집중 교육"
+                            _rx_color = "#ffebee"
+                            _rx_border = "#ef9a9a"
+                            _target = _ct_worst_name or _sel_off
+                            _rx_body = (
+                                f"<b>[{_sel_off}]</b>의 <b>[{_target}]</b> 고객 "
+                                f"<b>[{_c3_ch}]</b> 채널 응대 매뉴얼을 점검하고, "
+                                f"해당 업무(<b>{_c3_biz}</b>) 처리 담당자 대상 집중 교육을 실시하세요.")
+                        elif _ch_gap > 8:
+                            _rx_icon  = "🔄"
+                            _rx_label = "시나리오 C: 채널 전환(Call Steering) 전략"
+                            _rx_color = "#e8f5e9"
+                            _rx_border = "#a5d6a7"
+                            _ch_best  = _ch_sc.idxmax()
+                            _ch_worst_nm = _ch_sc.idxmin()
+                            _rx_body = (
+                                f"불만이 높은 <b>[{_ch_worst_nm}]</b> 채널 대신 "
+                                f"만족도가 높은 <b>[{_ch_best}]</b> 채널 사용을 유도하고, "
+                                f"<b>[{_ch_worst_nm}]</b>의 서비스 프로세스를 "
+                                f"<b>[{_ch_best}]</b> 수준으로 표준화하세요.")
+                        else:
+                            _rx_icon  = "🏢"
+                            _rx_label = "시나리오 B: 본사 프로세스 개선 제안"
+                            _rx_color = "#e3f2fd"
+                            _rx_border = "#90caf9"
+                            _rx_body = (
+                                f"<b>[{_c3_biz}]</b> 업무의 <b>[{_c3_ch}]</b> 채널 "
+                                "처리 프로세스 전반에 걸쳐 표준화가 필요합니다. "
+                                "안내 문구, 처리 절차, 응대 스크립트를 본사 차원에서 재설계하세요.")
+
+                        st.markdown(
+                            f'<div style="background:{_rx_color};border:2px solid {_rx_border};'
+                            f'border-radius:8px;padding:12px 16px;margin-bottom:12px;">'
+                            f'<div style="font-weight:800;margin-bottom:6px;">'
+                            f'{_rx_icon} {_rx_label}</div>'
+                            f'<div style="font-size:0.9em;">{_rx_body}</div></div>',
+                            unsafe_allow_html=True)
+
+                        # ── 컬럼: 차트 + VOC ──────────────────────
+                        _c3_l, _c3_r = st.columns([1, 1])
+
+                        with _c3_l:
+                            st.markdown("**📊 계약종별 만족도 — 범인 특정**")
+                            if M.get("contract") and M["contract"] in _c3_df.columns and not _c3_df.empty:
+                                _c3_ct = (_c3_df.groupby(M["contract"])["_점수100"]
+                                          .agg(["mean", "count"]).reset_index())
+                                _c3_ct.columns = ["계약종", "만족도", "건수"]
+                                _c3_ct = _c3_ct[_c3_ct["건수"] >= 1].sort_values("만족도")
+                                if not _c3_ct.empty:
+                                    _c3_colors = _c3_ct["만족도"].apply(
+                                        lambda x: "#d32f2f" if x < avg_score_100 - 5
+                                        else "#f57c00" if x < avg_score_100
+                                        else "#388e3c").tolist()
+                                    fig_c3 = go.Figure(go.Bar(
+                                        y=_c3_ct["계약종"], x=_c3_ct["만족도"],
+                                        orientation="h", marker_color=_c3_colors,
+                                        text=[f"{v:.1f}" for v in _c3_ct["만족도"]],
+                                        textposition="outside",
+                                        customdata=_c3_ct["건수"].values,
+                                        hovertemplate="%{y}<br>%{x:.1f}점<br>%{customdata}건<extra></extra>"))
+                                    fig_c3.add_vline(
+                                        x=avg_score_100, line_dash="dash", line_color=C["navy"],
+                                        annotation_text=f"본부 {avg_score_100:.1f}",
+                                        annotation_position="top right")
+                                    fig_c3.update_layout(
+                                        template=PLOTLY_TPL, height=280,
+                                        margin=dict(t=10, b=10, l=10, r=60),
+                                        xaxis=dict(range=[60, 105]))
+                                    st.plotly_chart(fig_c3, use_container_width=True)
+                                    _culprit = _c3_ct.iloc[0]
+                                    _cul_gap = round(_culprit["만족도"] - avg_score_100, 1)
+                                    st.markdown(
+                                        '<div style="background:#ffebee;border:2px solid #ef9a9a;'
+                                        'border-radius:8px;padding:10px 14px;font-size:0.88em;">'
+                                        f'🎯 <b>범인 확정:</b> <b>{_culprit["계약종"]}</b> 고객이 '
+                                        f'<b>{_c3_ch}</b> 채널로 <b>{_c3_biz}</b> 처리 시 '
+                                        f'만족도 <b style="color:#c62828">{_culprit["만족도"]:.1f}점</b>'
+                                        f' (본부 대비 {_cul_gap:+.1f}점, {_culprit["건수"]}건)</div>',
+                                        unsafe_allow_html=True)
+                            else:
+                                st.info("계약종 컬럼이 설정되지 않았습니다.")
+
+                        with _c3_r:
+                            st.markdown("**📋 실제 VOC 원문**")
+                            _c3_voc_valid = pd.Series(dtype=str)
+                            if M.get("voc") and not _c3_df.empty:
+                                _c3_voc_valid = (
+                                    _c3_df[M["voc"]].dropna()
+                                    .apply(lambda x: str(x).strip())
+                                    .loc[lambda s: (s.str.len() > 2) & (~s.isin(["응답없음", "nan", ""]))])
+                                _c3_vocs = _c3_voc_valid.head(10)
+                                if not _c3_vocs.empty:
+                                    with st.expander(f"VOC {len(_c3_vocs)}건 보기", expanded=True):
+                                        for _cv in _c3_vocs:
+                                            _cv_hl = str(_cv)
+                                            for _nkw in VOC_HIGHLIGHT_KW:
+                                                if _nkw in _cv_hl:
+                                                    _cv_hl = _cv_hl.replace(
+                                                        _nkw,
+                                                        '<mark style="background:#ffeb3b">'
+                                                        + _nkw + "</mark>")
+                                            st.markdown(
+                                                '<div style="border-left:3px solid #ef9a9a;'
+                                                'padding:4px 10px;margin-bottom:4px;font-size:0.87em;">'
+                                                + _cv_hl + "</div>",
+                                                unsafe_allow_html=True)
+                                else:
+                                    st.info("해당 조합의 VOC가 없습니다.")
+                            else:
+                                st.info("VOC 컬럼이 설정되지 않았습니다.")
+
+                        # ── AI 처방전 ──────────────────────────
+                        st.markdown("---")
+                        _c3_scenario_txt = f"[로직 기반 사전 진단]\n시나리오: {_rx_label}\n처방: {_rx_body}\n지사 간 편차: σ={_ofc_std}점 ({_cross_verdict})\n"
+                        if st.button("🤖 AI 처방전 생성", key="sol_ai_cell_btn",
+                                     type="primary", use_container_width=True):
+                            if not GEMINI_AVAILABLE:
+                                st.error("Gemini API 키가 설정되지 않았습니다.")
+                            else:
+                                _c3_ct_lines = ""
+                                if M.get("contract") and M["contract"] in _c3_df.columns:
+                                    _c3_ct2 = (_c3_df.groupby(M["contract"])["_점수100"]
+                                               .agg(["mean", "count"]).reset_index())
+                                    _c3_ct_lines = "\n".join(
+                                        f"  - {r.iloc[0]}: {r['mean']:.1f}점 ({r['count']}건)"
+                                        for _, r in _c3_ct2.iterrows())
+                                _c3_voc_lines = ""
+                                if M.get("voc"):
+                                    _c3_vl = (_c3_df[M["voc"]].dropna()
+                                              .apply(str)
+                                              .loc[lambda s: (s.str.len() > 2) &
+                                                             (~s.isin(["응답없음", "nan", ""]))]
+                                              .head(8))
+                                    _c3_voc_lines = "\n".join(f"  - {v}" for v in _c3_vl)
+                                _c3_prompt = (
+                                    f"당신은 전력산업 CS 전문가입니다.\n\n"
+                                    f"[진단 대상]\n"
+                                    f"지사: {_sel_off} | 업무: {_c3_biz} | 채널: {_c3_ch}\n"
+                                    f"지사 평균: {_sel_avg:.1f}점 (본부 {avg_score_100:.1f}점 대비 {_sel_gap:+.1f}점)\n"
+                                    f"데이터 건수: {_c3_n}건 ({'신뢰도 주의' if _c3_n < 10 else '신뢰도 충분'})\n\n"
+                                    f"{_c3_scenario_txt}\n"
+                                    f"[계약종별 만족도]\n{_c3_ct_lines or '데이터 없음'}\n\n"
+                                    f"[불만 VOC 원문]\n{_c3_voc_lines or '없음'}\n\n"
+                                    "[분석 요청]\n"
+                                    "위의 '로직 기반 사전 진단'을 참고하되, VOC 원문을 근거로 더 구체화하세요.\n"
+                                    f"1. 핵심 문제 진단: 왜 이 지사의 {_c3_biz} x {_c3_ch} 조합에서 만족도가 낮은가? (2~3문장)\n"
+                                    "2. 즉시 실행 처방: 72시간 내 지사장이 실행 가능한 구체적 조치 1가지\n"
+                                    "3. 근본 원인 처방: 3개월 내 구조적 개선 방안 1가지\n\n"
+                                    "※ 전력산업 도메인 지식을 활용하고 추상적 제안('친절 교육' 등)은 금지합니다."
+                                )
+                                with st.spinner("AI가 원인을 분석 중…"):
+                                    try:
+                                        import urllib.request
+                                        _models = ["gemini-2.0-flash", "gemma-3-12b-it", "gemma-3-27b-it"]
+                                        _c3_pl  = {
+                                            "contents": [{"parts": [{"text": _c3_prompt}]}],
+                                            "generationConfig": {"temperature": 0.7, "maxOutputTokens": 2048}
+                                        }
+                                        _ctx   = ssl._create_unverified_context()
+                                        _body  = None
+                                        for _model in _models:
+                                            _url = (f"https://generativelanguage.googleapis.com/v1beta/"
+                                                    f"models/{_model}:generateContent?key={_GEMINI_KEY}")
+                                            _req = urllib.request.Request(
+                                                _url,
+                                                data=json.dumps(_c3_pl).encode("utf-8"),
+                                                headers={"Content-Type": "application/json"},
+                                                method="POST")
+                                            try:
+                                                with urllib.request.urlopen(_req, context=_ctx, timeout=90) as _rsp:
+                                                    _body = json.loads(_rsp.read().decode("utf-8"))
+                                                break
+                                            except urllib.error.HTTPError as _he:
+                                                if _he.code == 429:
+                                                    continue
+                                                raise
+                                        if _body is None:
+                                            st.error("모든 AI 모델의 일일 한도가 소진되었습니다.")
+                                        else:
+                                            _ai_txt = _body["candidates"][0]["content"]["parts"][0]["text"].strip()
+                                            st.markdown(_ai_txt)
+                                    except Exception as _c3e:
+                                        st.error(f"AI 분석 중 오류: {_c3e}")
+            else:
+                st.info("채널 또는 업무유형 컬럼이 설정되지 않았습니다.")
+
+
 #  TAB 10  CXO 딥 인사이트 (투트랙 VOC 분석)
 # ─────────────────────────────────────────────────────────────
 
@@ -3341,7 +3155,7 @@ with tab10:
                     fig_hm = px.imshow(pivot_corr, text_auto=".2f", aspect="auto",
                                        color_continuous_scale="RdYlGn",
                                        title="계약종별 개별항목↔종합점수 상관관계 히트맵 (OOS 제외)")
-                    fig_hm.update_traces(hovertemplate="항목: %{y}<br>계약종: %{x}<br>상관계수: %{z:.3f}<extra></extra>")
+                    fig_hm.update_traces(hovertemplate="항목: %{y}<br>계약종별: %{x}<br>상관계수: %{z:.3f}<extra></extra>")
                     fig_hm.update_layout(height=max(350, len(score_item_cols) * 40 + 100),
                                           margin=dict(t=60, b=20, l=10, r=20),
                                           title_font=dict(size=14, color=C["navy"]))
@@ -3400,385 +3214,4 @@ with tab10:
     else:
         st.info("종합 점수 컬럼이 필요합니다.")
 
-    st.markdown("---")
-
-    # ══════════════════════════════════════════
-    # 3. 지사별 페르소나 (OOS 제외)
-    # ══════════════════════════════════════════
-    st.markdown('<p class="sec-head">3️⃣ 지사별 페르소나 — 데이터 기반 캐릭터 프로파일링 (순수 데이터)</p>',
-                unsafe_allow_html=True)
-
-    office_col = M.get("office")
-    if office_col and M["voc"] and "_점수100" in df_pure.columns:
-        offices = _sort_offices(df_pure[office_col].dropna().unique().tolist())
-        if len(offices) >= 2:
-            persona_data = []
-            for ofc in offices:
-                sub = df_pure[df_pure[office_col] == ofc]
-                if len(sub) < 5:
-                    continue
-                avg_score = sub["_점수100"].mean()
-                n = len(sub)
-
-                # 부정 VOC (문맥 인식)
-                voc_vals = sub[M["voc"]].dropna()
-                voc_vals = voc_vals[~voc_vals.isin(["응답없음", "nan", ""])]
-                neg_cnt = 0
-                top_neg_kws = Counter()
-                top_cause_cnt = Counter()
-                for v in voc_vals:
-                    s = str(v)
-                    is_neg_found = False
-                    for kw in NEGATIVE_KEYWORDS:
-                        if kw in s:
-                            idx_kw = s.find(kw)
-                            w = s[max(0, idx_kw - 15):min(len(s), idx_kw + len(kw) + 15)]
-                            if not any(pw in w for pw in POSITIVE_CONTEXT):
-                                top_neg_kws[kw] += 1
-                                is_neg_found = True
-                    if is_neg_found:
-                        neg_cnt += 1
-                        # 원인 태깅
-                        for cause, keywords in _CAUSE_TAGS.items():
-                            if any(kw in s and not any(
-                                pw in s[max(0, s.find(kw) - 15):min(len(s), s.find(kw) + len(kw) + 15)]
-                                for pw in POSITIVE_CONTEXT) for kw in keywords if kw in s):
-                                top_cause_cnt[cause] += 1
-                                break
-
-                neg_ratio = neg_cnt / max(n, 1) * 100
-
-                # 계약종 비중
-                contract_dist = ""
-                if "_계약종별" in sub.columns:
-                    top_ct = sub["_계약종별"].value_counts(normalize=True).head(2)
-                    contract_dist = ", ".join(f"{k} {v * 100:.0f}%" for k, v in top_ct.items())
-
-                # 업무 비중
-                biz_dist = ""
-                if M.get("business") and M["business"] in sub.columns:
-                    top_biz = sub[M["business"]].value_counts(normalize=True).head(2)
-                    biz_dist = ", ".join(f"{k} {v * 100:.0f}%" for k, v in top_biz.items())
-
-                # 주요 부정 원인
-                top_cause_str = ", ".join(
-                    f"{k}({v})" for k, v in top_cause_cnt.most_common(2)) if top_cause_cnt else "없음"
-                top_neg_str = ", ".join(
-                    f"{k}({v})" for k, v in top_neg_kws.most_common(3)) if top_neg_kws else "없음"
-
-                # 약점 항목 (전체 대비 3점 이상 낮은 항목)
-                weak_items = []
-                for col in df_pure.columns:
-                    if col.startswith("_") or col == M["score"]:
-                        continue
-                    ofc_val = pd.to_numeric(sub[col], errors="coerce").dropna()
-                    all_val = pd.to_numeric(df_pure[col], errors="coerce").dropna()
-                    if len(ofc_val) > 5 and len(all_val) > 5:
-                        gap = ofc_val.mean() - all_val.mean()
-                        if gap < -3:
-                            weak_items.append(f"{col}({gap:+.1f})")
-
-                # 페르소나 태그
-                tags = []
-                if neg_ratio >= 10:
-                    tags.append("🔴 부정VOC 다발")
-                elif neg_ratio <= 4:
-                    tags.append("🟢 안정 지사")
-                if avg_score < 92:
-                    tags.append("⚠️ 점수 하위권")
-                elif avg_score >= 95:
-                    tags.append("⭐ 우수 지사")
-
-                persona_data.append({
-                    "지사": ofc, "건수": n, "평균점수": round(avg_score, 1),
-                    "부정비율": round(neg_ratio, 1), "계약종구성": contract_dist,
-                    "주요업무": biz_dist, "부정원인": top_cause_str,
-                    "부정키워드": top_neg_str,
-                    "약점항목": ", ".join(weak_items) if weak_items else "-",
-                    "태그": " ".join(tags) if tags else "보통",
-                })
-
-            df_persona = _sort_df_by_office(pd.DataFrame(persona_data), "지사")
-
-            # 상위 3개 지사 처방전 카드
-            top3 = df_persona.head(3)
-            st.markdown("**🏥 CS 처방전 — 부정 VOC 상위 3개 지사 (OOS 제외 순수 부정만)**")
-            p_cols = st.columns(3)
-            for i, (_, row) in enumerate(top3.iterrows()):
-                with p_cols[i]:
-                    # 주요 원인에 따라 Do/Don't 자동 매칭
-                    main_cause = row["부정원인"].split(",")[0].split("(")[0].strip() if row["부정원인"] != "없음" else ""
-                    rx_map = {
-                        "절차 복잡·불편":  {"do": "원스톱 처리 체계 구축 — 한 번에 끝내기", "dont": "고객을 여러 부서로 돌려보내기"},
-                        "처리 지연·느림":  {"do": "접수 후 24시간 내 진행 상황 문자 발송", "dont": "처리 완료 전까지 연락 없이 방치"},
-                        "처리 오류·부정확": {"do": "처리 전 체크리스트 확인 — 1회 완결 처리", "dont": "확인 없이 신속 처리에만 집중"},
-                        "직원 태도·불친절": {"do": "경청→공감→해결 3단계 응대 훈련 실시", "dont": "감정 대응 없이 업무만 처리"},
-                        "요금·제도 불만":  {"do": "요금 구조를 고객 눈높이 비유·시각자료로 설명", "dont": "매뉴얼 그대로 읽어주는 기계적 응대"},
-                        "정전·안전 관련":  {"do": "예정 정전 72시간 전 사전 알림 체계 구축", "dont": "예고 없는 정전 및 복구 후 미통보"},
-                    }
-                    rx = rx_map.get(main_cause, {"do": "고객 맞춤 응대 프로세스 정비", "dont": "일괄적·기계적 대응"})
-                    card_color = "card-red" if row["부정비율"] >= 10 else "card-gold"
-                    weak_str = f'<br>📉 <b>약점항목:</b> {row["약점항목"]}' if row["약점항목"] != "-" else ""
-                    st.markdown(
-                        f'<div class="{card_color}" style="min-height:320px">'
-                        f'<b>{row["지사"]}</b> {row["태그"]}<br>'
-                        f'평균 {row["평균점수"]}점 · 부정비율 {row["부정비율"]}%<br><br>'
-                        f'📊 <b>고객구성:</b> {row["계약종구성"]}<br>'
-                        f'📋 <b>주요업무:</b> {row["주요업무"]}<br>'
-                        f'🔥 <b>부정원인:</b> {row["부정원인"]}<br>'
-                        f'🔑 <b>부정키워드:</b> {row["부정키워드"]}'
-                        f'{weak_str}<br><br>'
-                        f'<span style="color:green">✅ Do: {rx["do"]}</span><br>'
-                        f'<span style="color:red">❌ Don\'t: {rx["dont"]}</span>'
-                        f'</div>',
-                        unsafe_allow_html=True)
-
-            # 전체 지사 프로파일 테이블
-            st.markdown("**📋 전체 지사 프로파일 (OOS 제외)**")
-            st.dataframe(
-                df_persona[["지사", "건수", "평균점수", "부정비율", "계약종구성", "주요업무",
-                            "부정원인", "부정키워드", "약점항목", "태그"]],
-                use_container_width=True, height=500, hide_index=True)
-
-            # 포지셔닝 맵
-            fig_sc = px.scatter(df_persona, x="평균점수", y="부정비율", size="건수",
-                                text="지사", template=PLOTLY_TPL,
-                                color="부정비율",
-                                color_continuous_scale=["#27AE60", "#F39C12", "#E74C3C"],
-                                title="지사별 포지셔닝 맵 — 평균점수 vs 부정VOC 비율 (OOS 제외)")
-            fig_sc.update_traces(textposition="top center", textfont_size=10,
-                                  hovertemplate="%{text}<br>평균점수: %{x:.1f}점<br>부정비율: %{y:.1f}%<extra></extra>")
-            fig_sc.update_layout(height=480, margin=dict(t=60, b=40, l=40, r=40),
-                                  title_font=dict(size=14, color=C["navy"]),
-                                  coloraxis_showscale=False)
-            st.plotly_chart(fig_sc, use_container_width=True)
-    else:
-        st.info("지사, VOC, 종합점수 컬럼이 모두 필요합니다.")
-
-# ─────────────────────────────────────────────────────────────
-#  TAB 11  지사 맞춤형 CS 솔루션 (Google Gemini AI 연동)
-# ─────────────────────────────────────────────────────────────
-
-# ── Gemini AI 일괄 인사이트 함수 (API 1회 호출) ─────────────
-
-@st.cache_data(show_spinner=False)
-def get_gemini_bulk_insight(items_json):
-    """여러 지사·업무 데이터를 한 번에 보내 Gemini API 1회로 전체 인사이트를 도출"""
-    items = json.loads(items_json)
-    n = len(items)
-    if n == 0:
-        return []
-
-    if not GEMINI_AVAILABLE:
-        return [("AI 미연결", ".env 파일에 GEMINI_API_KEY를 설정해주세요.",
-                 "https://aistudio.google.com 에서 무료 발급")] * n
-
-    data_lines = []
-    for i, it in enumerate(items, 1):
-        data_lines.append(
-            f"[항목{i}] 지사: {it['office']} | 취약업무: {it['biz']} | "
-            f"계약종별: {it['ct']} | VOC: {it['voc']}")
-
-    prompt = f"""당신은 전력산업에 20년 이상 종사한 최고 고객만족도(CS) 분석 전문가입니다.
-아래 {n}개 항목 **각각**에 대해, 지사장이 즉시 액션할 수 있는 맞춤형 인사이트를 도출하세요.
-
-[데이터]
-{chr(10).join(data_lines)}
-
-[분석 및 추론 규칙]
-1. 단순 친절 교육, 매뉴얼 배포 같은 뻔하고 추상적인 액션 아이템은 절대 금지합니다.
-2. 전력산업의 도메인 지식(계절적 요인, 산업 특성, 요금제 등)과 제공된 VOC를 유기적으로 연결하여 뾰족한 인사이트를 뽑아내세요.
-3. VOC가 "없음"인 항목도 업무 특성과 계약종별을 근거로 추론하세요.
-4. 결과는 반드시 아래 JSON **배열** 형식으로만 출력하세요. 항목 수는 정확히 {n}개. (마크다운·설명 등 다른 텍스트 절대 금지)
-
-[{{"painpoint":"[상황/행위]+[결과/감정] 구체적 키워드","context":"원인 추론 2~3문장","action":"구체적 개선 조치 1문장"}}, ...]"""
-
-    try:
-        import urllib.request
-        _models = ["gemini-2.0-flash", "gemma-3-12b-it", "gemma-3-27b-it"]
-        _payload = {"contents": [{"parts": [{"text": prompt}]}],
-                     "generationConfig": {"temperature": 0.7, "maxOutputTokens": 4096}}
-        _ctx = ssl._create_unverified_context()
-        _body = None
-
-        for _model in _models:
-            _api_url = f"https://generativelanguage.googleapis.com/v1beta/models/{_model}:generateContent?key={_GEMINI_KEY}"
-            _req = urllib.request.Request(_api_url, data=json.dumps(_payload).encode("utf-8"),
-                                           headers={"Content-Type": "application/json"}, method="POST")
-            try:
-                with urllib.request.urlopen(_req, context=_ctx, timeout=90) as _resp:
-                    _body = json.loads(_resp.read().decode("utf-8"))
-                break
-            except urllib.error.HTTPError as _http_err:
-                if _http_err.code == 429:
-                    continue
-                raise
-        if _body is None:
-            raise Exception("모든 AI 모델의 일일 한도가 소진되었습니다. 내일 다시 시도해주세요.")
-
-        res_text = _body["candidates"][0]["content"]["parts"][0]["text"].strip()
-        if res_text.startswith("```json"):
-            res_text = res_text[7:-3].strip()
-        elif res_text.startswith("```"):
-            res_text = res_text[3:-3].strip()
-
-        parsed = json.loads(res_text)
-        results = []
-        for d in parsed:
-            results.append((d.get("painpoint", "분석 오류"),
-                            d.get("context", "분석 오류"),
-                            d.get("action", "분석 오류")))
-        # 항목 수 불일치 보정
-        while len(results) < n:
-            results.append(("분석 누락", "AI 응답에서 해당 항목이 누락되었습니다.", "재분석 필요"))
-        return results[:n]
-
-    except Exception as e:
-        return [("AI 분석 일시 지연",
-                 f"API 통신 중 문제 발생. ({str(e)})",
-                 "잠시 후 다시 시도해주세요.")] * n
-
-
-with tab11:
-    st.markdown(
-        '<p class="sec-head">🏢 지사 맞춤형 CS 솔루션 — AI 딥러닝 다차원 교차분석</p>',
-        unsafe_allow_html=True)
-
-    _need_office = M.get("office")
-    _need_score  = M.get("score")
-    _need_biz    = M.get("business")
-    _has_contract = M.get("contract")
-    _has_voc      = M.get("voc")
-
-    if _need_office and _need_score and _need_biz:
-        st.markdown(
-            f'<div class="card-blue">'
-            f'<b>🧠 AI 인사이트 도출 프로세스</b><br><br>'
-            f'<b>1차</b> 지사별 취약 업무구분 추출 → '
-            f'<b>2차</b> 취약 업무 내 타겟 계약종별 특정 → '
-            f'<b>3차</b> 실제 고객 VOC를 Google AI(Gemini)로 실시간 전송<br>'
-            f'구글 AI가 문맥을 분석하여 <b>기존에 없던 뾰족한 원인과 맞춤형 액션 아이템</b>을 자동 창작합니다.'
-            f'</div>', unsafe_allow_html=True)
-
-        st.markdown("")
-
-        offices = _sort_offices(df_f[_need_office].dropna().unique().tolist())
-        sel_mode = st.radio(
-            "분석 대상", ["🔍 특정 지사 선택 (API 속도를 위해 권장)", "📋 전체 지사"],
-            horizontal=True, key="tab11_sel_mode")
-
-        if "특정" in sel_mode:
-            sel_offices = st.multiselect("지사 선택", offices, default=offices[:1] if len(offices) >= 1 else offices,
-                                         key="tab11_offices")
-        else:
-            sel_offices = None
-
-        st.markdown("---")
-
-        score_col = "_점수100" if "_점수100" in df_f.columns else _need_score
-        grp = df_f.groupby([_need_office, _need_biz])[score_col].agg(["mean", "count"]).reset_index()
-        grp.columns = ["지사", "업무구분", "평균점수", "건수"]
-        grp = grp[grp["건수"] >= 3]
-
-        office_avg = df_f.groupby(_need_office)[score_col].mean().reset_index()
-        office_avg.columns = ["지사", "지사평균"]
-        office_avg = _sort_df_by_office(office_avg, "지사")
-
-        if sel_offices:
-            target_offices = [o for o in office_avg["지사"] if o in sel_offices]
-        else:
-            target_offices = office_avg["지사"].tolist()
-
-        if not target_offices:
-            st.warning("선택된 지사가 없습니다.")
-        else:
-            # ── 1단계: pandas로 전체 데이터 수집 (API 호출 없음) ──
-            all_items = []      # Gemini에 보낼 항목
-            all_meta = []       # 화면 표시용 메타데이터
-
-            for office in target_offices:
-                oavg = office_avg[office_avg["지사"] == office]["지사평균"].values
-                oavg_val = oavg[0] if len(oavg) > 0 else 0
-                office_grp = grp[grp["지사"] == office].sort_values("평균점수").head(3)
-
-                if office_grp.empty:
-                    continue
-
-                for _, biz_row in office_grp.iterrows():
-                    biz_name = biz_row["업무구분"]
-                    biz_avg  = biz_row["평균점수"]
-                    biz_cnt  = int(biz_row["건수"])
-
-                    target_ct = "-"
-                    target_ct_avg = 0
-                    if _has_contract:
-                        ct_sub = df_f[(df_f[_need_office] == office) & (df_f[_need_biz] == biz_name)]
-                        ct_grp = ct_sub.groupby(_has_contract)[score_col].agg(["mean", "count"]).reset_index()
-                        ct_grp.columns = ["계약종별", "평균", "건수"]
-                        ct_grp = ct_grp[ct_grp["건수"] >= 1].sort_values("평균")
-                        if not ct_grp.empty:
-                            target_ct = ct_grp.iloc[0]["계약종별"]
-                            target_ct_avg = ct_grp.iloc[0]["평균"]
-
-                    voc_str = "없음"
-                    if _has_voc:
-                        voc_filter = (df_f[_need_office] == office) & (df_f[_need_biz] == biz_name)
-                        if _has_contract and target_ct != "-":
-                            voc_sub = df_f[voc_filter & (df_f[_has_contract] == target_ct) & (df_f[score_col] <= 80)]
-                        else:
-                            voc_sub = df_f[voc_filter & (df_f[score_col] <= 80)]
-                        if not voc_sub.empty:
-                            raw = voc_sub[_has_voc].dropna().tolist()
-                            meaningful = [str(t).strip() for t in raw if len(str(t).strip()) > 5]
-                            if meaningful:
-                                voc_str = " / ".join(meaningful[:10])
-
-                    all_items.append({"office": office, "biz": biz_name,
-                                       "ct": target_ct, "voc": voc_str})
-                    all_meta.append({"office": office, "oavg": oavg_val,
-                                      "biz_label": f"{biz_name} ({biz_avg:.1f}점, {biz_cnt}건)",
-                                      "ct_label": f"{target_ct}" + (f" ({target_ct_avg:.0f}점)" if target_ct != "-" else "")})
-
-            # ── 2단계: API 1회 호출 ──
-            if all_items:
-                st.markdown("💡 **과도한 API 호출 방지:** 데이터 세팅이 끝나면 아래 버튼을 눌러주세요.")
-
-                if st.button("🚀 AI 지사 맞춤형 솔루션 분석 시작", type="primary"):
-                    with st.spinner(f"✨ 구글 AI가 {len(all_items)}개 항목을 일괄 분석 중입니다... (API 1회 호출)"):
-                        insights = get_gemini_bulk_insight(json.dumps(all_items, ensure_ascii=False))
-
-                    # ── 3단계: 지사별로 결과 표시 ──
-                    idx = 0
-                    for office in target_offices:
-                        office_meta = [m for m in all_meta if m["office"] == office]
-                        if not office_meta:
-                            st.info(f"{office}: 분석 가능한 업무구분 데이터가 부족합니다 (3건 이상 필요).")
-                            st.markdown("---")
-                            continue
-
-                        st.markdown(f'## 🏢 {office} CS 심층 분석 및 맞춤형 솔루션')
-                        st.markdown(f'**전체 평균: {office_meta[0]["oavg"]:.1f}점**')
-
-                        result_rows = []
-                        for m in office_meta:
-                            painpoint, context, action = insights[idx]
-                            idx += 1
-                            result_rows.append({
-                                "취약 업무구분": m["biz_label"],
-                                "주요 타겟 (계약종별)": m["ct_label"],
-                                "핵심 페인포인트": painpoint,
-                                "원인 분석 및 추론": context,
-                                "지사 맞춤형 Action Item": action,
-                            })
-                        df_result = pd.DataFrame(result_rows)
-                        st.dataframe(df_result, use_container_width=True, hide_index=True)
-                        st.markdown("---")
-            else:
-                st.info("분석 가능한 데이터가 없습니다.")
-    else:
-        missing = []
-        if not _need_office: missing.append("지사")
-        if not _need_score:  missing.append("종합점수")
-        if not _need_biz:    missing.append("업무구분")
-        st.info(f"이 분석을 수행하려면 다음 컬럼이 필요합니다: {', '.join(missing)}")
 
