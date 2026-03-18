@@ -151,8 +151,21 @@ def _sort_df_by_office(df, office_col, ascending=True):
     return df
 
 # ══════════════════════════════════════════════════════════════
-#  2. 키워드 사전
+#  2. AI 시스템 프롬프트 & 키워드 사전
 # ══════════════════════════════════════════════════════════════
+_AI_SYSTEM_PREFIX = (
+    "[전문가 페르소나]\n"
+    "너는 대한민국 전력산업 CS 컨설턴트이자 데이터 분석 전문가야. "
+    "공공기관의 예산/인력 제약 조건을 완벽히 이해하고 있으며, 실무 중심의 해결책을 제시해야 해.\n\n"
+    "[금지 사항]\n"
+    "다음 사항은 절대 제안하지 마: 단순 친절 교육, 상담원 역할극, 마인드 컨트롤, "
+    "인력 충원, 대규모 예산이 드는 시스템 전면 개편.\n\n"
+    "[도메인 지식]\n"
+    "분석 시 전력 산업의 특수성을 반드시 고려해:\n"
+    "- 계절성: 동절기/하절기 요금 급등 및 냉난방 민원\n"
+    "- 고객 특성: 고령층의 아날로그 선호 vs 기업 고객의 전문적 요구\n"
+    "- 채널 특성: 고객센터 병목 현상 및 한전ON 앱의 디지털 전환 과제\n\n"
+)
 NEGATIVE_KEYWORDS = [
     "불만","불편","민원","항의","화남","짜증","느림","느려","오류","오작동",
     "불량","고장","재방문","지연","오래","기다림","실망","최악","별로",
@@ -1339,7 +1352,7 @@ with tab1:
                        "font": {"size": 14, "color": C["navy"]}},
             ))
             fig_gauge.update_layout(height=300, margin=dict(t=70, b=20, l=30, r=30), paper_bgcolor="white")
-            st.plotly_chart(fig_gauge, use_container_width=True)
+            st.plotly_chart(fig_gauge, use_container_width=True, config={'staticPlot': True})
         with b_col:
             st.markdown('<p class="sec-head">📊 만족도 점수 구간별 비중 통계</p>', unsafe_allow_html=True)
             bucket_cnt = df_f["_점수구간"].value_counts()
@@ -1354,7 +1367,7 @@ with tab1:
                                   marker=dict(line=dict(color="#ffffff", width=2)),
                                   hovertemplate="%{label}<br>%{value:,}건 (%{percent})<extra></extra>")
             fig_bp.update_layout(height=300, margin=dict(t=30, b=20, l=20, r=20), showlegend=True)
-            st.plotly_chart(fig_bp, use_container_width=True)
+            st.plotly_chart(fig_bp, use_container_width=True, config={'staticPlot': True})
 
         # ── 사업소별 평균 만족도 ──
         if M["office"]:
@@ -1378,77 +1391,8 @@ with tab1:
             fig_bench.update_layout(height=max(350, len(_ofc_grp_bar) * 35 + 80),
                                      margin=dict(t=60, b=20, l=10, r=100), legend_title_text="",
                                      title_font=dict(size=14, color=C["navy"]))
-            st.plotly_chart(fig_bench, use_container_width=True)
+            st.plotly_chart(fig_bench, use_container_width=True, config={'staticPlot': True})
 
-        # ── 지사별 박스 플롯 ──
-        if M["office"]:
-            st.markdown("---")
-            st.markdown('<p class="sec-head">📦 지사별 만족도 점수 분포 (Box Plot)</p>', unsafe_allow_html=True)
-            _ofc_mean_map = df_f.groupby(M["office"])["_점수100"].mean()
-            _ofc_count_map = df_f.groupby(M["office"])["_점수100"].count()
-            _ofc_order = _ofc_count_map.sort_values(ascending=False).index.tolist()
-            _box_avg = df_f["_점수100"].mean()
-            _below_avg = set(_ofc_mean_map[_ofc_mean_map < _box_avg].index)
-            fig_box = go.Figure()
-            for ofc in _ofc_order:
-                ofc_data = df_f[df_f[M["office"]] == ofc]["_점수100"]
-                _is_below = ofc in _below_avg
-                fig_box.add_trace(go.Box(
-                    y=ofc_data, name=ofc,
-                    marker_color="#E8A0A0" if _is_below else C["sky"],
-                    line_color="#D08080" if _is_below else "#5B9BD5",
-                    fillcolor="rgba(232,160,160,0.4)" if _is_below else "rgba(91,155,213,0.4)",
-                    boxmean=True,
-                ))
-            fig_box.update_layout(height=450, margin=dict(t=60, b=80, l=60, r=20),
-                                   xaxis_tickangle=-25, xaxis_title="", yaxis_title="만족도 점수 (100점 환산)",
-                                   title=dict(text="지사별 만족도 분포 (응답 건수 많은 순 · 붉은색 = 전체 평균 미달)",
-                                              font=dict(size=14, color=C["navy"])),
-                                   showlegend=False, template=PLOTLY_TPL)
-            st.plotly_chart(fig_box, use_container_width=True)
-            _top5 = ", ".join(_ofc_order[:5])
-            st.info(f"💡 본부 전체 점수 향상을 위해 **응답 비중이 높은 상위 5개 지사({_top5})**의 불만족 요인을 우선 해결하고, 응답 수가 적어 점수가 왜곡될 수 있는 지사는 'VOC 내용' 중심의 개별 밀착 관리를 진행합니다.")
-
-            with st.expander("📊 박스 플롯(Box Plot), 1분 만에 이해하기"):
-                st.markdown("""
-**"평균 점수 뒤에 숨겨진 '진짜 모습'을 보여주는 그래프입니다."**
-
----
-
-**1. 각 부위의 의미** (무엇을 나타내나요?)
-
-박스 플롯은 데이터를 4등분 하여 어디에 사람들이 가장 많이 몰려 있는지 보여줍니다.
-
-- **가로선 (중앙값):** 응답자를 점수순으로 줄 세웠을 때 딱 중간에 있는 사람의 점수입니다. (평균보다 실제 체감 만족도에 가깝습니다.)
-- **색칠된 상자:** 전체 응답자의 **중심부 50%** 가 모여 있는 구간입니다. 우리 지사 고객 대부분의 점수대라고 보시면 됩니다.
-- **위아래 수염:** '정상 범위' 내에서의 최고점과 최저점입니다.
-- **떨어져 있는 점 (이상치):** 유독 아주 낮거나 높은 점수를 준 '특이 케이스'입니다. (집중 관리가 필요한 민원 신호!)
-""")
-                import base64 as _b64
-                _box_guide_img = _b64.b64decode("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")
-                st.image(_box_guide_img, width=640)
-                st.markdown("""
-
----
-
-**2. 딱 2가지만 확인하세요!** (어떻게 해석하나요?)
-
-**① 상자의 위치:** "우리 지사는 전반적으로 잘하나?"
-- 상자가 **위쪽(100점 근처)** 에 붙어 있을수록 고객들이 전반적으로 만족하고 있다는 뜻입니다.
-- **목표:** 상자를 전체적으로 위로 끌어올리기!
-
-**② 상자의 길이:** "우리 지사는 서비스가 일정한가?"
-- **상자가 짧음 (안정형):** 모든 고객이 비슷한 수준의 서비스를 받고 있습니다. (기복 없는 우수한 관리)
-- **상자가 길음 (불안정형):** 고객마다 느끼는 서비스 편차가 큽니다. 어떤 고객은 대만족, 어떤 고객은 대불만족인 상태입니다.
-- **목표:** 상자의 길이를 짧게 만들어 서비스 표준화하기!
-
----
-
-**3. 이런 지사는 주의 깊게 보세요!**
-- **상자는 높은데 아래로 수염이 긴 경우:** 전반적으로는 잘하지만, 특정 상황에서 고객이 큰 불만을 느꼈을 가능성이 큽니다. (돌발 악성 민원 주의)
-- **상자 아래에 점(이상치)이 많은 경우:** 반복적으로 아주 낮은 점수를 주는 특정 업무나 시간대가 있는지 파악이 필요합니다.
-""")
-            st.markdown("---")
 
     # ── 분포 차트 ──
     has_pie = any([M["age"], M["contract"], M["business"]])
@@ -1481,7 +1425,7 @@ with tab1:
                                            margin=dict(t=50, b=20, l=20, r=60), showlegend=False,
                                            title_font=dict(size=15, color=C["navy"]),
                                            xaxis_title="비율(%)", yaxis_title="")
-                    st.plotly_chart(fig_biz, use_container_width=True)
+                    st.plotly_chart(fig_biz, use_container_width=True, config={'staticPlot': True})
                 else:
                     # 연령대, 계약종별: 기존 파이차트 유지
                     fig_pie = px.pie(names=counts.index, values=counts.values, color_discrete_sequence=PIE_COLORS,
@@ -1491,7 +1435,7 @@ with tab1:
                                            hovertemplate="%{label}<br>%{value:,}건 (%{percent})<extra></extra>")
                     fig_pie.update_layout(height=360, margin=dict(t=50, b=20, l=20, r=20), showlegend=False,
                                            title_font=dict(size=15, color=C["navy"]))
-                    st.plotly_chart(fig_pie, use_container_width=True)
+                    st.plotly_chart(fig_pie, use_container_width=True, config={'staticPlot': True})
 
 
 # ─────────────────────────────────────────────────────────────
@@ -1520,7 +1464,7 @@ def _render_category_section(df, cat_col, cat_label, office_col, score_col, over
     fig.update_layout(height=max(300, len(grp) * 30 + 80),
                        margin=dict(t=60, b=20, l=10, r=100), legend_title_text="",
                        title_font=dict(size=14, color=C["navy"]))
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, use_container_width=True, config={'staticPlot': True})
 
     # ── 하위 3개 카드 ──
     b3_cols = st.columns(min(3, len(bottom3)))
@@ -1561,7 +1505,7 @@ def _render_category_section(df, cat_col, cat_label, office_col, score_col, over
                 height=max(350, len(pivot.index) * 30 + 100),
                 margin=dict(t=60, b=60, l=120, r=60),
                 title_font=dict(size=14, color=C["navy"]))
-            st.plotly_chart(fig_hm, use_container_width=True)
+            st.plotly_chart(fig_hm, use_container_width=True, config={'staticPlot': True})
 
         # ── 저점수 건 상세 조회 (60점 이하 전체 표) ──
         _uid = cat_label.replace(" ", "")
@@ -1781,7 +1725,7 @@ with tab3:
                            font=dict(size=14, color=C["navy"])),
                 legend=dict(orientation="h", yanchor="bottom", y=-0.18, xanchor="center", x=0.5, font=dict(size=11)),
                 template=PLOTLY_TPL)
-            st.plotly_chart(fig_bbl, use_container_width=True)
+            st.plotly_chart(fig_bbl, use_container_width=True, config={'staticPlot': True})
 
             # ── 사분면별 분류 카드 ──
             _q1_list = _bbl_grp[_bbl_grp["사분면"].str.contains("견인")].sort_values("처리건수", ascending=False)
@@ -1806,7 +1750,7 @@ with tab3:
                     st.error(f"**🚨 최우선 혁신** (건수↑ 점수↓ · 핵심 리스크): {_q4_names}\n\n→ 전사적 태스크포스(TF) 가동, 시스템 개선 및 인력 우선 배치")
 
             # ── AI 사분면 심층 분석 버튼 ──
-            if st.button("🤖 AI 사분면 심층 분석", key="ai_quadrant_btn", type="primary", use_container_width=True):
+            if st.button("🤖 AI 사분면 심층 분석", key="ai_quadrant_btn", type="primary", use_container_width=True, config={'staticPlot': True}):
                 if not GEMINI_AVAILABLE:
                     st.error("Gemini API 키가 설정되지 않았습니다. `.env` 파일에 `GEMINI_API_KEY`를 설정해주세요.")
                 else:
@@ -1834,8 +1778,7 @@ with tab3:
                                 for v in _vocs:
                                     _ai_q_voc.append(f"  - {v}")
 
-                    _ai_q_prompt = f"""당신은 전력산업 고객만족(CS) 전문 컨설턴트입니다.
-아래는 업무유형별 사분면 분석 결과입니다.
+                    _ai_q_prompt = _AI_SYSTEM_PREFIX + f"""아래는 업무유형별 사분면 분석 결과입니다.
 
 {_ai_q_data}
 [3·4사분면 업무의 불만족 VOC 원문]
@@ -1869,7 +1812,7 @@ with tab3:
                                         _body = json.loads(_resp.read().decode("utf-8"))
                                     break
                                 except urllib.error.HTTPError as _http_err:
-                                    if _http_err.code == 429:
+                                    if _http_err.code in (429, 503):
                                         continue
                                     raise
                             if _body is None:
@@ -1971,7 +1914,7 @@ with tab5:
                                           hovertemplate="%{x}: %{y}회<extra></extra>")
                     fig_neg.update_layout(height=340, margin=dict(t=50, b=70, l=60, r=20), xaxis_tickangle=-25,
                                            title_font=dict(size=14, color=C["navy"]))
-                    st.plotly_chart(fig_neg, use_container_width=True)
+                    st.plotly_chart(fig_neg, use_container_width=True, config={'staticPlot': True})
                 with nk_r:
                     fig_don = px.pie(nkw_df.head(10), names="부정키워드", values="감지횟수", hole=0.5,
                                      color_discrete_sequence=px.colors.sequential.Reds[::-1],
@@ -1981,7 +1924,7 @@ with tab5:
                                            hovertemplate="%{label}<br>%{value}회 (%{percent})<extra></extra>")
                     fig_don.update_layout(height=340, margin=dict(t=50, b=20, l=20, r=20), showlegend=False,
                                            title_font=dict(size=14, color=C["navy"]))
-                    st.plotly_chart(fig_don, use_container_width=True)
+                    st.plotly_chart(fig_don, use_container_width=True, config={'staticPlot': True})
 
             # 리스트 테이블
             display_cols = []
@@ -2006,7 +1949,7 @@ with tab5:
             st.download_button(label="📥  잠재 민원고객 엑셀 다운로드", data=excel_bytes,
                                file_name="잠재민원고객_사전케어리스트.xlsx",
                                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                               use_container_width=True)
+                               use_container_width=True, config={'staticPlot': True})
 
             # ── AI 사전케어 행동 가이드 ──
             st.markdown("---")
@@ -2027,13 +1970,12 @@ with tab5:
                 _biz_cnt = df_neg[M["business"]].value_counts().head(5)
                 _neg_biz_dist = ", ".join([f"{n}({v}건)" for n, v in _biz_cnt.items()])
 
-            if st.button("🤖 AI 맞춤 사전케어 가이드 생성", key="ai_precare_btn", type="primary", use_container_width=True):
+            if st.button("🤖 AI 맞춤 사전케어 가이드 생성", key="ai_precare_btn", type="primary", use_container_width=True, config={'staticPlot': True}):
                 if not GEMINI_AVAILABLE:
                     st.error("Gemini API 키가 설정되지 않았습니다. `.env` 파일에 `GEMINI_API_KEY`를 설정해주세요.")
                 else:
                     with st.spinner("Gemini AI가 VOC를 분석하여 맞춤 가이드를 생성 중입니다…"):
-                        _precare_prompt = f"""당신은 전력산업 고객만족(CS) 전문 컨설턴트입니다.
-아래는 고객 만족도 조사에서 추출된 **잠재 민원고객 {neg_n}명**의 데이터입니다.
+                        _precare_prompt = _AI_SYSTEM_PREFIX + f"""아래는 고객 만족도 조사에서 추출된 **잠재 민원고객 {neg_n}명**의 데이터입니다.
 
 [잠재 민원고객 현황]
 - 총 {neg_n}명 (전체 대비 {neg_r:.1f}%)
@@ -2087,7 +2029,7 @@ with tab5:
                                         _body = json.loads(_resp.read().decode("utf-8"))
                                     break
                                 except urllib.error.HTTPError as _http_err:
-                                    if _http_err.code == 429:
+                                    if _http_err.code in (429, 503):
                                         continue
                                     raise
                             if _body is None:
@@ -2144,7 +2086,7 @@ with tab5:
 
         # AI 심층 예측 버튼
         st.markdown("")
-        if st.button("🤖 AI 민원 예측 심층 분석", key="ai_predict_btn", type="primary", use_container_width=True):
+        if st.button("🤖 AI 민원 예측 심층 분석", key="ai_predict_btn", type="primary", use_container_width=True, config={'staticPlot': True}):
             if not GEMINI_AVAILABLE:
                 st.error("Gemini API 키가 설정되지 않았습니다.")
             else:
@@ -2157,8 +2099,7 @@ with tab5:
                         _samples = [t for t in _samples if t.strip() not in ("", "nan", "응답없음")][:10]
                         _pred_voc_samples.append((_biz, _samples))
 
-                _pred_prompt = f"""당신은 전력산업 CS 분석 전문가입니다.
-아래는 고객 만족도 조사에서 공식 민원 발전 가능성이 가장 높은 상위 3개 업무 유형입니다.
+                _pred_prompt = _AI_SYSTEM_PREFIX + f"""아래는 고객 만족도 조사에서 공식 민원 발전 가능성이 가장 높은 상위 3개 업무 유형입니다.
 
 [리스크 TOP 3 업무]
 """
@@ -2197,7 +2138,7 @@ with tab5:
                                     _body = json.loads(_resp.read().decode("utf-8"))
                                 break
                             except urllib.error.HTTPError as _http_err:
-                                if _http_err.code == 429:
+                                if _http_err.code in (429, 503):
                                     continue
                                 raise
                         if _body is None:
@@ -2290,7 +2231,7 @@ with tab_sol:
                 ))
                 fig_tm.update_layout(template=PLOTLY_TPL, height=440,
                                      margin=dict(t=10, b=10, l=10, r=10))
-                st.plotly_chart(fig_tm, use_container_width=True)
+                st.plotly_chart(fig_tm, use_container_width=True, config={'staticPlot': True})
 
         st.markdown("---")
 
@@ -2423,7 +2364,7 @@ with tab_sol:
                         margin=dict(t=30, b=30, l=60, r=60),
                         legend=dict(orientation="h", yanchor="bottom", y=-0.15),
                         showlegend=True)
-                    st.plotly_chart(fig_radar, use_container_width=True)
+                    st.plotly_chart(fig_radar, use_container_width=True, config={'staticPlot': True})
 
                     # 강점/약점 TOP 3
                     _biz_gap = pd.DataFrame({
@@ -2492,7 +2433,7 @@ with tab_sol:
                             xaxis=dict(title="건수 비중(%)", range=_pm_x_range),
                             yaxis=dict(title="평균 만족도", range=_pm_y_range),
                             showlegend=False)
-                        st.plotly_chart(fig_pm, use_container_width=True)
+                        st.plotly_chart(fig_pm, use_container_width=True, config={'staticPlot': True})
 
                         # 우하 사분면 경고
                         _pm_danger = _pm_grp[(_pm_grp["비중(%)"] >= _pm_x_mid) & (_pm_grp["만족도"] < _pm_y_mid)]
@@ -2569,7 +2510,7 @@ with tab_sol:
                     height=max(320, len(_hm_pivot) * 38 + 100),
                     margin=dict(t=10, b=60, l=120, r=20),
                     coloraxis_colorbar=dict(title="만족도"))
-                st.plotly_chart(fig_hm, use_container_width=True)
+                st.plotly_chart(fig_hm, use_container_width=True, config={'staticPlot': True})
 
                 # ── 벤치마킹 솔루션 + 사전케어 대상 ──────────────
                 _sol_bt_l, _sol_bt_r = st.columns([1, 1])
@@ -2880,7 +2821,7 @@ with tab_sol:
                                         template=PLOTLY_TPL, height=280,
                                         margin=dict(t=10, b=10, l=10, r=60),
                                         xaxis=dict(range=[60, 105]))
-                                    st.plotly_chart(fig_c3, use_container_width=True)
+                                    st.plotly_chart(fig_c3, use_container_width=True, config={'staticPlot': True})
                                     _culprit = _c3_ct.iloc[0]
                                     _cul_gap = round(_culprit["만족도"] - avg_score_100, 1)
                                     st.markdown(
@@ -2927,7 +2868,7 @@ with tab_sol:
                         st.markdown("---")
                         _c3_scenario_txt = f"[로직 기반 사전 진단]\n시나리오: {_rx_label}\n처방: {_rx_body}\n지사 간 편차: σ={_ofc_std}점 ({_cross_verdict})\n"
                         if st.button("🤖 AI 처방전 생성", key="sol_ai_cell_btn",
-                                     type="primary", use_container_width=True):
+                                     type="primary", use_container_width=True, config={'staticPlot': True}):
                             if not GEMINI_AVAILABLE:
                                 st.error("Gemini API 키가 설정되지 않았습니다.")
                             else:
@@ -2947,7 +2888,7 @@ with tab_sol:
                                               .head(8))
                                     _c3_voc_lines = "\n".join(f"  - {v}" for v in _c3_vl)
                                 _c3_prompt = (
-                                    f"당신은 전력산업 CS 전문가입니다.\n\n"
+                                    _AI_SYSTEM_PREFIX +
                                     f"[진단 대상]\n"
                                     f"지사: {_sel_off} | 업무: {_c3_biz} | 채널: {_c3_ch}\n"
                                     f"지사 평균: {_sel_avg:.1f}점 (본부 {avg_score_100:.1f}점 대비 {_sel_gap:+.1f}점)\n"
@@ -2985,7 +2926,7 @@ with tab_sol:
                                                     _body = json.loads(_rsp.read().decode("utf-8"))
                                                 break
                                             except urllib.error.HTTPError as _he:
-                                                if _he.code == 429:
+                                                if _he.code in (429, 503):
                                                     continue
                                                 raise
                                         if _body is None:
@@ -2995,6 +2936,147 @@ with tab_sol:
                                             st.markdown(_ai_txt)
                                     except Exception as _c3e:
                                         st.error(f"AI 분석 중 오류: {_c3e}")
+                # ══════════════════════════════════════════
+                # AI 종합 솔루션 보고서
+                # ══════════════════════════════════════════
+                st.markdown("---")
+                st.markdown("### 📑 AI 종합 솔루션 보고서")
+                st.caption("위 분석 결과(강점/약점, 미스매치, 히트맵, 리스크, 벤치마킹)를 종합하여 1페이지 맞춤형 보고서를 생성합니다.")
+                if st.button("📑 AI 종합 솔루션 보고서 생성", key="sol_report_btn",
+                             type="primary", use_container_width=True, config={'staticPlot': True}):
+                    if not GEMINI_AVAILABLE:
+                        st.error("Gemini API 키가 설정되지 않았습니다. `.env` 파일에 `GEMINI_API_KEY`를 설정해주세요.")
+                    else:
+                        # ── 데이터 수집 ──
+                        _rpt_lines = []
+                        # 1) 기본 정보
+                        _rpt_lines.append(f"[지사 기본 정보]")
+                        _rpt_lines.append(f"- 지사: {_sel_off}")
+                        _rpt_lines.append(f"- 만족도: {_sel_avg:.1f}점 (본부 평균 {avg_score_100:.1f}점 대비 {_sel_gap:+.1f}점)")
+                        _rpt_lines.append(f"- 응답 건수: {_sel_cnt}건 | 데이터 신뢰도: {_reliability}")
+                        _rpt_lines.append(f"- 본부 내 순위: {_rank}위/{_total_offs}개 지사")
+                        _rpt_lines.append(f"- 피어그룹({_peer_label}): {_peer_rank}위 (피어 평균 {_peer_avg:.1f}점)")
+
+                        # 2) 업무별 강점/약점
+                        _rpt_lines.append(f"\n[업무별 강점/약점 (레이더 차트 기반)]")
+                        if _strengths is not None and len(_strengths) > 0:
+                            for _, _sw in _strengths.iterrows():
+                                _rpt_lines.append(f"- 🟢 강점: {_sw.iloc[0]} ({_sw['편차']:+.1f}점)")
+                        if _weaknesses is not None and len(_weaknesses) > 0:
+                            for _, _sw in _weaknesses.iterrows():
+                                _rpt_lines.append(f"- 🔴 약점: {_sw.iloc[0]} ({_sw['편차']:+.1f}점)")
+
+                        # 3) 페르소나 미스매치
+                        _rpt_lines.append(f"\n[고객군(계약종별) 미스매치 분석]")
+                        if _pm_danger is not None and len(_pm_danger) > 0:
+                            for _, _pd in _pm_danger.iterrows():
+                                _rpt_lines.append(f"- 🚨 1순위 개선: {_pd['고객군']} (비중 {_pd['비중(%)']:.1f}%, 만족도 {_pd['만족도']:.1f}점, {_pd['건수']}건)")
+                        if _pm_watch is not None and len(_pm_watch) > 0:
+                            for _, _pw in _pm_watch.iterrows():
+                                _rpt_lines.append(f"- ⚠️ 특이 리스크: {_pw['고객군']} (비중 {_pw['비중(%)']:.1f}%, 만족도 {_pw['만족도']:.1f}점, {_pw['건수']}건)")
+
+                        # 4) 업무×채널 리스크
+                        _rpt_lines.append(f"\n[업무×채널 리스크]")
+                        if _real_top3:
+                            for _rr in _real_top3:
+                                _rpt_lines.append(f"- 실질적 리스크: {_rr['업무']}×{_rr['채널']} = {_rr['점수']:.1f}점 ({_rr['건수']}건, 임팩트 {_rr['impact']:.0f})")
+                        if _drop_top3:
+                            for _dd in _drop_top3:
+                                _rpt_lines.append(f"- 급락 조합: {_dd['업무']}×{_dd['채널']} = {_dd['점수']:.1f}점 ({_dd['건수']}건)")
+
+                        # 5) 벤치마킹
+                        _rpt_lines.append(f"\n[벤치마킹 대상 (본부 내 1위 지사)]")
+                        if _bm_cards:
+                            for _bc in _bm_cards:
+                                _rpt_lines.append(f"- {_bc['업무']}: 내 점수 {_bc['내점수']:.1f}점 → {_bc['1위지사']} {_bc['1위점수']:.1f}점 (1위, {_bc['1위건수']}건)")
+                        else:
+                            _rpt_lines.append("- 벤치마킹 대상 없음 (약점 업무 없음)")
+
+                        # 6) 사전케어
+                        _rpt_lines.append(f"\n[사전케어 대상 (50점 이하)]")
+                        _rpt_lines.append(f"- 해당 건수: {len(_pc_df)}건")
+
+                        # 7) 불만 VOC 원문
+                        _rpt_lines.append(f"\n[불만 VOC 원문 (최대 10건)]")
+                        _rpt_voc_list = []
+                        if M.get("voc") and M["voc"] in _df_sel.columns:
+                            _rpt_voc_raw = (_df_sel[_df_sel["_점수100"] < 60][M["voc"]]
+                                            .dropna().astype(str)
+                                            .loc[lambda s: (s.str.len() > 5) & (~s.isin(["응답없음", "nan", ""]))]
+                                            .head(10))
+                            _rpt_voc_list = _rpt_voc_raw.tolist()
+                        if _rpt_voc_list:
+                            for _rv in _rpt_voc_list:
+                                _rpt_lines.append(f"- {_rv[:150]}")
+                        else:
+                            _rpt_lines.append("- 해당 없음")
+
+                        _rpt_data = "\n".join(_rpt_lines)
+
+                        _rpt_prompt = _AI_SYSTEM_PREFIX + f"""아래는 **{_sel_off}**의 CS 종합 진단 데이터입니다.
+이 데이터를 기반으로 1페이지 분량의 맞춤형 종합 솔루션 보고서를 작성하세요.
+
+{_rpt_data}
+
+[보고서 형식 — 반드시 아래 구조를 따르세요]
+
+## 📊 {_sel_off} CS 종합 진단
+- 한줄 요약 (현재 상태 + 핵심 이슈를 한 문장으로)
+
+## 🔴 최우선 개선 과제 (TOP 3)
+- 각 과제별: **문제점** → **근거(수치·VOC 인용)** → **구체적 실행방안** → **기대효과**
+- 72시간 내 지사장이 즉시 실행 가능한 수준으로 작성
+
+## 🟡 구조적 개선 과제 (3개월 로드맵)
+- 1개월차 / 2개월차 / 3개월차 단위로 구분
+- 각 단계별 구체적 액션과 측정 지표 포함
+
+## 🟢 강점 활용 전략
+- 잘하는 업무의 성공 요인을 분석하고, 약점 업무에 전파하는 구체적 방법 제시
+
+## 💡 벤치마킹 포인트
+- 본부 내 우수 지사 데이터를 근거로 실행 가능한 제안
+
+## ⚠️ 리스크 모니터링 항목
+- 급락 조합 및 사전케어 대상에 대한 모니터링 방안
+
+※ 반드시 위 데이터의 지사명·업무명·수치·VOC를 근거로 작성하세요.
+※ 추상적 제안 금지. 현장에서 바로 쓸 수 있는 수준으로 구체화하세요."""
+
+                        with st.spinner("AI가 종합 솔루션 보고서를 생성 중…"):
+                            try:
+                                import urllib.request
+                                _models = ["gemini-2.0-flash", "gemma-3-12b-it", "gemma-3-27b-it"]
+                                _rpt_pl = {
+                                    "contents": [{"parts": [{"text": _rpt_prompt}]}],
+                                    "generationConfig": {"temperature": 0.7, "maxOutputTokens": 4096}
+                                }
+                                _ctx = ssl._create_unverified_context()
+                                _body = None
+                                for _model in _models:
+                                    _url = (f"https://generativelanguage.googleapis.com/v1beta/"
+                                            f"models/{_model}:generateContent?key={_GEMINI_KEY}")
+                                    _req = urllib.request.Request(
+                                        _url,
+                                        data=json.dumps(_rpt_pl).encode("utf-8"),
+                                        headers={"Content-Type": "application/json"},
+                                        method="POST")
+                                    try:
+                                        with urllib.request.urlopen(_req, context=_ctx, timeout=120) as _rsp:
+                                            _body = json.loads(_rsp.read().decode("utf-8"))
+                                        break
+                                    except urllib.error.HTTPError as _he:
+                                        if _he.code in (429, 503):
+                                            continue
+                                        raise
+                                if _body is None:
+                                    st.error("모든 AI 모델의 일일 한도가 소진되었습니다. 내일 다시 시도해주세요.")
+                                else:
+                                    _rpt_txt = _body["candidates"][0]["content"]["parts"][0]["text"].strip()
+                                    st.markdown(_rpt_txt)
+                            except Exception as _rpt_e:
+                                st.error(f"AI 보고서 생성 중 오류: {_rpt_e}")
+
             else:
                 st.info("채널 또는 업무유형 컬럼이 설정되지 않았습니다.")
 
@@ -3109,9 +3191,9 @@ with tab10:
 
             ch_l, ch_r = st.columns(2)
             with ch_l:
-                st.plotly_chart(fig_sent, use_container_width=True)
+                st.plotly_chart(fig_sent, use_container_width=True, config={'staticPlot': True})
             with ch_r:
-                st.plotly_chart(fig_cause, use_container_width=True)
+                st.plotly_chart(fig_cause, use_container_width=True, config={'staticPlot': True})
 
             # Unmet Needs 카드 (상위 3개 원인)
             st.markdown("**🎯 고객의 진짜 니즈 (Unmet Needs) — 부정 원인 TOP 3**")
@@ -3131,7 +3213,7 @@ with tab10:
                         f'{ex_text}</div>',
                         unsafe_allow_html=True)
         else:
-            st.plotly_chart(fig_sent, use_container_width=True)
+            st.plotly_chart(fig_sent, use_container_width=True, config={'staticPlot': True})
 
         # OOS 상세 (접기)
         if oos_cnt > 0:
@@ -3193,7 +3275,7 @@ with tab10:
                     fig_hm.update_layout(height=max(350, len(score_item_cols) * 40 + 100),
                                           margin=dict(t=60, b=20, l=10, r=20),
                                           title_font=dict(size=14, color=C["navy"]))
-                    st.plotly_chart(fig_hm, use_container_width=True)
+                    st.plotly_chart(fig_hm, use_container_width=True, config={'staticPlot': True})
 
                     # 핵심 인사이트 자동 도출
                     insights = []
