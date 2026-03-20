@@ -1811,6 +1811,105 @@ with tab3:
                         except Exception as e:
                             st.error(f"AI 분석 중 오류: {e}")
 
+        st.markdown("---")
+
+        # ── 계약종별 — 개별항목↔종합점수 상관관계 ──
+        _df_pure_t3 = df_f[~df_f["_is_oos"]].copy() if "_is_oos" in df_f.columns else df_f.copy()
+        st.markdown('<p class="sec-head">📊 계약종별 — 개별항목↔종합점수 상관관계 (순수 데이터)</p>',
+                    unsafe_allow_html=True)
+
+        if M["score"] and "_점수100" in _df_pure_t3.columns:
+            score_item_cols_t3 = []
+            for c in _df_pure_t3.columns:
+                if c in ("_점수100", "_원본순번", "_접수일", "_is_oos"): continue
+                if c.startswith("_"): continue
+                vals = pd.to_numeric(_df_pure_t3[c], errors="coerce")
+                valid_ratio = vals.notna().sum() / max(len(_df_pure_t3), 1)
+                if valid_ratio > 0.1 and vals.nunique() > 2:
+                    corr = vals.corr(_df_pure_t3["_점수100"])
+                    if pd.notna(corr) and abs(corr) > 0.05 and c != M["score"]:
+                        score_item_cols_t3.append(c)
+
+            contract_col_t3 = M.get("contract")
+            if contract_col_t3 and "_계약종별" in _df_pure_t3.columns:
+                contract_groups_t3 = _df_pure_t3["_계약종별"].dropna().unique()
+                contract_groups_t3 = [g for g in ["주택용", "일반용", "산업용", "농사용", "교육용", "가로등"]
+                                       if g in contract_groups_t3 and len(_df_pure_t3[_df_pure_t3["_계약종별"] == g]) >= 5]
+
+                if score_item_cols_t3 and contract_groups_t3:
+                    corr_data_t3 = []
+                    for grp_name in contract_groups_t3:
+                        sub = _df_pure_t3[_df_pure_t3["_계약종별"] == grp_name]
+                        for col in score_item_cols_t3:
+                            vals = pd.to_numeric(sub[col], errors="coerce")
+                            both = pd.DataFrame({"item": vals, "total": sub["_점수100"]}).dropna()
+                            if len(both) >= 5:
+                                corr = both["item"].corr(both["total"])
+                                if pd.notna(corr):
+                                    corr_data_t3.append({"계약종": grp_name, "항목": col, "상관계수": round(corr, 3)})
+
+                    if corr_data_t3:
+                        df_corr_t3 = pd.DataFrame(corr_data_t3)
+                        pivot_corr_t3 = df_corr_t3.pivot_table(index="항목", columns="계약종", values="상관계수")
+
+                        fig_hm_t3 = px.imshow(pivot_corr_t3, text_auto=".2f", aspect="auto",
+                                               color_continuous_scale="RdYlGn",
+                                               title="계약종별 개별항목↔종합점수 상관관계 히트맵 (OOS 제외)")
+                        fig_hm_t3.update_traces(hovertemplate="항목: %{y}<br>계약종별: %{x}<br>상관계수: %{z:.3f}<extra></extra>")
+                        fig_hm_t3.update_layout(height=max(350, len(score_item_cols_t3) * 40 + 100),
+                                                  margin=dict(t=60, b=20, l=10, r=20),
+                                                  title_font=dict(size=14, color=C["navy"]))
+                        st.plotly_chart(fig_hm_t3, use_container_width=True, config={'staticPlot': True})
+
+                        insights_t3 = []
+                        for grp_name in contract_groups_t3:
+                            grp_corr = df_corr_t3[df_corr_t3["계약종"] == grp_name].sort_values("상관계수", ascending=False)
+                            if len(grp_corr) >= 2:
+                                top = grp_corr.iloc[0]
+                                if top["상관계수"] > 0.8:
+                                    insights_t3.append(
+                                        f"**{grp_name}** 고객은 <b>{top['항목']}</b>(상관 {top['상관계수']:.2f})이 "
+                                        f"종합점수에 가장 큰 영향 → 이 항목 집중 개선 시 만족도 급상승 가능")
+                                grp_sub = _df_pure_t3[_df_pure_t3["_계약종별"] == grp_name]
+                                grp_mean = pd.to_numeric(grp_sub[top["항목"]], errors="coerce").mean()
+                                overall_mean = pd.to_numeric(_df_pure_t3[top["항목"]], errors="coerce").mean()
+                                if pd.notna(grp_mean) and pd.notna(overall_mean) and grp_mean < overall_mean - 2:
+                                    insights_t3.append(
+                                        f"  → {grp_name}의 {top['항목']} 평균 {grp_mean:.1f}점은 "
+                                        f"전체 평균 {overall_mean:.1f}점 대비 **{overall_mean - grp_mean:.1f}점 낮음** (집중 관리 필요)")
+
+                        if insights_t3:
+                            st.markdown(
+                                '<div class="card-gold"><b>📌 계약종별 핵심 상관관계 인사이트</b><br><br>' +
+                                "<br>".join(f"• {ins}" for ins in insights_t3[:6]) +
+                                '</div>', unsafe_allow_html=True)
+
+                        GUIDE = {
+                            "주택용": ("친절도 + 편리성", "감성적 공감이 점수를 좌우하는 고객층. 편안하고 따뜻한 응대가 핵심"),
+                            "일반용": ("처리 정확성 + 절차 간소화", "사업자는 시간이 곧 비용. 정확하게 한 번에 처리하는 것이 최우선"),
+                            "산업용": ("전문성 + 신속성", "수전설비·피크요금 등 전력 전문지식이 필수. 친절보다 정확한 답을 원함"),
+                            "농사용": ("친절도 + 쉬운 용어", "디지털 채널 이용률 낮은 고객층. 따뜻한 안내와 쉬운 설명이 핵심"),
+                            "교육용": ("안정적 전력 공급", "학교·교육시설 특성상 안정적 공급과 요금 체계 명확성이 중요"),
+                            "가로등": ("신속한 고장 처리", "야간 안전과 직결. 고장 신고 후 빠른 복구가 최우선"),
+                        }
+                        st.markdown('<p class="sec-head">📘 계약종별 응대 매뉴얼 인사이트</p>',
+                                    unsafe_allow_html=True)
+                        guide_cols_t3 = st.columns(min(3, len(contract_groups_t3)))
+                        for i, grp_name in enumerate(contract_groups_t3[:6]):
+                            with guide_cols_t3[i % 3]:
+                                focus, desc = GUIDE.get(grp_name, ("일반", ""))
+                                n = len(_df_pure_t3[_df_pure_t3["_계약종별"] == grp_name])
+                                avg = _df_pure_t3[_df_pure_t3["_계약종별"] == grp_name]["_점수100"].mean()
+                                st.markdown(
+                                    f'<div class="card-blue" style="min-height:160px">'
+                                    f'<b>{grp_name}</b> (n={n:,}, 평균 {avg:.1f}점)<br><br>'
+                                    f'🎯 <b>핵심 가치:</b> {focus}<br><br>'
+                                    f'<span style="font-size:0.9em">{desc}</span></div>',
+                                    unsafe_allow_html=True)
+            else:
+                st.info("계약종별 컬럼이 필요합니다.")
+        else:
+            st.info("종합 점수 컬럼이 필요합니다.")
 
 
 #  TAB 5  민원 조기 경보 시스템
@@ -3075,108 +3174,5 @@ with tab10:
     else:
         st.info("VOC(서술 의견) 컬럼이 필요합니다.")
 
-    st.markdown("---")
-
-    # ══════════════════════════════════════════
-    # 2. 계약종별-점수 상관관계 (OOS 제외 순수 데이터)
-    # ══════════════════════════════════════════
-    st.markdown('<p class="sec-head">2️⃣ 계약종별 — 개별항목↔종합점수 상관관계 (순수 데이터)</p>',
-                unsafe_allow_html=True)
-
-    if M["score"] and "_점수100" in df_pure.columns:
-        score_item_cols = []
-        for c in df_pure.columns:
-            if c in ("_점수100", "_원본순번", "_접수일", "_is_oos"): continue
-            if c.startswith("_"): continue
-            vals = pd.to_numeric(df_pure[c], errors="coerce")
-            valid_ratio = vals.notna().sum() / max(len(df_pure), 1)
-            if valid_ratio > 0.1 and vals.nunique() > 2:
-                corr = vals.corr(df_pure["_점수100"])
-                if pd.notna(corr) and abs(corr) > 0.05 and c != M["score"]:
-                    score_item_cols.append(c)
-
-        contract_col = M.get("contract")
-        if contract_col and "_계약종별" in df_pure.columns:
-            contract_groups = df_pure["_계약종별"].dropna().unique()
-            contract_groups = [g for g in ["주택용", "일반용", "산업용", "농사용", "교육용", "가로등"]
-                               if g in contract_groups and len(df_pure[df_pure["_계약종별"] == g]) >= 5]
-
-            if score_item_cols and contract_groups:
-                corr_data = []
-                for grp_name in contract_groups:
-                    sub = df_pure[df_pure["_계약종별"] == grp_name]
-                    for col in score_item_cols:
-                        vals = pd.to_numeric(sub[col], errors="coerce")
-                        both = pd.DataFrame({"item": vals, "total": sub["_점수100"]}).dropna()
-                        if len(both) >= 5:
-                            corr = both["item"].corr(both["total"])
-                            if pd.notna(corr):
-                                corr_data.append({"계약종": grp_name, "항목": col, "상관계수": round(corr, 3)})
-
-                if corr_data:
-                    df_corr = pd.DataFrame(corr_data)
-                    pivot_corr = df_corr.pivot_table(index="항목", columns="계약종", values="상관계수")
-
-                    fig_hm = px.imshow(pivot_corr, text_auto=".2f", aspect="auto",
-                                       color_continuous_scale="RdYlGn",
-                                       title="계약종별 개별항목↔종합점수 상관관계 히트맵 (OOS 제외)")
-                    fig_hm.update_traces(hovertemplate="항목: %{y}<br>계약종별: %{x}<br>상관계수: %{z:.3f}<extra></extra>")
-                    fig_hm.update_layout(height=max(350, len(score_item_cols) * 40 + 100),
-                                          margin=dict(t=60, b=20, l=10, r=20),
-                                          title_font=dict(size=14, color=C["navy"]))
-                    st.plotly_chart(fig_hm, use_container_width=True, config={'staticPlot': True})
-
-                    # 핵심 인사이트 자동 도출
-                    insights = []
-                    for grp_name in contract_groups:
-                        grp_corr = df_corr[df_corr["계약종"] == grp_name].sort_values("상관계수", ascending=False)
-                        if len(grp_corr) >= 2:
-                            top = grp_corr.iloc[0]
-                            if top["상관계수"] > 0.8:
-                                insights.append(
-                                    f"**{grp_name}** 고객은 <b>{top['항목']}</b>(상관 {top['상관계수']:.2f})이 "
-                                    f"종합점수에 가장 큰 영향 → 이 항목 집중 개선 시 만족도 급상승 가능")
-                            grp_sub = df_pure[df_pure["_계약종별"] == grp_name]
-                            grp_mean = pd.to_numeric(grp_sub[top["항목"]], errors="coerce").mean()
-                            overall_mean = pd.to_numeric(df_pure[top["항목"]], errors="coerce").mean()
-                            if pd.notna(grp_mean) and pd.notna(overall_mean) and grp_mean < overall_mean - 2:
-                                insights.append(
-                                    f"  → {grp_name}의 {top['항목']} 평균 {grp_mean:.1f}점은 "
-                                    f"전체 평균 {overall_mean:.1f}점 대비 **{overall_mean - grp_mean:.1f}점 낮음** (집중 관리 필요)")
-
-                    if insights:
-                        st.markdown(
-                            '<div class="card-gold"><b>📌 계약종별 핵심 상관관계 인사이트</b><br><br>' +
-                            "<br>".join(f"• {ins}" for ins in insights[:6]) +
-                            '</div>', unsafe_allow_html=True)
-
-                    # 계약종별 응대 가이드
-                    GUIDE = {
-                        "주택용": ("친절도 + 편리성", "감성적 공감이 점수를 좌우하는 고객층. 편안하고 따뜻한 응대가 핵심"),
-                        "일반용": ("처리 정확성 + 절차 간소화", "사업자는 시간이 곧 비용. 정확하게 한 번에 처리하는 것이 최우선"),
-                        "산업용": ("전문성 + 신속성", "수전설비·피크요금 등 전력 전문지식이 필수. 친절보다 정확한 답을 원함"),
-                        "농사용": ("친절도 + 쉬운 용어", "디지털 채널 이용률 낮은 고객층. 따뜻한 안내와 쉬운 설명이 핵심"),
-                        "교육용": ("안정적 전력 공급", "학교·교육시설 특성상 안정적 공급과 요금 체계 명확성이 중요"),
-                        "가로등": ("신속한 고장 처리", "야간 안전과 직결. 고장 신고 후 빠른 복구가 최우선"),
-                    }
-                    st.markdown('<p class="sec-head">📘 계약종별 응대 매뉴얼 인사이트</p>',
-                                unsafe_allow_html=True)
-                    guide_cols = st.columns(min(3, len(contract_groups)))
-                    for i, grp_name in enumerate(contract_groups[:6]):
-                        with guide_cols[i % 3]:
-                            focus, desc = GUIDE.get(grp_name, ("일반", ""))
-                            n = len(df_pure[df_pure["_계약종별"] == grp_name])
-                            avg = df_pure[df_pure["_계약종별"] == grp_name]["_점수100"].mean()
-                            st.markdown(
-                                f'<div class="card-blue" style="min-height:160px">'
-                                f'<b>{grp_name}</b> (n={n:,}, 평균 {avg:.1f}점)<br><br>'
-                                f'🎯 <b>핵심 가치:</b> {focus}<br><br>'
-                                f'<span style="font-size:0.9em">{desc}</span></div>',
-                                unsafe_allow_html=True)
-
-        else:
-            st.info("계약종별 컬럼이 필요합니다.")
-    else:
-        st.info("종합 점수 컬럼이 필요합니다.")
 
 
