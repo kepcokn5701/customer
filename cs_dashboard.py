@@ -1750,7 +1750,7 @@ with tab3:
                     st.error(f"**🚨 최우선 혁신** (건수↑ 점수↓ · 핵심 리스크): {_q4_names}\n\n→ 전사적 태스크포스(TF) 가동, 시스템 개선 및 인력 우선 배치")
 
             # ── AI 사분면 심층 분석 버튼 ──
-            if st.button("🤖 AI 사분면 심층 분석", key="ai_quadrant_btn", type="primary", use_container_width=True, config={'staticPlot': True}):
+            if st.button("🤖 AI 사분면 심층 분석", key="ai_quadrant_btn", type="primary", use_container_width=True):
                 if not GEMINI_AVAILABLE:
                     st.error("Gemini API 키가 설정되지 않았습니다. `.env` 파일에 `GEMINI_API_KEY`를 설정해주세요.")
                 else:
@@ -1949,7 +1949,7 @@ with tab5:
             st.download_button(label="📥  잠재 민원고객 엑셀 다운로드", data=excel_bytes,
                                file_name="잠재민원고객_사전케어리스트.xlsx",
                                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                               use_container_width=True, config={'staticPlot': True})
+                               use_container_width=True)
 
             # ── AI 사전케어 행동 가이드 ──
             st.markdown("---")
@@ -1970,7 +1970,7 @@ with tab5:
                 _biz_cnt = df_neg[M["business"]].value_counts().head(5)
                 _neg_biz_dist = ", ".join([f"{n}({v}건)" for n, v in _biz_cnt.items()])
 
-            if st.button("🤖 AI 맞춤 사전케어 가이드 생성", key="ai_precare_btn", type="primary", use_container_width=True, config={'staticPlot': True}):
+            if st.button("🤖 AI 맞춤 사전케어 가이드 생성", key="ai_precare_btn", type="primary", use_container_width=True):
                 if not GEMINI_AVAILABLE:
                     st.error("Gemini API 키가 설정되지 않았습니다. `.env` 파일에 `GEMINI_API_KEY`를 설정해주세요.")
                 else:
@@ -2086,7 +2086,7 @@ with tab5:
 
         # AI 심층 예측 버튼
         st.markdown("")
-        if st.button("🤖 AI 민원 예측 심층 분석", key="ai_predict_btn", type="primary", use_container_width=True, config={'staticPlot': True}):
+        if st.button("🤖 AI 민원 예측 심층 분석", key="ai_predict_btn", type="primary", use_container_width=True):
             if not GEMINI_AVAILABLE:
                 st.error("Gemini API 키가 설정되지 않았습니다.")
             else:
@@ -2868,7 +2868,7 @@ with tab_sol:
                         st.markdown("---")
                         _c3_scenario_txt = f"[로직 기반 사전 진단]\n시나리오: {_rx_label}\n처방: {_rx_body}\n지사 간 편차: σ={_ofc_std}점 ({_cross_verdict})\n"
                         if st.button("🤖 AI 처방전 생성", key="sol_ai_cell_btn",
-                                     type="primary", use_container_width=True, config={'staticPlot': True}):
+                                     type="primary", use_container_width=True):
                             if not GEMINI_AVAILABLE:
                                 st.error("Gemini API 키가 설정되지 않았습니다.")
                             else:
@@ -2943,7 +2943,7 @@ with tab_sol:
                 st.markdown("### 📑 AI 종합 솔루션 보고서")
                 st.caption("위 분석 결과(강점/약점, 미스매치, 히트맵, 리스크, 벤치마킹)를 종합하여 1페이지 맞춤형 보고서를 생성합니다.")
                 if st.button("📑 AI 종합 솔루션 보고서 생성", key="sol_report_btn",
-                             type="primary", use_container_width=True, config={'staticPlot': True}):
+                             type="primary", use_container_width=True):
                     if not GEMINI_AVAILABLE:
                         st.error("Gemini API 키가 설정되지 않았습니다. `.env` 파일에 `GEMINI_API_KEY`를 설정해주세요.")
                     else:
