@@ -2746,11 +2746,10 @@ with tab_sol:
                             _rx_label = "시나리오 A: 타겟팅 집중 교육"
                             _rx_color = "#ffebee"
                             _rx_border = "#ef9a9a"
-                            _target = _ct_worst_name or _sel_off
                             _rx_body = (
-                                f"<b>[{_sel_off}]</b>의 <b>[{_target}]</b> 고객 "
-                                f"<b>[{_c3_ch}]</b> 채널 응대 매뉴얼을 점검하고, "
-                                f"해당 업무(<b>{_c3_biz}</b>) 처리 담당자 대상 집중 교육을 실시하세요.")
+                                (f"<b>[{_sel_off}]</b>의 <b>[{_ct_worst_name}]</b> 고객 " if _ct_worst_name else f"<b>[{_sel_off}]</b> 고객 ")
+                                + f"<b>[{_c3_ch}]</b> 채널 응대 매뉴얼을 점검하고, "
+                                + f"해당 업무(<b>{_c3_biz}</b>) 처리 담당자 대상 집중 교육을 실시하세요.")
                         elif _ch_gap > 8:
                             _rx_icon  = "🔄"
                             _rx_label = "시나리오 C: 채널 전환(Call Steering) 전략"
@@ -2807,10 +2806,11 @@ with tab_sol:
                                         x=avg_score_100, line_dash="dash", line_color=C["navy"],
                                         annotation_text=f"본부 {avg_score_100:.1f}",
                                         annotation_position="top right")
+                                    _c3_x_min = max(0, _c3_ct["만족도"].min() - 10)
                                     fig_c3.update_layout(
                                         template=PLOTLY_TPL, height=280,
                                         margin=dict(t=10, b=10, l=10, r=90),
-                                        xaxis=dict(range=[60, 105]))
+                                        xaxis=dict(range=[_c3_x_min, 110]))
                                     st.plotly_chart(fig_c3, use_container_width=True, config={'staticPlot': True})
                                     _culprit = _c3_ct.iloc[0]
                                     _cul_gap = round(_culprit["만족도"] - avg_score_100, 1)
