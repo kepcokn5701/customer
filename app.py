@@ -1409,7 +1409,7 @@ with tab1:
                                           hovertemplate="%{y}: %{x:.1f}% (%{customdata[0]:,}건)<extra></extra>",
                                           customdata=_biz_df[["건수"]].values)
                     fig_biz.update_layout(height=max(360, len(_biz_df) * 30 + 80),
-                                           margin=dict(t=50, b=20, l=20, r=60), showlegend=False,
+                                           margin=dict(t=50, b=20, l=20, r=90), showlegend=False,
                                            title_font=dict(size=15, color=C["navy"]),
                                            xaxis_title="비율(%)", yaxis_title="")
                     st.plotly_chart(fig_biz, use_container_width=True, config={'staticPlot': True})
@@ -2809,7 +2809,7 @@ with tab_sol:
                                         annotation_position="top right")
                                     fig_c3.update_layout(
                                         template=PLOTLY_TPL, height=280,
-                                        margin=dict(t=10, b=10, l=10, r=60),
+                                        margin=dict(t=10, b=10, l=10, r=90),
                                         xaxis=dict(range=[60, 105]))
                                     st.plotly_chart(fig_c3, use_container_width=True, config={'staticPlot': True})
                                     _culprit = _c3_ct.iloc[0]
@@ -3034,7 +3034,7 @@ with tab10:
             fig_cause.update_traces(textposition="outside",
                                     hovertemplate="%{y}: %{x}건<extra></extra>")
             fig_cause.update_layout(height=max(300, len(df_cause) * 45 + 80),
-                                    margin=dict(t=60, b=20, l=10, r=80),
+                                    margin=dict(t=60, b=20, l=10, r=100),
                                     coloraxis_showscale=False,
                                     title_font=dict(size=14, color=C["navy"]))
 
