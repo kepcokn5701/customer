@@ -1278,8 +1278,9 @@ if M["contract"]:
 
 # ── 개별 점수 컬럼 자동 탐지 ──
 INDIVIDUAL_SCORE_NAMES = [
-    "이용 편리성", "직원 친절도", "전반적 만족",
-    "처리 신속도", "처리 정확도", "업무 개선도", "사용 추천도",
+    "전반적 만족", "직원 친절도", "처리 신속도",
+    "처리 정확도", "업무 개선도",
+    "이용 편리성", "사용 추천도",
 ]
 individual_scores = [c for c in INDIVIDUAL_SCORE_NAMES if c in df_raw.columns]
 
@@ -1435,10 +1436,11 @@ st.markdown("<br>", unsafe_allow_html=True)
 # ══════════════════════════════════════════════════════════════
 #  13. 탭 구성
 # ══════════════════════════════════════════════════════════════
-tab1, tab3, tab_sol, tab5, tab10 = st.tabs([
+tab1, tab3, tab_sol, tab_sol2, tab5, tab10 = st.tabs([
     "📊  종합 현황",
     "📡  계약종별 · 업무유형별 · 항목별 분석",
     "🏢  지사 맞춤형 CS 솔루션",
+    "🔬  3단계 정밀 진단",
     "🎯  민원 조기 경보 시스템",
     "🧠  CXO 딥 인사이트",
 ])
@@ -3155,6 +3157,279 @@ with tab_sol:
                                         st.error(f"AI 분석 중 오류: {_c3e}")
         else:
             st.info("업무유형 컬럼과 세부항목 점수가 필요합니다.")
+
+
+# ─────────────────────────────────────────────────────────────
+#  TAB SOL2  3단계 정밀 진단 (타겟팅 → 고통 분석 → 처방)
+# ─────────────────────────────────────────────────────────────
+
+with tab_sol2:
+
+    if df_f.empty or avg_score_100 is None:
+        st.info("데이터를 먼저 업로드하세요.")
+    elif not M.get("office") or not M.get("business") or not M.get("contract"):
+        st.info("지사·업무유형·계약종별 컬럼이 모두 필요합니다.")
+    else:
+        # ── 지사 선택 ────────────────────────────────────────
+        _s2_offices = _sort_offices(df_f[M["office"]].dropna().unique().tolist())
+        st.markdown("#### 🔬 3단계 정밀 진단 — 분석할 지사를 선택하세요")
+        _s2_off = st.selectbox("", _s2_offices, key="sol2_office_sel", label_visibility="collapsed")
+        _s2_df = df_f[df_f[M["office"]] == _s2_off].copy()
+
+        if _s2_df.empty:
+            st.warning(f"{_s2_off}의 데이터가 없습니다.")
+        else:
+            _s2_avg = float(_s2_df["_점수100"].mean())
+            _s2_gap = _s2_avg - avg_score_100
+
+            # ══════════════════════════════════════════════════
+            # STEP 1 — 조망: 업무 × 계약종별 히트맵
+            # ══════════════════════════════════════════════════
+            st.markdown("---")
+            st.markdown("### STEP 1. 조망 — 어디가 제일 아픈가?")
+            st.caption("업무유형(행) × 계약종별(열)의 평균 만족도입니다. **가장 빨간 칸**이 우선 관리 대상입니다.")
+
+            _s2_pivot = _s2_df.pivot_table(
+                index=M["business"], columns=M["contract"],
+                values="_점수100", aggfunc="mean"
+            ).round(1)
+
+            if _s2_pivot.empty or _s2_pivot.size == 0:
+                st.info("데이터가 부족하여 히트맵을 생성할 수 없습니다.")
+            else:
+                # 최저점 자동 탐지
+                _s2_min_val = _s2_pivot.min().min()
+                _s2_min_pos = _s2_pivot.stack()
+                if not _s2_min_pos.empty:
+                    _s2_min_idx = _s2_min_pos.idxmin()
+                    _s2_worst_biz = _s2_min_idx[0]
+                    _s2_worst_ct = _s2_min_idx[1]
+                else:
+                    _s2_worst_biz = _s2_pivot.index[0]
+                    _s2_worst_ct = _s2_pivot.columns[0]
+
+                fig_s2_hm = px.imshow(
+                    _s2_pivot,
+                    color_continuous_scale="RdYlGn",
+                    zmin=max(50, float(_s2_pivot.min().min()) - 5),
+                    zmax=min(100, float(_s2_pivot.max().max()) + 2),
+                    text_auto=".1f",
+                    labels={"x": "계약종별", "y": "업무유형", "color": "만족도"},
+                    aspect="auto",
+                )
+                fig_s2_hm.update_layout(
+                    template=PLOTLY_TPL, height=max(300, len(_s2_pivot) * 40 + 80),
+                    margin=dict(l=10, r=10, t=10, b=10),
+                    xaxis=dict(side="top"),
+                )
+                st.plotly_chart(fig_s2_hm, use_container_width=True, config={"staticPlot": True})
+
+                # 최우선 타겟 안내
+                _s2_min_score = round(float(_s2_min_val), 1)
+                st.warning(
+                    f"⚠️ **최우선 타겟**: [{_s2_worst_ct}] 고객의 [{_s2_worst_biz}] 업무 "
+                    f"= **{_s2_min_score}점** (본부 평균 {avg_score_100:.1f}점 대비 "
+                    f"{_s2_min_score - avg_score_100:+.1f}점)"
+                )
+
+                # ══════════════════════════════════════════════════
+                # STEP 2 — 심층: 타겟의 5대 항목 분석
+                # ══════════════════════════════════════════════════
+                st.markdown("---")
+                st.markdown("### STEP 2. 심층 — 도대체 '왜' 화가 났나?")
+                st.caption("STEP 1에서 잡은 타겟의 세부 항목별 점수를 쪼개봅니다. 최저 항목이 **진짜 원인**입니다.")
+
+                _s2_ct_list = sorted(_s2_pivot.columns.tolist())
+                _s2_biz_list = sorted(_s2_pivot.index.tolist())
+
+                _s2_col_l, _s2_col_r = st.columns(2)
+                with _s2_col_l:
+                    _s2_sel_ct = st.selectbox(
+                        "계약종별", _s2_ct_list,
+                        index=_s2_ct_list.index(_s2_worst_ct) if _s2_worst_ct in _s2_ct_list else 0,
+                        key="sol2_ct_sel"
+                    )
+                with _s2_col_r:
+                    _s2_sel_biz = st.selectbox(
+                        "업무유형", _s2_biz_list,
+                        index=_s2_biz_list.index(_s2_worst_biz) if _s2_worst_biz in _s2_biz_list else 0,
+                        key="sol2_biz_sel"
+                    )
+
+                # 타겟 필터
+                _s2_target = _s2_df[
+                    (_s2_df[M["contract"]] == _s2_sel_ct) &
+                    (_s2_df[M["business"]] == _s2_sel_biz)
+                ]
+                _s2_tn = len(_s2_target)
+
+                if _s2_tn == 0:
+                    st.info(f"[{_s2_sel_ct}] × [{_s2_sel_biz}] 조합의 데이터가 없습니다.")
+                else:
+                    st.markdown(f"**타겟**: [{_s2_sel_ct}] 고객의 [{_s2_sel_biz}] — **{_s2_tn}건**")
+
+                    # 5대 항목 점수 계산
+                    _s2_score_cols = [c for c in individual_scores if c in _s2_target.columns]
+                    _s2_item_scores = {}
+                    for _sc in _s2_score_cols:
+                        _vals = pd.to_numeric(_s2_target[_sc], errors="coerce").dropna()
+                        if len(_vals) > 0:
+                            _s2_item_scores[_sc] = round(float(_vals.mean()), 1)
+
+                    if _s2_item_scores:
+                        _s2_worst_item = min(_s2_item_scores, key=_s2_item_scores.get)
+                        _s2_worst_score = _s2_item_scores[_s2_worst_item]
+
+                        # 바 차트
+                        _s2_bar_colors = [
+                            "#d32f2f" if k == _s2_worst_item else "#43a047"
+                            for k in _s2_item_scores
+                        ]
+                        fig_s2_bar = go.Figure(data=[
+                            go.Bar(
+                                x=list(_s2_item_scores.values()),
+                                y=list(_s2_item_scores.keys()),
+                                orientation="h",
+                                marker_color=_s2_bar_colors,
+                                text=[f"{v}점" for v in _s2_item_scores.values()],
+                                textposition="outside",
+                            )
+                        ])
+                        fig_s2_bar.update_layout(
+                            template=PLOTLY_TPL, height=max(250, len(_s2_item_scores) * 45 + 60),
+                            margin=dict(l=10, r=60, t=10, b=10),
+                            xaxis=dict(range=[0, 105], title="만족도"),
+                        )
+                        st.plotly_chart(fig_s2_bar, use_container_width=True, config={"staticPlot": True})
+
+                        st.error(
+                            f"🔍 **범인 특정**: [{_s2_worst_item}] = {_s2_worst_score}점 — "
+                            f"이 항목이 [{_s2_sel_ct}] 고객의 [{_s2_sel_biz}] 만족도를 끌어내리는 핵심 원인입니다."
+                        )
+
+                        # VOC 원문
+                        _s2_voc_lines = ""
+                        if M.get("voc"):
+                            _s2_vocs = _s2_target[_s2_target["_점수100"] < 70][M["voc"]].dropna().astype(str).tolist()
+                            _s2_vocs = [v for v in _s2_vocs if v.strip() not in _VOC_EMPTY and len(v.strip()) > 2][:10]
+                            if _s2_vocs:
+                                st.markdown("**📝 불만 VOC 원문**")
+                                for _v in _s2_vocs:
+                                    st.markdown(f"- {_v}")
+                                _s2_voc_lines = "\n".join(f"  - {v}" for v in _s2_vocs)
+
+                        # 벤치마킹
+                        _s2_bm_txt = ""
+                        _s2_bm_all = df_f[df_f[M["business"]] == _s2_sel_biz].groupby(M["office"])["_점수100"].agg(["mean", "count"]).reset_index()
+                        _s2_bm_all.columns = ["지사", "점수", "건수"]
+                        _s2_bm_all = _s2_bm_all[(_s2_bm_all["건수"] >= 3) & (_s2_bm_all["지사"] != _s2_off)]
+                        if not _s2_bm_all.empty:
+                            _s2_bm_top = _s2_bm_all.sort_values("점수", ascending=False).iloc[0]
+                            _s2_bm_txt = f"벤치마킹 대상: {_s2_bm_top['지사']} ({_s2_bm_top['점수']:.1f}점, {int(_s2_bm_top['건수'])}건)"
+                            st.success(f"📚 {_s2_bm_txt}")
+
+                        # ══════════════════════════════════════════
+                        # STEP 3 — 결론: AI 맞춤 처방전
+                        # ══════════════════════════════════════════
+                        st.markdown("---")
+                        st.markdown("### STEP 3. 결론 — 어떻게 고칠 것인가?")
+
+                        # KB 조회
+                        _s2_kb = _get_office_kb(_s2_off)
+                        _s2_kb_ctx = _s2_kb["context"] if _s2_kb else "지역 특성 정보 없음"
+                        _s2_kb_act = _s2_kb["action"] if _s2_kb else ""
+
+                        _s2_item_lines = "\n".join([f"- {k}: {v}점" for k, v in _s2_item_scores.items()])
+
+                        if st.button("🤖 AI 핀셋 처방전 생성", key="sol2_ai_btn",
+                                     type="primary", use_container_width=True):
+                            if not GEMINI_AVAILABLE:
+                                st.error("Gemini API 키가 설정되지 않았습니다.")
+                            else:
+                                _s2_prompt = (
+                                    "# ROLE: 전력 산업 25년 차 '현장 밀착형 CS 마스터 컨설턴트'\n"
+                                    "당신은 지사장이 내일 아침 주간 회의에서 부서장들에게 바로 지시할 수 있는 "
+                                    "'핀셋 처방전'을 작성합니다. 무난한 교육이나 시스템 개선안은 철저히 배제하고, "
+                                    "현장 인력과 기존 채널을 활용한 '즉시 실행 전술'에 집중하세요.\n\n"
+                                    "[절대 금지]\n"
+                                    "- 'TF 구성', '교육 실시', '매뉴얼 배포', '시스템 개편' 같은 뻔한 제안\n"
+                                    "- 예산이나 본사 승인이 필요한 제안\n"
+                                    "- 액션 뒤에 '(이번 주)', '(다음 달)' 등 괄호 시기 표기\n\n"
+                                    "# INPUT DATA (3차원 교차 분석 결과)\n"
+                                    f"1. 대상 지사: {_s2_off} (지역 특성: {_s2_kb_ctx})\n"
+                                    f"2. 타겟 그룹: [{_s2_sel_ct}] 고객의 [{_s2_sel_biz}] 업무\n"
+                                    f"3. 지사 종합 평균: {_s2_avg:.1f}점 (본부 {avg_score_100:.1f}점 대비 {_s2_gap:+.1f}점)\n"
+                                    f"4. 타겟 건수: {_s2_tn}건 ({'신뢰도 주의' if _s2_tn < 10 else '신뢰도 충분'})\n"
+                                    f"5. 핵심 결함: 5개 세부 항목 중 [{_s2_worst_item}] = {_s2_worst_score}점 (최저)\n\n"
+                                    f"[세부항목별 만족도]\n{_s2_item_lines}\n\n"
+                                )
+                                if _s2_bm_txt:
+                                    _s2_prompt += f"[{_s2_bm_txt}]\n\n"
+                                if _s2_kb_act:
+                                    _s2_prompt += f"[지역 추천 액션]\n{_s2_kb_act}\n\n"
+                                _s2_prompt += (
+                                    f"[불만 VOC 원문]\n{_s2_voc_lines or '없음'}\n\n"
+                                    "# STEP 1: 현장의 언어로 '진짜 원인' 진단 (Root Cause)\n"
+                                    f"- [{_s2_sel_ct}]의 특성과 [{_s2_sel_biz}]의 성격을 결합하여, "
+                                    f"왜 [{_s2_worst_item}] 점수가 낮은지 심리학적/실무적으로 해석하세요.\n"
+                                    "- (예: '산업용 고객에게 정전 시 정확성이 낮은 것은, 복구 지연 자체보다 "
+                                    "예정 시간 번복으로 인한 공장 가동 계획 차질이 더 큰 분노 포인트임')\n\n"
+                                    "# STEP 2: 지사장 전결 '72시간 내 즉시 실행' 전술 (Action Plan)\n"
+                                    "- 예산 필요 없고, 본사 승인 필요 없는 '행동' 위주로 2가지 제안.\n"
+                                    "- 전술 1 (내부 관리): 직원의 응대 방식이나 자원 재배치\n"
+                                    "- 전술 2 (외부 소통): 고객과의 소통 방식 변경 또는 안내 체계 개선\n\n"
+                                    "# STEP 3: 글로벌/로컬 베스트 프랙티스 매칭 (Benchmarking)\n"
+                                    "- 이 상황에 가장 적합한 우수 사례를 인용하여 처방의 신뢰도를 높이세요.\n\n"
+                                    "# OUTPUT FORMAT (Brief & Sharp)\n"
+                                    f"## 🎯 [{_s2_off}] 현장 핀셋 처방전\n"
+                                    f"### 1. 분석 결과: \"지금 [{_s2_sel_ct}]-[{_s2_sel_biz}] 고객이 가장 화난 이유\"\n"
+                                    "- (데이터 기반의 날카로운 원인 진단 1~2줄)\n"
+                                    "### 2. 내일 아침 즉시 지시사항 (Action)\n"
+                                    "- **[전술 A]**: 구체적인 행동과 기대 효과\n"
+                                    "- **[전술 B]**: 구체적인 소통 방식과 타겟\n"
+                                    "### 3. 한 줄 조언 (Expert Insight)\n"
+                                    f"- \"지사장님, 이 고객들에겐 [핵심 가치]를 먼저 보여주는 것이 우선입니다.\"\n"
+                                )
+
+                                with st.spinner("AI가 핀셋 처방전 생성 중…"):
+                                    try:
+                                        import urllib.request
+                                        _models = ["gemini-2.0-flash", "gemma-3-12b-it", "gemma-3-27b-it"]
+                                        _s2_pl = {
+                                            "contents": [{"parts": [{"text": _s2_prompt}]}],
+                                            "generationConfig": {"temperature": 0.7, "maxOutputTokens": 3072}
+                                        }
+                                        _ctx = ssl._create_unverified_context()
+                                        _body = None
+                                        for _model in _models:
+                                            _url = (f"https://generativelanguage.googleapis.com/v1beta/"
+                                                    f"models/{_model}:generateContent?key={_GEMINI_KEY}")
+                                            _req = urllib.request.Request(
+                                                _url,
+                                                data=json.dumps(_s2_pl).encode("utf-8"),
+                                                headers={"Content-Type": "application/json"},
+                                                method="POST")
+                                            try:
+                                                with urllib.request.urlopen(_req, context=_ctx, timeout=90) as _resp:
+                                                    _body = json.loads(_resp.read().decode("utf-8"))
+                                                break
+                                            except urllib.error.HTTPError as _http_err:
+                                                if _http_err.code == 429:
+                                                    continue
+                                                raise
+                                        if _body is None:
+                                            st.error("모든 AI 모델의 일일 한도가 소진되었습니다. 내일 다시 시도해주세요.")
+                                        else:
+                                            _s2_text = _body["candidates"][0]["content"]["parts"][0]["text"].strip()
+                                            st.markdown(
+                                                '<div style="background:#f8f9fb;border:1px solid #d0d7de;border-radius:10px;'
+                                                'padding:24px 28px;margin:8px 0;font-size:0.93em;line-height:1.85;">\n\n'
+                                                f'{_s2_text}\n\n</div>',
+                                                unsafe_allow_html=True)
+                                    except Exception as _s2e:
+                                        st.error(f"AI 분석 중 오류: {_s2e}")
+                    else:
+                        st.info("세부항목 점수 데이터가 없습니다.")
 
 
 #  TAB 10  CXO 딥 인사이트 (투트랙 VOC 분석)
