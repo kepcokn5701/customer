@@ -1115,6 +1115,56 @@ def _detect_header_row(raw_bytes, max_scan=10):
             return i
     return 0  # 못 찾으면 첫 행을 헤더로
 
+def _check_pii(df):
+    """개인정보(PII) 포함 여부를 검사하여 탐지 항목 리스트 반환"""
+    import re
+    warnings = []
+    col_names = [str(c).strip() for c in df.columns]
+
+    # 1단계: 컬럼명 키워드 검사
+    _PII_COL_KW = ["고객번호", "전화", "휴대폰", "핸드폰", "연락처",
+                    "주소", "성명", "명의자", "신청자명", "고객명",
+                    "주민번호", "주민등록"]
+    for col in col_names:
+        for kw in _PII_COL_KW:
+            if kw in col:
+                warnings.append(f"컬럼 '{col}' — '{kw}' 개인정보 컬럼 탐지")
+                break
+
+    # 2단계: 데이터 패턴 검사 (상위 100행 샘플)
+    sample = df.head(100)
+    _re_custno = re.compile(r'^09\d{8}$')
+    _re_phone = re.compile(r'01[016789]-?\d{3,4}-?\d{4}')
+    _re_ssn = re.compile(r'\d{6}-?[1-4]\d{6}')
+    _re_kr_name = re.compile(r'^[가-힣]{2,4}$')
+
+    for col in sample.columns:
+        vals = sample[col].dropna().astype(str).str.strip()
+        if vals.empty:
+            continue
+        # 고객번호 패턴
+        if vals.apply(lambda v: bool(_re_custno.match(v))).sum() >= 3:
+            msg = f"컬럼 '{col}' — 고객번호 패턴(09XXXXXXXX) 탐지"
+            if msg not in warnings:
+                warnings.append(msg)
+        # 전화번호 패턴
+        if vals.apply(lambda v: bool(_re_phone.search(v))).sum() >= 3:
+            msg = f"컬럼 '{col}' — 전화번호 패턴(010-XXXX-XXXX) 탐지"
+            if msg not in warnings:
+                warnings.append(msg)
+        # 주민번호 패턴
+        if vals.apply(lambda v: bool(_re_ssn.search(v))).sum() >= 1:
+            msg = f"컬럼 '{col}' — 주민등록번호 패턴 탐지"
+            if msg not in warnings:
+                warnings.append(msg)
+        # 한국인 이름 패턴 (2~4글자 한글이 50% 이상)
+        name_ratio = vals.apply(lambda v: bool(_re_kr_name.match(v))).mean()
+        if name_ratio >= 0.5 and len(vals) >= 5:
+            msg = f"컬럼 '{col}' — 한국인 성명 패턴 탐지"
+            if msg not in warnings:
+                warnings.append(msg)
+    return warnings
+
 @st.cache_data(show_spinner=False)
 def load_data(raw_bytes, file_name=""):
     if file_name.lower().endswith(".csv"):
@@ -1146,6 +1196,15 @@ if uploaded_file is None:
 
 with st.spinner("데이터를 불러오는 중…"):
     df_raw, orig_len = load_data(uploaded_file.read(), uploaded_file.name)
+
+# ── 개인정보(PII) 차단 ──
+_pii_warnings = _check_pii(df_raw)
+if _pii_warnings:
+    st.error("🚫 **개인정보가 탐지되어 업로드할 수 없습니다.**")
+    for _pw in _pii_warnings:
+        st.warning(_pw)
+    st.info("고객번호·전화번호·성명·주소 등 개인정보 컬럼을 제거한 후 다시 업로드해주세요.")
+    st.stop()
 
 # ══════════════════════════════════════════════════════════════
 #  9. 컬럼 자동 매핑 (엑셀 컬럼명 기반)
@@ -2469,82 +2528,9 @@ with tab5:
 # ─────────────────────────────────────────────────────────────
 with tab_sol:
 
-    # ══════════════════════════════════════════════════════════
-    # LEVEL 1 — 본부 전체 조망 (Discovery)
-    # ══════════════════════════════════════════════════════════
-    st.markdown('<p class="sec-head">🔭 본부 전체 CS 현황 — 지사별 정밀 진단 엔진</p>', unsafe_allow_html=True)
-
     if df_f.empty or avg_score_100 is None:
         st.info("데이터를 먼저 업로드하세요.")
     else:
-        # ── KPI 상태 바 ────────────────────────────────────────
-        _sol_risk_cnt = 0
-        if M.get("business"):
-            _sol_biz_avg  = df_f.groupby(M["business"])["_점수100"].mean()
-            _sol_risk_cnt = int((_sol_biz_avg < avg_score_100).sum())
-
-        _kpi_html = (
-            '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:18px;">'
-            '<div style="background:#1a237e;color:white;border-radius:10px;padding:14px;text-align:center;">'
-            '<div style="font-size:0.78em;opacity:.8">본부 평균 만족도</div>'
-            f'<div style="font-size:2em;font-weight:900">{avg_score_100:.1f}<span style="font-size:.45em">점</span></div>'
-            '</div>'
-            '<div style="background:#1565c0;color:white;border-radius:10px;padding:14px;text-align:center;">'
-            '<div style="font-size:0.78em;opacity:.8">전체 응답 건수</div>'
-            f'<div style="font-size:2em;font-weight:900">{len(df_f):,}<span style="font-size:.45em">건</span></div>'
-            '</div>'
-            '<div style="background:#b71c1c;color:white;border-radius:10px;padding:14px;text-align:center;">'
-            '<div style="font-size:0.78em;opacity:.8">평균 이하 업무 수</div>'
-            f'<div style="font-size:2em;font-weight:900">{_sol_risk_cnt}<span style="font-size:.45em">건</span></div>'
-            '</div></div>'
-        )
-        st.markdown(_kpi_html, unsafe_allow_html=True)
-
-        # ── 트리맵: 계약종별 × 업무유형 ───────────────────────
-        if M.get("contract") and M.get("business"):
-            st.markdown("##### 🗺️ 계약종별 × 업무유형 리스크 맵 (면적 = 건수, 색상 = 만족도)")
-            st.caption("면적이 크고 붉은 영역이 본부 점수를 갉아먹는 **최우선 개선 타겟**입니다.")
-            _tm_df = df_f.groupby([M["contract"], M["business"]])["_점수100"].agg(
-                ["mean", "count"]).reset_index()
-            _tm_df.columns = ["계약종", "업무유형", "평균만족도", "응답수"]
-            _tm_df = _tm_df[_tm_df["응답수"] >= 3].dropna(subset=["평균만족도"])
-            if not _tm_df.empty:
-                # 부모(계약종) 가중평균 집계 — 직접 계산해 NaN 방지
-                _tm_df["_wgt"] = _tm_df["평균만족도"] * _tm_df["응답수"]
-                _tm_par = _tm_df.groupby("계약종").agg(
-                    _wgt_sum=("_wgt", "sum"), 응답수=("응답수", "sum")).reset_index()
-                _tm_par["평균만족도"] = _tm_par["_wgt_sum"] / _tm_par["응답수"]
-                # 계층 조립 (go.Treemap: ids / labels / parents 명시)
-                _tm_ids     = _tm_par["계약종"].tolist() + \
-                              (_tm_df["계약종"] + "/" + _tm_df["업무유형"]).tolist()
-                _tm_labels  = _tm_par["계약종"].tolist() + _tm_df["업무유형"].tolist()
-                _tm_parents = [""] * len(_tm_par) + _tm_df["계약종"].tolist()
-                _tm_values  = _tm_par["응답수"].tolist() + _tm_df["응답수"].tolist()
-                _tm_colors  = _tm_par["평균만족도"].tolist() + _tm_df["평균만족도"].tolist()
-                _tm_min = min(_tm_colors)
-                _tm_max = max(_tm_colors)
-                fig_tm = go.Figure(go.Treemap(
-                    ids=_tm_ids, labels=_tm_labels,
-                    parents=_tm_parents, values=_tm_values,
-                    customdata=[[round(c, 1), v] for c, v in zip(_tm_colors, _tm_values)],
-                    marker=dict(
-                        colors=_tm_colors,
-                        colorscale="RdYlGn",
-                        cmin=max(60, _tm_min - 2),
-                        cmax=min(100, _tm_max + 2),
-                        colorbar=dict(title="만족도", len=0.6),
-                        showscale=True,
-                    ),
-                    texttemplate="<b>%{label}</b><br>%{customdata[0]:.1f}점<br>%{customdata[1]}건",
-                    hovertemplate="%{label}<br>평균: %{customdata[0]:.1f}점<br>건수: %{customdata[1]}건<extra></extra>",
-                    branchvalues="total",
-                ))
-                fig_tm.update_layout(template=PLOTLY_TPL, height=440,
-                                     margin=dict(t=10, b=10, l=10, r=10))
-                st.plotly_chart(fig_tm, use_container_width=True, config={'staticPlot': True})
-
-        st.markdown("---")
-
         # ── 지사 선택 ────────────────────────────────────────
         _sol_offices = _sort_offices(df_f[M["office"]].dropna().unique().tolist()) if M.get("office") else []
         if not _sol_offices:
