@@ -1124,7 +1124,7 @@ def _check_pii(df):
     # 1단계: 컬럼명 키워드 검사
     _PII_COL_KW = ["고객번호", "전화", "휴대폰", "핸드폰", "연락처",
                     "주소", "성명", "명의자", "신청자명", "고객명",
-                    "주민번호", "주민등록"]
+                    ]
     for col in col_names:
         for kw in _PII_COL_KW:
             if kw in col:
@@ -1135,9 +1135,6 @@ def _check_pii(df):
     sample = df.head(100)
     _re_custno = re.compile(r'^09\d{8}$')
     _re_phone = re.compile(r'01[016789]-?\d{3,4}-?\d{4}')
-    _re_ssn = re.compile(r'\d{6}-?[1-4]\d{6}')
-    _re_kr_name = re.compile(r'^[가-힣]{2,4}$')
-
     for col in sample.columns:
         vals = sample[col].dropna().astype(str).str.strip()
         if vals.empty:
@@ -1150,17 +1147,6 @@ def _check_pii(df):
         # 전화번호 패턴
         if vals.apply(lambda v: bool(_re_phone.search(v))).sum() >= 3:
             msg = f"컬럼 '{col}' — 전화번호 패턴(010-XXXX-XXXX) 탐지"
-            if msg not in warnings:
-                warnings.append(msg)
-        # 주민번호 패턴
-        if vals.apply(lambda v: bool(_re_ssn.search(v))).sum() >= 1:
-            msg = f"컬럼 '{col}' — 주민등록번호 패턴 탐지"
-            if msg not in warnings:
-                warnings.append(msg)
-        # 한국인 이름 패턴 (2~4글자 한글이 50% 이상)
-        name_ratio = vals.apply(lambda v: bool(_re_kr_name.match(v))).mean()
-        if name_ratio >= 0.5 and len(vals) >= 5:
-            msg = f"컬럼 '{col}' — 한국인 성명 패턴 탐지"
             if msg not in warnings:
                 warnings.append(msg)
     return warnings
