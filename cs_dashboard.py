@@ -2132,20 +2132,26 @@ with tab3:
             fig_bbl = go.Figure()
             _q_order = ["1사분면: 본부 견인형", "2사분면: 전문 특화형", "3사분면: 개별 개선형", "4사분면: 최우선 혁신"]
 
-            # 라벨 겹침 방지: annotation으로 처리 (확장된 후보 위치 + 라벨 중심 충돌 감지)
-            _ann_placed = []  # (label_x_px, label_y_px) — 라벨 중심의 "논리 픽셀 좌표"
+            # 라벨 겹침 방지: 텍스트 너비 고려 + 데이터포인트 회피
+            _ann_boxes = []   # (cx, cy, half_w, half_h) — 라벨 바운딩 박스
+            _dot_positions = []  # 데이터 포인트 픽셀 좌표
             _bbl_annotations = []
             _x_range = max(_bbl_grp["처리건수"].max() - _bbl_grp["처리건수"].min(), 1)
             _y_range = max(_bbl_grp["평균만족도"].max() - _bbl_grp["평균만족도"].min(), 1)
+            _CHART_W, _CHART_H = 800, 450  # 논리 차트 크기
 
-            # 후보 오프셋: 16방향 × 2단계 거리 — 밀집 영역에서도 분산 가능
+            # 후보 오프셋: 아래 우선 (도형 밑에 라벨) → 겹칠 때만 주변으로
             _cand_offsets = [
-                (0, -22), (0, 26), (-50, 0), (50, 0),          # 상하좌우 (근거리)
-                (-40, -22), (40, -22), (-40, 26), (40, 26),     # 대각선 (근거리)
-                (0, -44), (0, 48), (-80, 0), (80, 0),           # 상하좌우 (원거리)
-                (-60, -38), (60, -38), (-60, 42), (60, 42),     # 대각선 (원거리)
-                (-90, -18), (90, -18), (-90, 22), (90, 22),     # 양쪽 수평 확장
-                (0, -66), (0, 68), (-70, -55), (70, 55),        # 극원거리
+                (0, 20),                                    # 1순위: 바로 아래
+                (-30, 20), (30, 20),                        # 좌하, 우하
+                (0, -20),                                   # 위
+                (-30, -20), (30, -20),                      # 좌상, 우상
+                (0, 35), (-40, 35), (40, 35),               # 더 아래
+                (0, -35), (-40, -35), (40, -35),            # 더 위
+                (-60, 15), (60, 15), (-60, -15), (60, -15), # 좌우
+                (0, 50), (-50, 50), (50, 50),               # 원거리 아래
+                (0, -50), (-50, -50), (50, -50),            # 원거리 위
+                (-80, 0), (80, 0),                          # 좌우 수평
             ]
 
             # 모든 trace 먼저 그리기
@@ -2158,9 +2164,9 @@ with tab3:
                 fig_bbl.add_trace(go.Scatter(
                     x=_sub["처리건수"], y=_sub["평균만족도"],
                     mode="markers",
-                    marker=dict(size=(_sub["버블크기"] * 5).clip(lower=14),
-                                color=_q_colors[q_name], opacity=0.75,
-                                line=dict(width=1.5, color="white")),
+                    marker=dict(size=(_sub["버블크기"] * 8).clip(lower=22, upper=90),
+                                color=_q_colors[q_name], opacity=0.7,
+                                line=dict(width=2, color="white")),
                     hovertext=[_hover_texts[i] for i in _sub_idx],
                     hovertemplate="%{hovertext}<extra></extra>",
                     name=q_name,
@@ -2168,48 +2174,72 @@ with tab3:
                 for _, _r in _sub.iterrows():
                     _all_rows.append(_r)
 
-            # 밀집도 높은 버블 먼저 배치 (주변 이웃 수 기준 정렬)
+            # 데이터 포인트 픽셀 좌표 미리 계산
+            _x_min_val = _bbl_grp["처리건수"].min()
+            _y_min_val = _bbl_grp["평균만족도"].min()
+            for _r in _all_rows:
+                _dpx = (_r["처리건수"] - _x_min_val) / _x_range * _CHART_W
+                _dpy = (1 - (_r["평균만족도"] - _y_min_val) / _y_range) * _CHART_H
+                _dot_positions.append((_dpx, _dpy))
+
+            # 밀집도 높은 버블 먼저 배치
             def _neighbor_cnt(row):
                 cnt = 0
                 for other in _all_rows:
                     if row.name == other.name:
                         continue
-                    if abs(row["처리건수"] - other["처리건수"]) / _x_range < 0.2 and \
-                       abs(row["평균만족도"] - other["평균만족도"]) / _y_range < 0.2:
+                    if abs(row["처리건수"] - other["처리건수"]) / _x_range < 0.25 and \
+                       abs(row["평균만족도"] - other["평균만족도"]) / _y_range < 0.25:
                         cnt += 1
                 return cnt
             _all_rows.sort(key=lambda r: _neighbor_cnt(r), reverse=True)
 
+            def _boxes_overlap(cx1, cy1, hw1, hh1, cx2, cy2, hw2, hh2, pad=6):
+                """두 라벨 박스가 겹치는지 (패딩 포함)"""
+                return (abs(cx1 - cx2) < hw1 + hw2 + pad) and (abs(cy1 - cy2) < hh1 + hh2 + pad)
+
             for _r in _all_rows:
                 _rx = _r["처리건수"]
                 _ry = _r["평균만족도"]
-                # 현재 포인트의 논리 픽셀 좌표 (차트 영역 기준)
-                _base_px = (_rx - _bbl_grp["처리건수"].min()) / _x_range * 600
-                _base_py = (_ry - _bbl_grp["평균만족도"].min()) / _y_range * 400
+                _base_px = (_rx - _x_min_val) / _x_range * _CHART_W
+                _base_py = (1 - (_ry - _y_min_val) / _y_range) * _CHART_H
+                # 텍스트 크기 추정 (한글 1자 ≈ 6px wide at font 11, 높이 ≈ 14px)
+                _txt_len = len(_r["업무유형"])
+                _half_w = max(_txt_len * 6, 25)
+                _half_h = 8
+                # 버블 크기(px) 추정 — 라벨이 버블 바깥에 붙도록
+                _bbl_r = max(float(_r["버블크기"]) * 2.5, 7)
                 _best_ax, _best_ay = _cand_offsets[0]
-                _best_score = -1
+                _best_score = -99999
                 for _cax, _cay in _cand_offsets:
-                    _lbl_px = _base_px + _cax
-                    _lbl_py = _base_py - _cay  # y축 반전 (화면 좌표)
-                    _min_dist = 9999
-                    for _opx, _opy in _ann_placed:
-                        _d = ((_lbl_px - _opx)**2 + (_lbl_py - _opy)**2) ** 0.5
-                        _min_dist = min(_min_dist, _d)
-                    # 거리가 가까울수록 나쁨, 오프셋이 작을수록 좋음
-                    _offset_penalty = (abs(_cax) + abs(_cay)) * 0.15
-                    _score = _min_dist - _offset_penalty
+                    _lbl_cx = _base_px + _cax
+                    _lbl_cy = _base_py + _cay
+                    # 1) 기존 라벨과 겹침 체크
+                    _overlap = False
+                    for _ocx, _ocy, _ohw, _ohh in _ann_boxes:
+                        if _boxes_overlap(_lbl_cx, _lbl_cy, _half_w, _half_h, _ocx, _ocy, _ohw, _ohh):
+                            _overlap = True
+                            break
+                    if _overlap:
+                        continue
+                    # 2) 점수: 가까울수록 좋음 (버블 근접 배치)
+                    _dist_penalty = (abs(_cax) + abs(_cay)) * 0.5
+                    _score = 100 - _dist_penalty
                     if _score > _best_score:
                         _best_score = _score
                         _best_ax, _best_ay = _cax, _cay
-                        _best_lbl = (_lbl_px, _lbl_py)
-                _ann_placed.append((_base_px + _best_ax, _base_py - _best_ay))
+                _final_cx = _base_px + _best_ax
+                _final_cy = _base_py + _best_ay
+                _ann_boxes.append((_final_cx, _final_cy, _half_w, _half_h))
+                # 화살표 항상 표시
                 _bbl_annotations.append(dict(
                     x=_rx, y=_ry,
-                    text=_r["업무유형"], showarrow=True,
-                    arrowhead=0, arrowwidth=0.8, arrowcolor="#aaa",
+                    text=_r["업무유형"],
+                    showarrow=True,
+                    arrowhead=2, arrowwidth=1.2, arrowcolor="#000",
                     ax=_best_ax, ay=_best_ay,
-                    font=dict(size=9.5, color="#333"),
-                    bgcolor="rgba(255,255,255,0.85)", borderpad=2,
+                    font=dict(size=13, color="#222"),
+                    bgcolor="rgba(255,255,255,0)", borderpad=1,
                 ))
 
             # 사분면 기준선
@@ -2237,14 +2267,16 @@ with tab3:
             for _ann in _bbl_annotations:
                 fig_bbl.add_annotation(**_ann)
 
+            # y축 여유 (라벨이 잘리지 않도록)
+            _y_pad = _y_range * 0.12
             fig_bbl.update_layout(
-                height=560, margin=dict(t=60, b=60, l=60, r=40),
+                height=640, margin=dict(t=60, b=60, l=60, r=60),
                 xaxis_title="처리 건수", yaxis_title="평균 만족도 (100점 환산)",
-                title=dict(text="업무유형별 사분면 분석 — 처리 건수 vs 만족도 (버블 크기 = 불만족 건수)",
-                           font=dict(size=14, color=C["navy"])),
-                legend=dict(orientation="h", yanchor="bottom", y=-0.18, xanchor="center", x=0.5, font=dict(size=11)),
+                yaxis=dict(range=[_bbl_grp["평균만족도"].min() - _y_pad - 2,
+                                  _bbl_grp["평균만족도"].max() + _y_pad + 2]),
+                legend=dict(orientation="h", yanchor="bottom", y=-0.15, xanchor="center", x=0.5, font=dict(size=14)),
                 template=PLOTLY_TPL)
-            st.plotly_chart(fig_bbl, use_container_width=True, config={'staticPlot': True})
+            st.plotly_chart(fig_bbl, use_container_width=True)
 
             # ── 사분면별 분류 카드 ──
             _q1_list = _bbl_grp[_bbl_grp["사분면"].str.contains("견인")].sort_values("처리건수", ascending=False)
