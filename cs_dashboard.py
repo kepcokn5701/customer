@@ -1591,6 +1591,11 @@ with m5:
     else:
         st.metric("🎯 조기 경보 감지", "미선택")
 
+st.markdown(
+    '<div style="background:#f8f9fa;border-radius:8px;padding:8px 14px;margin:-8px 0 8px;font-size:0.82em;color:#666;">'
+    '💬 <b>VOC 응답률</b> = 서술형 의견을 작성한 고객 비율 (전체 조사 건수 대비) &nbsp;│&nbsp; '
+    '🎯 <b>조기 경보 감지</b> = 민원 조기 경보 시스템 탭의 잠재 민원 대상자 수'
+    '</div>', unsafe_allow_html=True)
 st.markdown("<br>", unsafe_allow_html=True)
 
 # ══════════════════════════════════════════════════════════════
