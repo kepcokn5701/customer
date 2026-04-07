@@ -3589,17 +3589,23 @@ with tab_letter:
             if paragraph.strip() == "":
                 _lines.append("")
             else:
-                wrapped = textwrap.wrap(paragraph, width=42)
+                wrapped = textwrap.wrap(paragraph, width=38)
                 _lines.extend(wrapped if wrapped else [""])
+
+        # 줄 수에 따라 간격 동적 조절 (텍스트 잘림 방지)
+        _total_lines = len(_lines)
+        _available_height = 88  # y=110 ~ y=22
+        _line_gap = min(4.5, max(3.0, _available_height / max(_total_lines, 1)))
 
         y_pos = 110
         for _line in _lines:
             if y_pos < 22:
                 break
             _fp_use = _fp_body_bold if _line.startswith("한국전력") else _fp_body
-            ax.text(10, y_pos, _line, fontproperties=_fp_use, fontsize=9.5,
+            _fs = min(9.5, 9.5 * (4.5 / max(_line_gap, 3.0)))
+            ax.text(10, y_pos, _line, fontproperties=_fp_use, fontsize=_fs,
                     color="#333333", va="top")
-            y_pos -= 4.5
+            y_pos -= _line_gap
 
         # 날짜 + 지사명 (본문 아래)
         from datetime import datetime as _dt
@@ -3688,6 +3694,7 @@ with tab_letter:
 
     # ── AI 서한문 생성 or 기본 템플릿 ────────────────────────
     _lt_body_key = f"letter_body_{_lt_sel_key}_{_lt_season}"
+    _lt_ta_key = f"letter_textarea_{_lt_sel_key}_{_lt_season}"
 
     if _lt_body_key not in st.session_state:
         st.session_state[_lt_body_key] = _lt_default_body
@@ -3702,45 +3709,42 @@ with tab_letter:
                 st.error("Gemini API 키가 설정되지 않았습니다. `.env` 파일에 `GEMINI_API_KEY`를 설정해주세요.")
             else:
                 _lt_prompt = (
-                    "당신은 한국전력공사 지사에서 경험고객에게 보내는 서한문(감사 편지)을 작성합니다.\n\n"
-                    "[기본 구조 — 인제지사 사계절 서한문 기반]\n"
-                    "고객님, 안녕하십니까. 한국전력 ○○지사입니다.\n"
-                    "항상 한국전력에 보내주시는 성원에 진심으로 감사드리며 (계절 기원).\n\n"
-                    "한국전력 ○○지사는 ○○ 일원을 관할하며\n"
-                    "안정적인 전력공급과 최상의 서비스 제공을 제1의 목표로 삼아 늘 고민하고 있습니다.\n"
-                    "또한 ○○지사에서는 언제나 고객님의 목소리에 귀 기울이기 위해 노력하고 있으며,\n"
-                    "전기 사용과 관련하여 미흡하거나 궁금하신 사항이 있으실 경우 언제든지 연락주시기 바랍니다.\n\n"
-                    "(계절 한 줄).\n"
-                    "항상 건강 유의하시고 고객님의 가정과 일터에 사랑과 행복이 넘쳐나길 기원드립니다.\n\n"
-                    "YYYY년 MM월\n"
-                    "한국전력공사 ○○지사\n\n"
-                    "[변주 참고 — 합천지사]\n"
-                    "- 합천은 감사 표현이 더 풍부함: '전력 서비스를 변함없이 믿고 이용해주시는 고객 여러분께 진심을 담은 감사의 인사를 올립니다.'\n"
-                    "- 계절 서정이 좀 더 문학적: '붉게 물든 단풍과 떨어지는 낙엽이 가을의 정취를 물씬 느끼게 하는 만추의 계절'\n"
-                    "- 마무리에 '감사합니다.' 추가\n\n"
-                    "[아래 요소를 본문에 자연스럽게 녹여주세요]\n"
-                    "- 고객만족: 친절·정확·신속한 서비스로 '매우만족' 하실 수 있도록 노력\n"
-                    "- 불편 안내: 한전 고객센터(국번없이 123) 또는 한전ON으로 연락 가능\n\n"
-                    "[절대 금지 — 아래 표현이 출력에 1개라도 포함되면 실패로 간주]\n"
-                    "- '국민기업', '국민 기업', '국민과 함께한 120년', '국민과 함께' 절대 금지\n"
-                    "- 영어, 이모지, 줄 번호, 제목 금지\n"
-                    "- 발전소, 에너지 산업, 인구 구성, 지역 산업 특성 등 일체 금지\n"
-                    "- 과도한 미사여구 금지\n\n"
+                    f"당신은 따뜻하고 진심 어린 편지를 쓰는 작가입니다. "
+                    f"한국전력공사 {_lt_sel_name}에서 경험고객에게 보내는 {_lt_theme['season_name']} 서한문(감사 편지)을 작성하세요.\n\n"
                     f"[작성 대상]\n"
                     f"- 지사: 한국전력 {_lt_sel_name} (관할: {_lt_area})\n"
                     f"- 계절: {_lt_theme['season_name']}\n"
                     f"- 날짜: {_lt_date_str}\n\n"
-                    "[요청]\n"
-                    f"위 인제 구조를 뼈대로 하되, 합천의 변주를 참고하여 {_lt_sel_name}의 {_lt_theme['season_name']} 서한문을 작성해주세요. "
-                    "인제 구조를 그대로 베끼지 말고, 계절에 맞는 표현으로 자연스럽게 변형하세요. "
-                    "본문 텍스트만 출력하세요."
+                    f"[서한문 구조 — 반드시 5개 문단 모두 포함, 문단 사이 빈 줄]\n"
+                    f"1문단) 인사 + 계절감: '고객님, 안녕하십니까. 한국전력 {_lt_sel_name}입니다.'로 시작. "
+                    f"{_lt_theme['season_name']}의 정취를 담은 서정적 인사 1~2문장 (해당 지역의 자연·풍경을 은은히 녹여주세요)\n"
+                    f"2문단) 감사: 변함없이 한국전력을 믿고 이용해주시는 고객 여러분께 진심 어린 감사 표현 2~3문장. "
+                    f"고객 한 분 한 분의 소중함을 느낄 수 있는 따뜻한 문장으로 작성\n"
+                    f"3문단) 약속: {_lt_sel_name}는 {_lt_area} 일원을 관할하며 안정적 전력공급과 최상의 서비스를 약속. "
+                    f"친절·정확·신속한 서비스로 고객님께서 '매우만족' 하실 수 있도록 늘 노력하겠다는 다짐 2~3문장\n"
+                    f"4문단) 안내: 전기 사용 관련 미흡하거나 궁금하신 사항은 "
+                    f"한전 고객센터(국번없이 123) 또는 한전ON(online.kepco.co.kr)으로 연락 안내\n"
+                    f"5문단) 마무리: {_lt_theme['season_name']}에 맞는 건강·행복 기원 인사 + '감사합니다.'\n\n"
+                    f"[형식]\n"
+                    f"- 마지막에 반드시 '{_lt_date_str}' 과 '한국전력공사 {_lt_sel_name}'을 넣으세요\n"
+                    f"- 전체 분량: 12~18줄 (충분히 정성스럽게)\n"
+                    f"- 본문 텍스트만 출력 (제목, 번호, 이모지, 영어, 마크다운 서식 금지)\n\n"
+                    f"[문체 지침]\n"
+                    f"- 공공기관 서한문답되 딱딱하지 않고, 읽는 사람의 마음에 닿는 따뜻한 문체\n"
+                    f"- 계절의 서정을 은은히 담되 과도한 미사여구는 지양\n"
+                    f"- 지역 자연환경(산, 강, 바다 등)을 1~2곳만 자연스럽게 언급하되 관광 홍보처럼 되지 않게\n\n"
+                    f"[절대 금지]\n"
+                    f"- '국민기업', '국민 기업', '국민과 함께' 표현 금지\n"
+                    f"- 발전소, 에너지 산업, 인구 구성 언급 금지\n"
                 )
                 with st.spinner("AI가 맞춤 문구를 작성하고 있습니다..."):
                     try:
                         import urllib.request
-                        _models = ["gemini-2.5-flash", "gemma-3-12b-it"]
+                        # gemini-2.5-pro: 감성적 글쓰기 최적 (무료 100회/일)
+                        # gemini-2.5-flash-lite: thinking 없는 빠른 폴백 (무료 1000회/일)
+                        _models = ["gemini-2.5-pro", "gemini-2.5-flash-lite"]
                         _payload = {"contents": [{"parts": [{"text": _lt_prompt}]}],
-                                     "generationConfig": {"temperature": 0.8, "maxOutputTokens": 1024}}
+                                     "generationConfig": {"temperature": 0.75, "maxOutputTokens": 2048}}
                         _ctx = ssl._create_unverified_context()
                         _body = None
                         for _model in _models:
@@ -3748,7 +3752,7 @@ with tab_letter:
                             _req = urllib.request.Request(_api_url, data=json.dumps(_payload).encode("utf-8"),
                                                            headers={"Content-Type": "application/json"}, method="POST")
                             try:
-                                with urllib.request.urlopen(_req, context=_ctx, timeout=60) as _resp:
+                                with urllib.request.urlopen(_req, context=_ctx, timeout=90) as _resp:
                                     _body = json.loads(_resp.read().decode("utf-8"))
                                 break
                             except urllib.error.HTTPError as _http_err:
@@ -3759,13 +3763,21 @@ with tab_letter:
                             st.error("모든 AI 모델의 일일 한도가 소진되었습니다. 내일 다시 시도해주세요.")
                         else:
                             _ai_letter = _body["candidates"][0]["content"]["parts"][0]["text"].strip()
+                            # 마크다운 코드블럭 제거
+                            _ai_letter = re.sub(r"^```[a-z]*\n?", "", _ai_letter)
+                            _ai_letter = re.sub(r"\n?```$", "", _ai_letter.strip())
                             st.session_state[_lt_body_key] = _ai_letter
+                            # text_area 위젯 키도 동기화 (Streamlit 위젯 키 우선 문제 방지)
+                            if _lt_ta_key in st.session_state:
+                                del st.session_state[_lt_ta_key]
                             st.rerun()
                     except Exception as e:
                         st.error(f"AI 서한문 생성 중 오류: {e}")
 
         if st.button("🔄 기본 템플릿으로 초기화", key="letter_reset_btn", use_container_width=True):
             st.session_state[_lt_body_key] = _lt_default_body
+            if _lt_ta_key in st.session_state:
+                del st.session_state[_lt_ta_key]
             st.rerun()
 
         # 편집 가능한 텍스트 영역
