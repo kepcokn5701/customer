@@ -3574,8 +3574,11 @@ with tab_letter:
         ax.text(50, 124, f"한국전력공사입니다.", ha="center", va="top",
                 fontproperties=_fp_head, color=theme["title_color"])
 
-        # 계절 아이콘
-        ax.text(90, 136, theme["icon"], fontsize=28, ha="center", va="top")
+        # 계절 텍스트 (matplotlib은 이모지 렌더링 불가하므로 한글로 표시)
+        _season_label = {"봄": "春", "여름": "夏", "가을": "秋", "겨울": "冬"}.get(
+            theme.get("season_name", ""), "")
+        ax.text(92, 135, _season_label, fontsize=22, ha="center", va="top",
+                fontproperties=_fp_head, color=theme["accent"], alpha=0.4)
 
         # 본문 영역 테두리
         body_box = FancyBboxPatch((6, 18), 88, 96, boxstyle="round,pad=1",
