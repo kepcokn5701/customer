@@ -2318,6 +2318,7 @@ with tab3:
                     st.error(f"**🚨 최우선 혁신** (건수↑ 점수↓ · 핵심 리스크): {_q4_names}")
 
             # ── AI 사분면 분석 버튼 ──
+            _q_ss_key = "_ai_quadrant_result"
             if st.button("🤖 AI 업무유형 처방전", key="ai_quadrant_btn", type="primary", use_container_width=True):
                 if not GEMINI_AVAILABLE:
                     st.error("Gemini API 키가 설정되지 않았습니다. `.env` 파일에 `GEMINI_API_KEY`를 설정해주세요.")
@@ -2411,14 +2412,16 @@ with tab3:
                             if _body is None:
                                 st.error("모든 AI 모델의 일일 한도가 소진되었습니다. 내일 다시 시도해주세요.")
                             else:
-                                _ai_text = _body["candidates"][0]["content"]["parts"][0]["text"].strip()
-                                st.markdown(
-                                    '<div style="background:#f8f9fb;border:1px solid #d0d7de;border-radius:10px;'
-                                    'padding:24px 28px;margin:8px 0;font-size:0.93em;line-height:1.85;">\n\n'
-                                    f'{_ai_text}\n\n</div>',
-                                    unsafe_allow_html=True)
+                                st.session_state[_q_ss_key] = _body["candidates"][0]["content"]["parts"][0]["text"].strip()
                         except Exception as e:
                             st.error(f"AI 분석 중 오류: {e}")
+            # 캐시된 결과 표시 (리런 후에도 유지)
+            if _q_ss_key in st.session_state:
+                st.markdown(
+                    '<div style="background:#f8f9fb;border:1px solid #d0d7de;border-radius:10px;'
+                    'padding:24px 28px;margin:8px 0;font-size:0.93em;line-height:1.85;">\n\n'
+                    f'{st.session_state[_q_ss_key]}\n\n</div>',
+                    unsafe_allow_html=True)
 
         st.markdown("---")
 
@@ -2633,6 +2636,7 @@ with tab5:
             _biz_cnt = df_neg[M["business"]].value_counts().head(5)
             _neg_biz_dist = ", ".join([f"{n}({v}건)" for n, v in _biz_cnt.items()])
 
+        _pc_ss_key = "_ai_precare_result"
         if st.button("🤖 AI 본부 민원 리스크 종합 진단", key="ai_precare_btn", type="primary", use_container_width=True):
             if not GEMINI_AVAILABLE:
                 st.error("Gemini API 키가 설정되지 않았습니다. `.env` 파일에 `GEMINI_API_KEY`를 설정해주세요.")
@@ -2731,14 +2735,16 @@ with tab5:
                         if _body is None:
                             st.error("모든 AI 모델의 일일 한도가 소진되었습니다. 내일 다시 시도해주세요.")
                         else:
-                            _ai_text = _body["candidates"][0]["content"]["parts"][0]["text"].strip()
-                            st.markdown(
-                                '<div style="background:#f8f9fb;border:1px solid #d0d7de;border-radius:10px;'
-                                'padding:24px 28px;margin:8px 0;font-size:0.93em;line-height:1.85;">\n\n'
-                                f'{_ai_text}\n\n</div>',
-                                unsafe_allow_html=True)
+                            st.session_state[_pc_ss_key] = _body["candidates"][0]["content"]["parts"][0]["text"].strip()
                     except Exception as e:
                         st.error(f"AI 분석 중 오류가 발생했습니다: {e}")
+        # 캐시된 결과 표시 (리런 후에도 유지)
+        if _pc_ss_key in st.session_state:
+            st.markdown(
+                '<div style="background:#f8f9fb;border:1px solid #d0d7de;border-radius:10px;'
+                'padding:24px 28px;margin:8px 0;font-size:0.93em;line-height:1.85;">\n\n'
+                f'{st.session_state[_pc_ss_key]}\n\n</div>',
+                unsafe_allow_html=True)
         else:
             st.caption("버튼을 누르면 Gemini AI가 부정 VOC 패턴 + 리스크 업무를 종합 진단합니다.")
 
@@ -3335,6 +3341,7 @@ with tab_sol:
 
                             _item_lines = "\n".join([f"- {k}: {v}점" for k, v in _item_scores.items()])
 
+                            _c3_ss_key = f"_ai_pinset_{_sel_off}_{_sel_ct}_{_sel_biz}"
                             if st.button("🤖 AI 핀셋 처방전 생성", key="sol_ai_cell_btn",
                                          type="primary", use_container_width=True):
                                 if not GEMINI_AVAILABLE:
@@ -3424,14 +3431,16 @@ with tab_sol:
                                             if _body is None:
                                                 st.error("모든 AI 모델의 일일 한도가 소진되었습니다.")
                                             else:
-                                                _sol_text = _body["candidates"][0]["content"]["parts"][0]["text"].strip()
-                                                st.markdown(
-                                                    '<div style="background:#f8f9fb;border:1px solid #d0d7de;border-radius:10px;'
-                                                    'padding:24px 28px;margin:8px 0;font-size:0.93em;line-height:1.85;">\n\n'
-                                                    f'{_sol_text}\n\n</div>',
-                                                    unsafe_allow_html=True)
+                                                st.session_state[_c3_ss_key] = _body["candidates"][0]["content"]["parts"][0]["text"].strip()
                                         except Exception as _c3e:
                                             st.error(f"AI 분석 중 오류: {_c3e}")
+                            # 캐시된 결과 표시 (리런 후에도 유지)
+                            if _c3_ss_key in st.session_state:
+                                st.markdown(
+                                    '<div style="background:#f8f9fb;border:1px solid #d0d7de;border-radius:10px;'
+                                    'padding:24px 28px;margin:8px 0;font-size:0.93em;line-height:1.85;">\n\n'
+                                    f'{st.session_state[_c3_ss_key]}\n\n</div>',
+                                    unsafe_allow_html=True)
                         else:
                             st.info("세부항목 점수 데이터가 없습니다.")
         else:
