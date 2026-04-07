@@ -1638,11 +1638,9 @@ with tab1:
         with g_col:
             st.markdown('<p class="sec-head">🎯 종합 만족도 게이지</p>', unsafe_allow_html=True)
             fig_gauge = go.Figure(go.Indicator(
-                mode="gauge+number+delta",
+                mode="gauge+number",
                 value=round(avg_score_100, 1),
                 number={"suffix": "점", "font": {"size": 40, "color": C["navy"]}},
-                delta={"reference": 80, "increasing": {"color": C["green"]},
-                       "decreasing": {"color": C["red"]}},
                 gauge={
                     "axis": {"range": [0, 100], "tickfont": {"size": 11}},
                     "bar": {"color": C["blue"], "thickness": 0.28},
