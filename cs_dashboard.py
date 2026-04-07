@@ -332,12 +332,19 @@ for _c in [
     "C:/Windows/Fonts/gulim.ttc",
     "/System/Library/Fonts/AppleGothic.ttf",
     "/usr/share/fonts/truetype/nanum/NanumGothic.ttf",
+    "/usr/share/fonts/truetype/nanum/NanumGothicBold.ttf",
+    "/usr/share/fonts/truetype/nanum/NanumBarunGothic.ttf",
 ]:
     if os.path.exists(_c):
         FONT_PATH = _c
         FONT_PROP = fm.FontProperties(fname=_c)
         plt.rcParams["font.family"] = FONT_PROP.get_name()
         break
+
+# 폰트 캐시 갱신 (Streamlit Cloud 배포 시 packages.txt로 설치된 폰트 반영)
+if FONT_PATH and "/usr/share/fonts" in FONT_PATH:
+    fm._load_fontmanager(try_read_cache=False)
+
 plt.rcParams["axes.unicode_minus"] = False
 
 # ══════════════════════════════════════════════════════════════
@@ -2374,7 +2381,7 @@ with tab3:
                     with st.spinner("AI가 업무유형별 처방전 생성 중…"):
                         try:
                             import urllib.request
-                            _models = ["gemini-2.0-flash", "gemma-3-12b-it", "gemma-3-27b-it"]
+                            _models = ["gemini-2.5-flash", "gemma-3-12b-it"]
                             _payload = {"contents": [{"parts": [{"text": _ai_q_prompt}]}],
                                          "generationConfig": {"temperature": 0.7, "maxOutputTokens": 3072}}
                             _ctx = ssl._create_unverified_context()
@@ -2694,7 +2701,7 @@ with tab5:
 
                     try:
                         import urllib.request
-                        _models = ["gemini-2.0-flash", "gemma-3-12b-it", "gemma-3-27b-it"]
+                        _models = ["gemini-2.5-flash", "gemma-3-12b-it"]
                         _payload = {"contents": [{"parts": [{"text": _unified_prompt}]}],
                                      "generationConfig": {"temperature": 0.7, "maxOutputTokens": 4096}}
                         _ctx = ssl._create_unverified_context()
@@ -3381,7 +3388,7 @@ with tab_sol:
                                     with st.spinner("AI가 핀셋 처방전 생성 중…"):
                                         try:
                                             import urllib.request
-                                            _models = ["gemini-2.0-flash", "gemma-3-12b-it", "gemma-3-27b-it"]
+                                            _models = ["gemini-2.5-flash", "gemma-3-12b-it"]
                                             _c3_pl = {
                                                 "contents": [{"parts": [{"text": _c3_prompt}]}],
                                                 "generationConfig": {"temperature": 0.7, "maxOutputTokens": 3072}
@@ -3721,7 +3728,7 @@ with tab_letter:
                 with st.spinner("AI가 맞춤 문구를 작성하고 있습니다..."):
                     try:
                         import urllib.request
-                        _models = ["gemini-2.0-flash", "gemma-3-12b-it", "gemma-3-27b-it"]
+                        _models = ["gemini-2.5-flash", "gemma-3-12b-it"]
                         _payload = {"contents": [{"parts": [{"text": _lt_prompt}]}],
                                      "generationConfig": {"temperature": 0.8, "maxOutputTokens": 1024}}
                         _ctx = ssl._create_unverified_context()
