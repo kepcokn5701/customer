@@ -327,17 +327,6 @@ def _get_office_annual(office_name: str) -> str:
 FONT_PATH = None
 FONT_PROP = None
 
-# matplotlib 폰트 캐시 강제 삭제 후 재구축 (Streamlit Cloud 배포 시 필수)
-import glob as _glob
-_cache_dir = matplotlib.get_cachedir()
-if _cache_dir:
-    for _fc in _glob.glob(os.path.join(_cache_dir, "fontlist-*.json")):
-        try:
-            os.remove(_fc)
-        except OSError:
-            pass
-fm.fontManager = fm.FontManager()
-
 for _c in [
     "C:/Windows/Fonts/malgun.ttf",
     "C:/Windows/Fonts/NanumGothic.ttf",
@@ -349,7 +338,10 @@ for _c in [
 ]:
     if os.path.exists(_c):
         FONT_PATH = _c
-        fm.fontManager.addfont(_c)
+        try:
+            fm.fontManager.addfont(_c)
+        except Exception:
+            pass
         FONT_PROP = fm.FontProperties(fname=_c)
         plt.rcParams["font.family"] = FONT_PROP.get_name()
         break
