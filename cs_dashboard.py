@@ -2393,7 +2393,7 @@ with tab3:
                             import urllib.request
                             _models = ["gemini-2.5-flash", "gemma-3-12b-it"]
                             _payload = {"contents": [{"parts": [{"text": _ai_q_prompt}]}],
-                                         "generationConfig": {"temperature": 0.7, "maxOutputTokens": 3072}}
+                                         "generationConfig": {"temperature": 0.7, "maxOutputTokens": 8192}}
                             _ctx = ssl._create_unverified_context()
                             _body = None
                             for _model in _models:
@@ -2713,7 +2713,7 @@ with tab5:
                         import urllib.request
                         _models = ["gemini-2.5-flash", "gemma-3-12b-it"]
                         _payload = {"contents": [{"parts": [{"text": _unified_prompt}]}],
-                                     "generationConfig": {"temperature": 0.7, "maxOutputTokens": 4096}}
+                                     "generationConfig": {"temperature": 0.7, "maxOutputTokens": 8192}}
                         _ctx = ssl._create_unverified_context()
                         _body = None
                         for _model in _models:
@@ -3401,7 +3401,7 @@ with tab_sol:
                                             _models = ["gemini-2.5-flash", "gemma-3-12b-it"]
                                             _c3_pl = {
                                                 "contents": [{"parts": [{"text": _c3_prompt}]}],
-                                                "generationConfig": {"temperature": 0.7, "maxOutputTokens": 3072}
+                                                "generationConfig": {"temperature": 0.7, "maxOutputTokens": 8192}
                                             }
                                             _ctx = ssl._create_unverified_context()
                                             _body = None
