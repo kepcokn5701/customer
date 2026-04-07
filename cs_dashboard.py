@@ -3723,12 +3723,12 @@ with tab_letter:
     # ── 지사별 데이터 집계 (서한문 톤·기념품 반영용) ──────────
     _lt_region_type = _get_region_type(_lt_kb.get("context", ""))
 
-    # (a) 상위 불만 키워드 (top 3)
+    # (a) 상위 불만 키워드 (top 3) — 사전 계산된 _pre_neg_res 재활용
     _lt_top_complaints = []
     _lt_branch_df = df_f[df_f[M["office"]] == _lt_sel_name] if M.get("office") else df_f
     if M.get("voc") and len(_lt_branch_df) > 0:
         try:
-            _lt_neg_kws = _lt_branch_df[M["voc"]].apply(check_negative).apply(lambda x: x[1])
+            _lt_neg_kws = _pre_neg_res.loc[_lt_branch_df.index].apply(lambda x: x[1])
             _lt_kw_counter = Counter([kw for kws in _lt_neg_kws for kw in kws])
             _lt_top_complaints = [kw for kw, _ in _lt_kw_counter.most_common(3)]
         except Exception:
@@ -3923,8 +3923,7 @@ with tab_letter:
                 f'({_lt_kb.get("context", "").split(".")[0] if _lt_kb.get("context") else "정보 없음"})'
                 f'</div>', unsafe_allow_html=True)
 
-    _gc_cols = [3, 2] if not _lt_voc_gifts else [3, 2, 2]
-    _gc_list = st.columns(_gc_cols)
+    _gc_list = st.columns([3, 2, 2])
 
     with _gc_list[0]:
         st.markdown("**공통 추천 (어떤 지사든 인기 보장)**")
@@ -3944,14 +3943,17 @@ with tab_letter:
         else:
             st.info("공통 추천을 활용하세요.")
 
-    if _lt_voc_gifts and len(_gc_list) > 2:
-        with _gc_list[2]:
+    with _gc_list[2]:
+        if _lt_voc_gifts:
             st.markdown("**🎯 VOC 맞춤 추천**")
             _voc_gift_table = []
             for _gname, _gprice, _gdesc in _lt_voc_gifts:
                 _voc_gift_table.append({"기념품": _gname, "예상 단가": _gprice, "추천 이유": _gdesc})
             st.dataframe(pd.DataFrame(_voc_gift_table), use_container_width=True, hide_index=True)
             st.caption("고객 의견 분석 결과 기반 추천")
+        else:
+            st.markdown("**🎯 VOC 맞춤 추천**")
+            st.info("VOC 데이터 업로드 시 표시됩니다.")
 
     # 추천 조합 카드
     st.markdown("**💡 추천 조합 (2~3천원 예산)**")
