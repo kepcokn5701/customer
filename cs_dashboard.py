@@ -3530,6 +3530,60 @@ with tab_letter:
         },
     }
 
+    # ── 불만 키워드 → 약속 문장 매핑 (서한문 프롬프트용) ──
+    _COMPLAINT_TO_PROMISE = {
+        "정전": "안정적인 전력공급에 더욱 만전을 기하겠습니다",
+        "단전": "안정적인 전력공급에 더욱 만전을 기하겠습니다",
+        "지연": "신속한 업무 처리로 고객님의 시간을 소중히 여기겠습니다",
+        "오래": "대기 시간 단축을 위해 지속적으로 개선하겠습니다",
+        "기다림": "대기 시간 단축을 위해 지속적으로 개선하겠습니다",
+        "지체": "대기 시간 단축을 위해 지속적으로 개선하겠습니다",
+        "불친절": "친절하고 정중한 응대를 최우선으로 하겠습니다",
+        "무시": "고객님 한 분 한 분의 목소리에 귀 기울이겠습니다",
+        "냉담": "고객님 한 분 한 분의 목소리에 귀 기울이겠습니다",
+        "요금": "투명하고 정확한 요금 안내에 힘쓰겠습니다",
+        "과금": "투명하고 정확한 요금 안내에 힘쓰겠습니다",
+        "과다": "투명하고 정확한 요금 안내에 힘쓰겠습니다",
+        "고장": "설비 점검과 유지보수에 더욱 힘쓰겠습니다",
+        "불량": "설비 점검과 유지보수에 더욱 힘쓰겠습니다",
+        "오류": "정확한 업무 처리를 위해 꼼꼼히 점검하겠습니다",
+        "실수": "정확한 업무 처리를 위해 꼼꼼히 점검하겠습니다",
+        "착오": "정확한 업무 처리를 위해 꼼꼼히 점검하겠습니다",
+        "반복": "같은 불편이 되풀이되지 않도록 근본적으로 개선하겠습니다",
+        "여전히": "같은 불편이 되풀이되지 않도록 근본적으로 개선하겠습니다",
+        "위험": "안전한 전기 사용 환경을 만들기 위해 최선을 다하겠습니다",
+        "안전": "안전한 전기 사용 환경을 만들기 위해 최선을 다하겠습니다",
+    }
+
+    # ── 불만 키워드 → 기념품 매핑 (VOC 맞춤 추천용) ──
+    _COMPLAINT_GIFT = {
+        "정전": [("LED 비상 랜턴", "3,000원", "정전 시 즉시 활용 가능한 실용 아이템")],
+        "단전": [("LED 비상 랜턴", "3,000원", "정전 시 즉시 활용 가능한 실용 아이템")],
+        "요금": [("에너지 절약 멀티탭", "3,500원", "대기전력 차단으로 요금 절감 도움")],
+        "과금": [("에너지 절약 멀티탭", "3,500원", "대기전력 차단으로 요금 절감 도움")],
+        "고장": [("휴대용 멀티 충전케이블", "2,500원", "전기 관련 실용 아이템으로 호감 형성")],
+        "불친절": [("프리미엄 보온텀블러", "3,500원", "정성이 담긴 사과의 의미 전달")],
+        "위험": [("가정용 소화기 (미니)", "3,500원", "전기 안전 관련 실용 아이템")],
+        "안전": [("가정용 소화기 (미니)", "3,500원", "전기 안전 관련 실용 아이템")],
+    }
+
+    # ── 계약종별 → 톤 가이드 매핑 ──
+    _CONTRACT_TONE = {
+        "주택용": "가정과 일상을 중심으로 편안하고 따뜻한 톤",
+        "농사용": "농번기의 수고를 격려하고 계절 변화에 공감하는 톤",
+        "산업용": "사업 번창을 기원하며 안정적 전력공급의 신뢰를 강조하는 톤",
+        "일반용": "사업 운영을 응원하며 효율적 서비스를 강조하는 톤",
+        "교육용": "교육 현장의 가치를 존중하며 안정적 학습환경을 약속하는 톤",
+    }
+
+    # ── 지역유형 → 톤 가이드 매핑 ──
+    _REGION_TONE = {
+        "농촌형": "소박하고 정감 있는 톤, 자연·계절 묘사를 살짝 더",
+        "해안형": "바다·포구 등 해안 정서를 은은히, 중간 톤",
+        "도심형": "간결하고 신뢰감 있는 톤, 효율·서비스 품질 강조",
+        "공통": "보편적이고 따뜻한 톤",
+    }
+
     def _get_region_type(kb_context: str) -> str:
         """KB context에서 지역유형 추출"""
         if not kb_context:
@@ -3666,6 +3720,31 @@ with tab_letter:
 
     st.markdown("---")
 
+    # ── 지사별 데이터 집계 (서한문 톤·기념품 반영용) ──────────
+    _lt_region_type = _get_region_type(_lt_kb.get("context", ""))
+
+    # (a) 상위 불만 키워드 (top 3)
+    _lt_top_complaints = []
+    _lt_branch_df = df_f[df_f[M["office"]] == _lt_sel_name] if M.get("office") else df_f
+    if M.get("voc") and len(_lt_branch_df) > 0:
+        try:
+            _lt_neg_kws = _lt_branch_df[M["voc"]].apply(check_negative).apply(lambda x: x[1])
+            _lt_kw_counter = Counter([kw for kws in _lt_neg_kws for kw in kws])
+            _lt_top_complaints = [kw for kw, _ in _lt_kw_counter.most_common(3)]
+        except Exception:
+            pass
+
+    # (b) 주요 계약종별
+    _lt_dominant_contract = ""
+    _lt_contract_pct = ""
+    if M.get("contract") and M["contract"] in _lt_branch_df.columns and len(_lt_branch_df) > 0:
+        try:
+            _vc = _lt_branch_df[M["contract"]].value_counts()
+            _lt_dominant_contract = _vc.index[0]
+            _lt_contract_pct = f"{_vc.iloc[0] / len(_lt_branch_df) * 100:.0f}%"
+        except Exception:
+            pass
+
     # ── 기본 템플릿 문구 (인제 스타일 기반) ──────────────────
     _region_desc = _lt_kb.get("context", "").split("/")[0].strip().replace("[", "").replace("]", "") if _lt_kb.get("context") else ""
     _lt_region_name = _lt_sel_key.replace("지사", "").replace("/", "·")
@@ -3707,10 +3786,23 @@ with tab_letter:
     with _lt_col_text:
         st.markdown(f"### {_lt_theme['icon']} {_lt_sel_name} · {_lt_theme['season_name']} 서한문")
 
+        # 데이터 반영 상태 캡션
+        _lt_caption_parts = []
+        if _lt_dominant_contract:
+            _lt_caption_parts.append(f"주요 고객: {_lt_dominant_contract}({_lt_contract_pct})")
+        if _lt_top_complaints:
+            _lt_caption_parts.append(f"주요 개선 요청: {', '.join(_lt_top_complaints)}")
+        if _lt_caption_parts:
+            st.caption(f"📊 {' │ '.join(_lt_caption_parts)}")
+
         if st.button("🤖 AI 맞춤 문구 생성", key="letter_ai_btn", type="primary", use_container_width=True):
             if not GEMINI_AVAILABLE:
                 st.error("Gemini API 키가 설정되지 않았습니다. `.env` 파일에 `GEMINI_API_KEY`를 설정해주세요.")
             else:
+                # 불만 키워드 → 약속 문장 힌트 (중복 제거)
+                _lt_promises = list(dict.fromkeys(
+                    _COMPLAINT_TO_PROMISE[kw] for kw in _lt_top_complaints if kw in _COMPLAINT_TO_PROMISE))
+                _lt_promise_hint = ("특히 다음 약속을 자연스럽게 녹여주세요: " + " / ".join(_lt_promises)) if _lt_promises else ""
                 _lt_prompt = (
                     f"당신은 따뜻하고 진심 어린 편지를 쓰는 작가입니다. "
                     f"한국전력공사 {_lt_sel_name}에서 경험고객에게 보내는 {_lt_theme['season_name']} 서한문(감사 편지)을 작성하세요.\n\n"
@@ -3724,7 +3816,8 @@ with tab_letter:
                     f"2문단) 감사: 변함없이 한국전력을 믿고 이용해주시는 고객 여러분께 진심 어린 감사 표현 2~3문장. "
                     f"고객 한 분 한 분의 소중함을 느낄 수 있는 따뜻한 문장으로 작성\n"
                     f"3문단) 약속: {_lt_sel_name}는 {_lt_area} 일원을 관할하며 안정적 전력공급과 최상의 서비스를 약속. "
-                    f"친절·정확·신속한 서비스로 고객님께서 '매우만족' 하실 수 있도록 늘 노력하겠다는 다짐 2~3문장\n"
+                    f"친절·정확·신속한 서비스로 고객님께서 '매우만족' 하실 수 있도록 늘 노력하겠다는 다짐 2~3문장. "
+                    f"{_lt_promise_hint}\n"
                     f"4문단) 안내: 전기 사용 관련 미흡하거나 궁금하신 사항은 "
                     f"한전 고객센터(국번없이 123) 또는 한전ON(online.kepco.co.kr)으로 연락 안내\n"
                     f"5문단) 마무리: {_lt_theme['season_name']}에 맞는 건강·행복 기원 인사 + '감사합니다.'\n\n"
@@ -3736,7 +3829,9 @@ with tab_letter:
                     f"- 담백하고 격식 있는 공공기관 서한문 톤. 따뜻하되 절제된 표현\n"
                     f"- 계절감은 첫 인사에서 한두 문장 정도만 간결하게\n"
                     f"- 지역 자연환경은 1곳만 짧게 언급하거나 생략해도 무방\n"
-                    f"- 대등한 위치에서 감사를 전하는 어조 (저자세·과잉 겸손 금지)\n\n"
+                    f"- 대등한 위치에서 감사를 전하는 어조 (저자세·과잉 겸손 금지)\n"
+                    f"- 고객층 톤: {_CONTRACT_TONE.get(_lt_dominant_contract, '보편적이고 따뜻한 톤')}\n"
+                    f"- 지역 톤: {_REGION_TONE.get(_lt_region_type, '보편적이고 따뜻한 톤')}\n\n"
                     f"[절대 금지]\n"
                     f"- '국민기업', '국민 기업', '국민과 함께' 표현 금지\n"
                     f"- '감사할 따름', '송구', '부족하나마', '미력하나마' 등 과잉 겸손 표현 금지\n"
@@ -3810,19 +3905,28 @@ with tab_letter:
     st.markdown("---")
     st.markdown(f"### 🎁 {_lt_theme['season_name']} 추천 기념품 세트 — {_lt_sel_name}")
 
-    _lt_region_type = _get_region_type(_lt_kb.get("context", ""))
     _lt_season_name = _lt_theme["season_name"]
     _lt_gifts_common = _GIFT_DB.get(_lt_season_name, {}).get("공통", [])
     _lt_gifts_region = _GIFT_DB.get(_lt_season_name, {}).get(_lt_region_type, [])
+
+    # VOC 맞춤 기념품 추출
+    _lt_voc_gifts = []
+    _seen_gifts = set()
+    for _ckw in _lt_top_complaints:
+        for _gift_item in _COMPLAINT_GIFT.get(_ckw, []):
+            if _gift_item[0] not in _seen_gifts:
+                _lt_voc_gifts.append(_gift_item)
+                _seen_gifts.add(_gift_item[0])
 
     st.markdown(f'<div class="card-teal">'
                 f'<b>📍 {_lt_sel_name} 지역유형:</b> {_lt_region_type} '
                 f'({_lt_kb.get("context", "").split(".")[0] if _lt_kb.get("context") else "정보 없음"})'
                 f'</div>', unsafe_allow_html=True)
 
-    _gc1, _gc2 = st.columns([3, 2])
+    _gc_cols = [3, 2] if not _lt_voc_gifts else [3, 2, 2]
+    _gc_list = st.columns(_gc_cols)
 
-    with _gc1:
+    with _gc_list[0]:
         st.markdown("**공통 추천 (어떤 지사든 인기 보장)**")
         _gift_table = []
         for _gname, _gprice, _gdesc in _lt_gifts_common:
@@ -3830,7 +3934,7 @@ with tab_letter:
         if _gift_table:
             st.dataframe(pd.DataFrame(_gift_table), use_container_width=True, hide_index=True)
 
-    with _gc2:
+    with _gc_list[1]:
         st.markdown(f"**{_lt_region_type} 특화 추천**")
         _gift_region_table = []
         for _gname, _gprice, _gdesc in _lt_gifts_region:
@@ -3839,6 +3943,15 @@ with tab_letter:
             st.dataframe(pd.DataFrame(_gift_region_table), use_container_width=True, hide_index=True)
         else:
             st.info("공통 추천을 활용하세요.")
+
+    if _lt_voc_gifts and len(_gc_list) > 2:
+        with _gc_list[2]:
+            st.markdown("**🎯 VOC 맞춤 추천**")
+            _voc_gift_table = []
+            for _gname, _gprice, _gdesc in _lt_voc_gifts:
+                _voc_gift_table.append({"기념품": _gname, "예상 단가": _gprice, "추천 이유": _gdesc})
+            st.dataframe(pd.DataFrame(_voc_gift_table), use_container_width=True, hide_index=True)
+            st.caption("고객 의견 분석 결과 기반 추천")
 
     # 추천 조합 카드
     st.markdown("**💡 추천 조합 (2~3천원 예산)**")
