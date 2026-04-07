@@ -1561,6 +1561,17 @@ else:
 
 neg_ratio = neg_cnt / max(len(voc_texts_all), 1) * 100
 
+# ── 잠재 민원고객 수 사전 계산 (KPI + 탭5 공용) ──
+_pre_neg_n = 0
+if M["voc"]:
+    _pre_neg_res = df_f[M["voc"]].apply(check_negative)
+    _pre_neg_kw_mask = _pre_neg_res.apply(lambda x: x[0])
+    _pre_low_score_mask = pd.Series(False, index=df_f.index)
+    if M["score"] and "_점수100" in df_f.columns:
+        _pre_low_score_mask = df_f["_점수100"] <= 50
+    _pre_neg_n = int((_pre_low_score_mask & _pre_neg_kw_mask).sum())
+_pre_neg_r = _pre_neg_n / max(len(df_f), 1) * 100
+
 # ══════════════════════════════════════════════════════════════
 #  12. 자동 인사이트 & KPI 메트릭
 # ══════════════════════════════════════════════════════════════
@@ -1593,8 +1604,8 @@ with m4:
         st.metric("😊 긍정 비율", "미선택")
 with m5:
     if M["voc"]:
-        st.metric("🎯 조기 경보 감지", f"{neg_cnt:,}명",
-                  delta=f"전체의 {neg_ratio:.1f}%", delta_color="inverse")
+        st.metric("🎯 조기 경보 감지", f"{_pre_neg_n:,}명",
+                  delta=f"전체의 {_pre_neg_r:.1f}%", delta_color="inverse")
     else:
         st.metric("🎯 조기 경보 감지", "미선택")
 
