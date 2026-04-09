@@ -1719,7 +1719,9 @@ with tab_weekly:
             if _wr_sel_view == "전체 (본부 종합)":
                 # ── 전체: 지사별 행 ──
                 _offices_wr = _sort_offices(df_f[_wr_office].dropna().unique().tolist())
-                _s1_rows = []
+                # 금주 점수 dict (순위 계산용)
+                _ofc_tw_scores = {}
+                _s1_raw = []
                 for ofc in _offices_wr:
                     _tw = _wr_this_week[_wr_this_week[_wr_office] == ofc]
                     _lw = _wr_last_week[_wr_last_week[_wr_office] == ofc]
@@ -1729,7 +1731,22 @@ with tab_weekly:
                     _tw_sc = _tw["_점수100"].mean() if "_점수100" in _tw.columns and not _tw["_점수100"].dropna().empty else None
                     _lw_sc = _lw["_점수100"].mean() if "_점수100" in _lw.columns and not _lw["_점수100"].dropna().empty else None
                     _mo_sc = _mo["_점수100"].mean() if "_점수100" in _mo.columns and not _mo["_점수100"].dropna().empty else None
-                    _s1_rows.append((ofc, _tw_total, _tw_resp, _tw_sc, _lw_sc, _mo_sc, _delta_html(_tw_sc, _lw_sc)))
+                    _ofc_tw_scores[ofc] = _tw_sc
+                    _s1_raw.append((ofc, _tw_total, _tw_resp, _tw_sc, _lw_sc, _mo_sc))
+
+                # 순위 계산 (금주 점수 기준, 높을수록 1위)
+                _valid_scores = {k: v for k, v in _ofc_tw_scores.items() if v is not None}
+                _ranked = sorted(_valid_scores.items(), key=lambda x: x[1], reverse=True)
+                _rank_map = {}
+                _total_ranked = len(_ranked)
+                for idx, (k, _) in enumerate(_ranked, 1):
+                    _rank_map[k] = idx
+
+                _s1_rows = []
+                for ofc, tt, tr, tw_sc, lw_sc, mo_sc in _s1_raw:
+                    _dlt = _delta_html(_tw_sc, lw_sc)
+                    _rank_str = f"{_rank_map[ofc]}/{_total_ranked}위" if ofc in _rank_map else "-"
+                    _s1_rows.append((ofc, tt, tr, tw_sc, _dlt, lw_sc, mo_sc, _rank_str))
             else:
                 # ── 개별 지사: 업무유형별 행 ──
                 _s1_rows = []
@@ -1744,14 +1761,14 @@ with tab_weekly:
                         _tw_sc = _tw["_점수100"].mean() if "_점수100" in _tw.columns and not _tw["_점수100"].dropna().empty else None
                         _lw_sc = _lw["_점수100"].mean() if "_점수100" in _lw.columns and not _lw["_점수100"].dropna().empty else None
                         _mo_sc = _mo["_점수100"].mean() if "_점수100" in _mo.columns and not _mo["_점수100"].dropna().empty else None
-                        _s1_rows.append((bt, _tw_total, _tw_resp, _tw_sc, _lw_sc, _mo_sc, _delta_html(_tw_sc, _lw_sc)))
+                        _s1_rows.append((bt, _tw_total, _tw_resp, _tw_sc, _delta_html(_tw_sc, _lw_sc), _lw_sc, _mo_sc, "-"))
                 else:
                     _tw_total = len(_wr_tw_view)
                     _tw_resp = int(_wr_tw_view["_점수100"].dropna().count()) if "_점수100" in _wr_tw_view.columns else _tw_total
                     _tw_sc = _wr_tw_view["_점수100"].mean() if "_점수100" in _wr_tw_view.columns and not _wr_tw_view["_점수100"].dropna().empty else None
                     _lw_sc = _wr_lw_view["_점수100"].mean() if "_점수100" in _wr_lw_view.columns and not _wr_lw_view["_점수100"].dropna().empty else None
                     _mo_sc = _wr_mo_view["_점수100"].mean() if "_점수100" in _wr_mo_view.columns and not _wr_mo_view["_점수100"].dropna().empty else None
-                    _s1_rows.append((_wr_sel_view, _tw_total, _tw_resp, _tw_sc, _lw_sc, _mo_sc, _delta_html(_tw_sc, _lw_sc)))
+                    _s1_rows.append((_wr_sel_view, _tw_total, _tw_resp, _tw_sc, _delta_html(_tw_sc, _lw_sc), _lw_sc, _mo_sc, "-"))
 
             # 합계 행
             _tw_all_t = len(_wr_tw_view)
@@ -1760,32 +1777,35 @@ with tab_weekly:
             _lw_all_s = _wr_lw_view["_점수100"].mean() if "_점수100" in _wr_lw_view.columns and not _wr_lw_view["_점수100"].dropna().empty else None
             _mo_all_s = _wr_mo_view["_점수100"].mean() if "_점수100" in _wr_mo_view.columns and not _wr_mo_view["_점수100"].dropna().empty else None
 
+            # 열: 구분 | 업무처리건수 | 응답호수 | 조사결과(금주, 증감, 전주) | 월별누계 | 비고(순위)
             _row_label = "구분" if _wr_sel_view == "전체 (본부 종합)" else "업무유형"
             html_s1 = '<div style="overflow-x:auto;"><table style="border-collapse:collapse;width:100%;font-size:0.85em;text-align:center;">'
-            # 1단 헤더: 조사결과 colspan=2
+            # 1단 헤더: 조사결과 colspan=3
             html_s1 += f'<tr style="background:{_hdr};font-weight:bold;">'
             html_s1 += f'<th rowspan="2" style="border:1px solid {_bdr};padding:6px 8px;">{_row_label}</th>'
             html_s1 += f'<th rowspan="2" style="border:1px solid {_bdr};padding:6px 8px;">업무처리<br>건수</th>'
             html_s1 += f'<th rowspan="2" style="border:1px solid {_bdr};padding:6px 8px;">응답<br>호수</th>'
-            html_s1 += f'<th colspan="2" style="border:1px solid {_bdr};padding:6px 8px;">조사결과</th>'
+            html_s1 += f'<th colspan="3" style="border:1px solid {_bdr};padding:6px 8px;">조사결과</th>'
             html_s1 += f'<th rowspan="2" style="border:1px solid {_bdr};padding:6px 8px;">월별<br>누계</th>'
             html_s1 += f'<th rowspan="2" style="border:1px solid {_bdr};padding:6px 8px;">비고</th>'
             html_s1 += '</tr>'
-            # 2단 헤더: 금주 / 전주
+            # 2단 헤더: 금주 / 증감 / 전주
             html_s1 += f'<tr style="background:{_hdr};font-weight:bold;font-size:0.92em;">'
             html_s1 += f'<th style="border:1px solid {_bdr};padding:4px 6px;">금주</th>'
+            html_s1 += f'<th style="border:1px solid {_bdr};padding:4px 6px;">증감</th>'
             html_s1 += f'<th style="border:1px solid {_bdr};padding:4px 6px;">전주</th>'
             html_s1 += '</tr>'
 
-            for ofc, tt, tr, tw_s, lw_s, mo_s, rmk in _s1_rows:
+            for name, tt, tr, tw_s, dlt, lw_s, mo_s, rank_str in _s1_rows:
                 html_s1 += '<tr>'
-                html_s1 += f'<td style="border:1px solid {_bdr};padding:5px 8px;font-weight:bold;background:#f9f9f9;">{ofc}</td>'
+                html_s1 += f'<td style="border:1px solid {_bdr};padding:5px 8px;font-weight:bold;background:#f9f9f9;">{name}</td>'
                 html_s1 += f'<td style="border:1px solid {_bdr};padding:5px;">{tt:,}</td>'
                 html_s1 += f'<td style="border:1px solid {_bdr};padding:5px;">{tr:,}</td>'
                 html_s1 += f'<td style="border:1px solid {_bdr};padding:5px;font-weight:bold;">{_fv(tw_s)}</td>'
+                html_s1 += f'<td style="border:1px solid {_bdr};padding:5px;">{dlt}</td>'
                 html_s1 += f'<td style="border:1px solid {_bdr};padding:5px;">{_fv(lw_s)}</td>'
                 html_s1 += f'<td style="border:1px solid {_bdr};padding:5px;">{_fv(mo_s)}</td>'
-                html_s1 += f'<td style="border:1px solid {_bdr};padding:5px;">{rmk}</td>'
+                html_s1 += f'<td style="border:1px solid {_bdr};padding:5px;">{rank_str}</td>'
                 html_s1 += '</tr>'
 
             # 합계
@@ -1794,20 +1814,19 @@ with tab_weekly:
             html_s1 += f'<td style="border:1px solid {_bdr};padding:5px;">{_tw_all_t:,}</td>'
             html_s1 += f'<td style="border:1px solid {_bdr};padding:5px;">{_tw_all_r:,}</td>'
             html_s1 += f'<td style="border:1px solid {_bdr};padding:5px;">{_fv(_tw_all_s)}</td>'
+            html_s1 += f'<td style="border:1px solid {_bdr};padding:5px;">{_delta_html(_tw_all_s, _lw_all_s)}</td>'
             html_s1 += f'<td style="border:1px solid {_bdr};padding:5px;">{_fv(_lw_all_s)}</td>'
             html_s1 += f'<td style="border:1px solid {_bdr};padding:5px;">{_fv(_mo_all_s)}</td>'
-            html_s1 += f'<td style="border:1px solid {_bdr};padding:5px;">{_delta_html(_tw_all_s, _lw_all_s)}</td>'
+            html_s1 += f'<td style="border:1px solid {_bdr};padding:5px;">-</td>'
             html_s1 += '</tr></table>'
             html_s1 += '<div style="text-align:right;font-size:0.8em;margin-top:4px;color:#555;">(단위 : 건, 점)</div></div>'
             st.markdown(html_s1, unsafe_allow_html=True)
 
             # 엑셀 다운로드
-            _s1_dl = pd.DataFrame(_s1_rows, columns=[_row_label,"업무처리건수","응답호수","조사결과(금주)","조사결과(전주)","월별누계","비고"])
-            _s1_dl["비고"] = _s1_dl["비고"].astype(str).str.replace(r"<[^>]+>", "", regex=True)
-            _s1_dl.loc[len(_s1_dl)] = ["합계", _tw_all_t, _tw_all_r,
-                                        round(_tw_all_s,1) if _tw_all_s is not None else "",
-                                        round(_lw_all_s,1) if _lw_all_s is not None else "",
-                                        round(_mo_all_s,1) if _mo_all_s is not None else "", ""]
+            _s1_dl_rows = [(n, tt, tr, _fv(tw), dlt, _fv(lw), _fv(mo), rk) for n, tt, tr, tw, dlt, lw, mo, rk in _s1_rows]
+            _s1_dl = pd.DataFrame(_s1_dl_rows, columns=[_row_label,"업무처리건수","응답호수","금주","증감","전주","월별누계","비고(순위)"])
+            _s1_dl["증감"] = _s1_dl["증감"].astype(str).str.replace(r"<[^>]+>", "", regex=True)
+            _s1_dl.loc[len(_s1_dl)] = ["합계", _tw_all_t, _tw_all_r, _fv(_tw_all_s), "", _fv(_lw_all_s), _fv(_mo_all_s), ""]
             st.download_button("📥 주간 조사 결과 다운로드", df_to_excel_bytes(_s1_dl),
                                "주간_조사결과.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                                key="dl_weekly_s1")
