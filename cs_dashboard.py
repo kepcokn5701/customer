@@ -3641,6 +3641,106 @@ with tab_sol:
                 if not _real_top3 and not _drop_top3:
                     st.success("✅ 모든 업무×계약종별 조합이 본부 평균 이상입니다.")
 
+                # ── AI 종합 처방전 (실질+급락 전체) ──────────────
+                if _real_top3 or _drop_top3:
+                    st.markdown("---")
+                    _office_kb = _get_office_kb(_sel_off)
+                    _kb_ctx = _office_kb["context"] if _office_kb else "지역 특성 정보 없음"
+                    _kb_act = _office_kb["action"] if _office_kb else ""
+
+                    # 리스크 요약 텍스트 생성
+                    _rx_lines = ""
+                    if _real_top3:
+                        _rx_lines += "■ 실질적 리스크 (건수 多 & 평균 이하):\n"
+                        for _ri, _rk in enumerate(_real_top3, 1):
+                            _rx_lines += f"  {_ri}. {_rk['계약종별']}×{_rk['업무']}: {_rk['점수']}점, {_rk['건수']}건, 최저항목={_rk['최저항목']}({_rk['최저점수']}점)"
+                            if _rk["voc"]:
+                                _rx_lines += f", VOC=\"{_rk['voc']}\""
+                            _rx_lines += "\n"
+                    if _drop_top3:
+                        _rx_lines += "■ 급락 리스크 (건수 少 & 점수 급락):\n"
+                        for _di, _dk in enumerate(_drop_top3, 1):
+                            _rx_lines += f"  {_di}. {_dk['계약종별']}×{_dk['업무']}: {_dk['점수']}점, {_dk['건수']}건, 최저항목={_dk['최저항목']}({_dk['최저점수']}점)"
+                            if _dk["voc"]:
+                                _rx_lines += f", VOC=\"{_dk['voc']}\""
+                            _rx_lines += "\n"
+
+                    # 전체 VOC 수집
+                    _all_neg_vocs = ""
+                    if M.get("voc"):
+                        _all_voc_df = _df_sel[_df_sel["_점수100"] < 70][M["voc"]].dropna().astype(str)
+                        _all_voc_list = [v.strip() for v in _all_voc_df.tolist() if v.strip() not in _VOC_EMPTY and len(v.strip()) > 2]
+                        if _all_voc_list:
+                            _all_neg_vocs = "\n".join(f"- {v}" for v in _all_voc_list[:15])
+
+                    _sol_ai_key = f"_ai_sol_{_sel_off}"
+                    if st.button("🤖 AI 종합 처방전 생성", key="sol_ai_total_btn",
+                                 type="primary", use_container_width=True):
+                        if not GEMINI_AVAILABLE:
+                            st.error("Gemini API 키가 설정되지 않았습니다.")
+                        else:
+                            _sol_prompt = (
+                                f"# 역할: 전력 산업 CS 컨설턴트\n"
+                                f"아래 [{_sel_off}]의 리스크 데이터를 보고, 지사장이 내일 아침 회의에서 바로 지시할 수 있는 "
+                                f"**즉시 실행 가능한 액션**만 개조식으로 제안하세요.\n\n"
+                                f"[지사 정보]\n"
+                                f"- 지사: {_sel_off} (지역 특성: {_kb_ctx})\n"
+                                f"- 지사 종합 평균: {_sel_avg:.1f}점 (본부 {avg_score_100:.1f}점)\n\n"
+                                f"[리스크 현황]\n{_rx_lines}\n"
+                                f"[불만 VOC 원문 (최대 15건)]\n{_all_neg_vocs or '없음'}\n\n"
+                                f"# 출력 형식\n"
+                                f"리스크별로 즉시 실행 전술을 1~2개씩 제안하세요.\n"
+                                f"각 전술은 아래 형태로 작성:\n"
+                                f"### 🔴 [계약종별] × [업무] — 점수\n"
+                                f"- **전술명**: 구체적 행동 한 줄\n"
+                                f"- **전술명**: 구체적 행동 한 줄\n\n"
+                                f"[절대 금지]\n"
+                                f"- 현황 분석, 원인 추정, 기대 효과 등 부가 섹션 작성 금지. 오직 전술만.\n"
+                                f"- 'TF 구성', '교육 실시', '매뉴얼 배포', '시스템 개편' 같은 뻔한 제안 금지\n"
+                                f"- 예산이나 본사 승인이 필요한 제안 금지\n"
+                                f"- 특정 직원을 저격하는 듯한 제안(멘토링, 코칭, 롤플레이 등) 금지\n"
+                                f"- '전기세' 금지 → '전기요금'\n"
+                                f"- 줄글 금지. 개조식 bullet만. 한 bullet에 1문장.\n"
+                                f"- 데이터에 없는 사실 창작 금지\n"
+                            )
+                            with st.spinner("AI가 종합 처방전 생성 중…"):
+                                try:
+                                    import urllib.request
+                                    _models = ["gemini-2.5-flash", "gemma-3-12b-it"]
+                                    _sol_pl = {
+                                        "contents": [{"parts": [{"text": _sol_prompt}]}],
+                                        "generationConfig": {"temperature": 0.7, "maxOutputTokens": 8192}
+                                    }
+                                    _ctx = ssl._create_unverified_context()
+                                    _body = None
+                                    for _model in _models:
+                                        _url = (f"https://generativelanguage.googleapis.com/v1beta/"
+                                                f"models/{_model}:generateContent?key={_GEMINI_KEY}")
+                                        _req = urllib.request.Request(
+                                            _url, data=json.dumps(_sol_pl).encode("utf-8"),
+                                            headers={"Content-Type": "application/json"}, method="POST")
+                                        try:
+                                            with urllib.request.urlopen(_req, context=_ctx, timeout=90) as _rsp:
+                                                _body = json.loads(_rsp.read().decode("utf-8"))
+                                            break
+                                        except urllib.error.HTTPError as _he:
+                                            if _he.code in (429, 503):
+                                                continue
+                                            raise
+                                    if _body is None:
+                                        st.error("모든 AI 모델의 일일 한도가 소진되었습니다.")
+                                    else:
+                                        st.session_state[_sol_ai_key] = _body["candidates"][0]["content"]["parts"][0]["text"].strip()
+                                except Exception as _e:
+                                    st.error(f"AI 분석 중 오류: {_e}")
+
+                    if _sol_ai_key in st.session_state:
+                        st.markdown(
+                            '<div style="background:#f8f9fb;border:1px solid #d0d7de;border-radius:12px;'
+                            'padding:28px 32px;margin:12px 0;font-size:1.05em;line-height:2.0;">\n\n'
+                            f'{st.session_state[_sol_ai_key]}\n\n</div>',
+                            unsafe_allow_html=True)
+
                 # ══════════════════════════════════════════
                 # 상세 분석 — 선택된 카드의 범인 특정 + VOC + AI 처방전
                 # ══════════════════════════════════════════
@@ -3776,115 +3876,6 @@ with tab_sol:
                                 else:
                                     st.info("VOC 컬럼이 설정되지 않았습니다.")
 
-                            # ── AI 처방전 ──────────────────────────
-                            st.markdown("---")
-                            _office_kb = _get_office_kb(_sel_off)
-                            _kb_ctx = _office_kb["context"] if _office_kb else "지역 특성 정보 없음"
-                            _kb_act = _office_kb["action"] if _office_kb else ""
-                            _annual_ctx = _get_office_annual(_sel_off)
-
-                            _item_lines = "\n".join([f"- {k}: {v}점" for k, v in _item_scores.items()])
-
-                            _c3_ss_key = f"_ai_pinset_{_sel_off}_{_sel_ct}_{_sel_biz}"
-                            if st.button("🤖 AI 핀셋 처방전 생성", key="sol_ai_cell_btn",
-                                         type="primary", use_container_width=True):
-                                if not GEMINI_AVAILABLE:
-                                    st.error("Gemini API 키가 설정되지 않았습니다.")
-                                else:
-                                    _c3_prompt = (
-                                        "# ROLE: 전력 산업 25년 차 '현장 밀착형 CS 마스터 컨설턴트'\n"
-                                        "당신은 지사장이 내일 아침 주간 회의에서 부서장들에게 바로 지시할 수 있는 "
-                                        "'핀셋 처방전'을 작성합니다. 무난한 교육이나 시스템 개선안은 철저히 배제하고, "
-                                        "현장 인력과 기존 채널을 활용한 '즉시 실행 전술'에 집중하세요.\n\n"
-                                        "[절대 금지]\n"
-                                        "- 'TF 구성', '교육 실시', '매뉴얼 배포', '시스템 개편' 같은 뻔한 제안\n"
-                                        "- 예산이나 본사 승인이 필요한 제안\n"
-                                        "- 액션 뒤에 '(이번 주)', '(다음 달)' 등 괄호 시기 표기\n"
-                                        "- '멘토링', '코칭', '직원 교육', '롤플레이', '모니터링 평가' 등 특정 직원을 저격하는 듯한 제안. 점수가 낮다고 개인 역량을 탓하는 방향 금지\n"
-                                        "- 제공된 데이터(점수·건수·VOC 원문)에 없는 사실을 만들어내는 것. 추측 시 반드시 '추정'이라고 명시할 것\n"
-                                        "- '전국적으로', '타 본부에서는', '한전 전체에서' 등 경남본부 범위를 벗어나는 표현. 모든 데이터는 경남본부 관할 지사 한정이며 전국 데이터가 아님\n"
-                                        f"- 분석 대상은 [{_sel_ct}] 고객이므로, 다른 계약종별(농사용·산업용 등)의 특성을 혼용하지 말 것\n"
-                                        "- 다른 지사의 구체적 운영 방식을 창작하지 말 것\n\n"
-                                        "# INPUT DATA (3차원 교차 분석 결과)\n"
-                                        f"1. 대상 지사: {_sel_off} (지역 특성: {_kb_ctx})\n"
-                                        f"   [경남 전력 산업 배경] {POWER_INDUSTRY_CONTEXT}\n"
-                                        f"2. 타겟 그룹: [{_sel_ct}] 고객의 [{_sel_biz}] 업무\n"
-                                        f"3. 지사 종합 평균: {_sel_avg:.1f}점 (본부 {avg_score_100:.1f}점 대비 {_sel_gap:+.1f}점)\n"
-                                        f"4. 타겟 건수: {_c3_n}건 ({'신뢰도 주의' if _c3_n < 10 else '신뢰도 충분'})\n"
-                                        f"5. 핵심 결함: 세부 항목 중 [{_worst_item_name}] = {_worst_score}점 (최저)\n\n"
-                                        f"[세부항목별 만족도]\n{_item_lines}\n\n"
-                                    )
-                                    _c3_prompt += "\n"
-
-                                    if _bm_best_txt:
-                                        _c3_prompt += f"[{_bm_best_txt}]\n\n"
-                                    if _kb_act:
-                                        _c3_prompt += f"[지역 추천 액션]\n{_kb_act}\n\n"
-                                    _c3_prompt += (
-                                        f"[불만 VOC 원문]\n{_c3_voc_lines or '없음'}\n\n"
-                                        "# 출력 형식 (반드시 아래 4개 항목만 순서대로 출력. 추가 항목 금지)\n"
-                                        f"**보고서 제목: [{_sel_off} CS 리스크 진단 보고서]**\n\n"
-                                        "#### 1. 현황 분석\n"
-                                        "- 위 세부항목 점수와 VOC 원문만 근거로 사용.\n"
-                                        f"- [{_sel_ct}] 고객의 [{_sel_biz}] 업무에서 어떤 항목이 얼마나 낮은지 수치로 진단.\n\n"
-                                        "#### 2. 원인 추정\n"
-                                        f"- [{_sel_ct}]의 특성과 [{_sel_biz}]의 성격을 결합하여, "
-                                        f"왜 [{_worst_item_name}] 점수가 낮은지 실무적으로 해석.\n"
-                                        "- VOC 원문에서 드러나는 구체적 불만 포인트를 근거로 제시.\n\n"
-                                        "#### 3. 즉시 실행 전술\n"
-                                        "- 예산·본사 승인 불필요한 '행동' 위주. 내방 고객용 1개 + 전화 고객용 1개, 총 2가지.\n"
-                                        "- 전술 1 (내방 고객): 창구 비치용 가이드지, 대기 공간 활용, 안내문 등 물리적 접점 개선\n"
-                                        "- 전술 2 (전화 고객): 콜백 절차, 안내 스크립트, 문자 발송 시점 등 비대면 접점 개선\n"
-                                        f"- 위 지역 특성의 인구 구성을 감안할 것. 고령층 비율이 높은 지사면 쉬운 말·큰 글씨 등 고려, 도심 지사면 젊은 층에 맞는 디지털 안내도 고려. 단, 이 부분에 매몰되지 말 것.\n\n"
-                                        "#### 4. 기대 효과\n"
-                                        "- 위 전술 실행 시 어떤 항목이 얼마나 개선될지 구체적으로.\n\n"
-                                        "[작성 규칙]\n"
-                                        "- 줄글(산문체) 절대 금지. 반드시 개조식 bullet 보고서 형태로 작성.\n"
-                                        "- 한 bullet에 1~2문장 이내. 핵심만 짧게 끊어 쓸 것.\n"
-                                        "- '전기세' 표현 절대 금지 → 반드시 '전기요금'으로 표기.\n"
-                                        "- 수치(점수, 격차)를 문장 서두에 배치.\n"
-                                        "- 이번 달 데이터·VOC만 근거. 제공되지 않은 사실 창작 금지.\n"
-                                        "- 미사여구·AI 추임새 금지.\n"
-                                    )
-                                    with st.spinner("AI가 핀셋 처방전 생성 중…"):
-                                        try:
-                                            import urllib.request
-                                            _models = ["gemini-2.5-flash", "gemma-3-12b-it"]
-                                            _c3_pl = {
-                                                "contents": [{"parts": [{"text": _c3_prompt}]}],
-                                                "generationConfig": {"temperature": 0.7, "maxOutputTokens": 8192}
-                                            }
-                                            _ctx = ssl._create_unverified_context()
-                                            _body = None
-                                            for _model in _models:
-                                                _url = (f"https://generativelanguage.googleapis.com/v1beta/"
-                                                        f"models/{_model}:generateContent?key={_GEMINI_KEY}")
-                                                _req = urllib.request.Request(
-                                                    _url,
-                                                    data=json.dumps(_c3_pl).encode("utf-8"),
-                                                    headers={"Content-Type": "application/json"},
-                                                    method="POST")
-                                                try:
-                                                    with urllib.request.urlopen(_req, context=_ctx, timeout=90) as _rsp:
-                                                        _body = json.loads(_rsp.read().decode("utf-8"))
-                                                    break
-                                                except urllib.error.HTTPError as _he:
-                                                    if _he.code == 429:
-                                                        continue
-                                                    raise
-                                            if _body is None:
-                                                st.error("모든 AI 모델의 일일 한도가 소진되었습니다.")
-                                            else:
-                                                st.session_state[_c3_ss_key] = _body["candidates"][0]["content"]["parts"][0]["text"].strip()
-                                        except Exception as _c3e:
-                                            st.error(f"AI 분석 중 오류: {_c3e}")
-                            # 캐시된 결과 표시 (리런 후에도 유지)
-                            if _c3_ss_key in st.session_state:
-                                st.markdown(
-                                    '<div style="background:#f8f9fb;border:1px solid #d0d7de;border-radius:10px;'
-                                    'padding:24px 28px;margin:8px 0;font-size:0.93em;line-height:1.85;">\n\n'
-                                    f'{st.session_state[_c3_ss_key]}\n\n</div>',
-                                    unsafe_allow_html=True)
                         else:
                             st.info("세부항목 점수 데이터가 없습니다.")
         else:
