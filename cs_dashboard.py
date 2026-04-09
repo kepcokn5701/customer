@@ -403,7 +403,7 @@ def _sort_df_by_office(df, office_col, ascending=True):
 #  2. 키워드 사전
 # ══════════════════════════════════════════════════════════════
 NEGATIVE_KEYWORDS = [
-    "불만","불편","민원","항의","화남","짜증","느림","느려","오류","오작동",
+    "불만","불편","항의","화남","짜증","느림","느려","오류","오작동",
     "불량","고장","재방문","지연","오래","기다림","실망","최악","별로",
     "안됨","문제","취소","환불","비싸다","비싸","과다","과금","폭탄",
     "불친절","무시","황당","어이없","답답","이해불가","납득불가","부당",
@@ -867,9 +867,12 @@ def _is_out_of_scope(text):
     return True
 
 
-def _classify_sentiment_3tier(text):
+def _classify_sentiment_3tier(text, score=None):
     """VOC 3단계 감성 분류: 긍정/중립/부정 (역접 패턴 + 결론 우선)"""
-    if not text or str(text).strip() in ("", "nan", "응답없음"):
+    if not text or str(text).strip() in ("", "nan", "응답없음", "없음"):
+        # 의견 없음 + 100점 → 긍정
+        if score is not None and score >= 100:
+            return "긍정"
         return "중립"
     s = str(text)
 
@@ -1555,7 +1558,10 @@ if M["voc"]:
             else:                    neu_cnt += 1
     voc_response_rate = len(voc_texts_all) / max(len(df_f), 1) * 100
     df_f["_VOC분류"] = df_f[M["voc"]].apply(classify_voc_3tier)
-    df_f["_VOC감성"] = df_f[M["voc"]].apply(_classify_sentiment_3tier)  # 투트랙: 긍정/중립/부정
+    if "_점수100" in df_f.columns:
+        df_f["_VOC감성"] = df_f.apply(lambda r: _classify_sentiment_3tier(r[M["voc"]], r.get("_점수100")), axis=1)
+    else:
+        df_f["_VOC감성"] = df_f[M["voc"]].apply(_classify_sentiment_3tier)
     df_f["_is_oos"] = df_f[M["voc"]].apply(_is_out_of_scope)           # 통제 불가 필터링
 else:
     voc_response_rate = 0.0
@@ -1904,7 +1910,10 @@ with tab_weekly:
 
         if _wr_voc:
             _fb_df = _wr_tw_view.copy()
-            _fb_df["_감성분류"] = _fb_df[_wr_voc].apply(_classify_sentiment_3tier)
+            if "_점수100" in _fb_df.columns:
+                _fb_df["_감성분류"] = _fb_df.apply(lambda r: _classify_sentiment_3tier(r[_wr_voc], r.get("_점수100")), axis=1)
+            else:
+                _fb_df["_감성분류"] = _fb_df[_wr_voc].apply(_classify_sentiment_3tier)
             _fb_pos = int((_fb_df["_감성분류"] == "긍정").sum())
             _fb_neg = int((_fb_df["_감성분류"] == "부정").sum())
             _fb_neu = int((_fb_df["_감성분류"] == "중립").sum())
@@ -1936,7 +1945,36 @@ with tab_weekly:
             _fb_rename[_wr_voc] = "서술의견"
 
             _fb_show = _fb_df[_fb_cols].rename(columns=_fb_rename).reset_index(drop=True)
-            st.dataframe(_fb_show, use_container_width=True, height=400)
+
+            # HTML 테이블 (부정 행 빨간 배경 강조)
+            _fb_html = '<div style="overflow-x:auto;max-height:420px;overflow-y:auto;"><table style="border-collapse:collapse;width:100%;font-size:0.84em;text-align:left;">'
+            _fb_html += f'<tr style="background:#d6e4f0;font-weight:bold;position:sticky;top:0;">'
+            for col in _fb_show.columns:
+                _fb_html += f'<th style="border:1px solid #b0b0b0;padding:6px 8px;">{col}</th>'
+            _fb_html += '</tr>'
+            for _, row in _fb_show.iterrows():
+                _sent = row.get("감성분류", "")
+                if _sent == "부정":
+                    _row_bg = "background:#ffebee;"
+                    _badge = '<span style="background:#C62828;color:#fff;padding:2px 8px;border-radius:10px;font-size:0.88em;">부정</span>'
+                elif _sent == "긍정":
+                    _row_bg = ""
+                    _badge = '<span style="background:#1565C0;color:#fff;padding:2px 8px;border-radius:10px;font-size:0.88em;">긍정</span>'
+                else:
+                    _row_bg = ""
+                    _badge = '<span style="background:#757575;color:#fff;padding:2px 8px;border-radius:10px;font-size:0.88em;">중립</span>'
+                _fb_html += f'<tr style="{_row_bg}">'
+                for col in _fb_show.columns:
+                    v = row[col]
+                    if col == "감성분류":
+                        _fb_html += f'<td style="border:1px solid #b0b0b0;padding:5px 8px;text-align:center;">{_badge}</td>'
+                    elif col == "종합점수":
+                        _fb_html += f'<td style="border:1px solid #b0b0b0;padding:5px 8px;text-align:center;">{_fv(v)}</td>'
+                    else:
+                        _fb_html += f'<td style="border:1px solid #b0b0b0;padding:5px 8px;">{v}</td>'
+                _fb_html += '</tr>'
+            _fb_html += '</table></div>'
+            st.markdown(_fb_html, unsafe_allow_html=True)
         else:
             st.info("VOC(서술의견) 컬럼을 선택해야 피드백 목록을 표시할 수 있습니다.")
 
