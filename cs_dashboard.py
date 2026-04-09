@@ -3829,37 +3829,39 @@ with tab_sol:
                                 f"# 고객 불만 VOC 원문 (핵심 데이터 — 반드시 패턴 분석할 것)\n"
                                 f"{_all_neg_vocs or '없음'}\n\n"
                                 f"# 요청\n"
-                                f"1. 위 VOC 원문을 꼼꼼히 읽고, 고객 불만의 **공통 패턴**을 2~3가지로 묶어라.\n"
-                                f"   (예: '전화 연결 불만', '처리 지연 불만', '안내 부족 불만' 등)\n"
-                                f"2. 각 패턴에 대해, 직원 10명 내외의 작은 사업소에서 **예산·본사 승인 없이 즉시 실행**할 수 있는 구체적 행동을 제안하라.\n"
-                                f"3. '계약종별×업무' 조합에 매몰되지 말고, 지사 전체의 CS 수준을 올리는 관점에서 쓸 것.\n\n"
+                                f"1. 위 VOC 원문을 꼼꼼히 읽고, 고객 불만의 **공통 패턴**을 2~3가지로 묶어라. (원문 인용 불필요, 패턴 요약만)\n"
+                                f"2. 각 패턴별로, 직원 10명 내외의 작은 사업소에서 **예산·본사 승인 없이 즉시 실행**할 수 있는 전략을 세워라.\n"
+                                f"3. 구글 검색을 활용하여 **전력회사·가스공사·수도공사 등 유사 공공서비스 기업의 실제 CS 우수사례**를 찾아 전략에 반영하라.\n"
+                                f"   사례를 인용할 때는 '(출처: OO공사 CS 우수사례)' 형태로 근거를 밝혀라.\n"
+                                f"4. '계약종별×업무' 조합에 매몰되지 말고, 지사 전체 CS 수준을 올리는 관점에서 쓸 것.\n\n"
                                 f"# 출력 형식 (반드시 이 구조로)\n"
-                                f"### 📌 VOC 패턴 분석\n"
-                                f"- 패턴 1: (VOC에서 읽어낸 불만 유형 한 줄 요약)\n"
-                                f"- 패턴 2: ...\n"
-                                f"- 패턴 3: ...\n\n"
-                                f"### 🛠️ 즉시 실행 전략\n"
-                                f"**전략 1. (전략명)**\n"
-                                f"- 구체적 행동 한 줄\n"
-                                f"- 구체적 행동 한 줄\n\n"
-                                f"**전략 2. (전략명)**\n"
-                                f"- ...\n\n"
-                                f"(전략 3~4개 권장)\n\n"
+                                f"### 📌 불만 패턴 요약\n"
+                                f"- 패턴 1: (한 줄 요약)\n"
+                                f"- 패턴 2: ...\n\n"
+                                f"### 🛠️ 즉시 실행 전략 (정확히 3개)\n"
+                                f"**전략 1. (신박하고 구체적인 전략명)**\n"
+                                f"- 세부 행동 1\n"
+                                f"- 세부 행동 2\n\n"
+                                f"**전략 2. ...**\n"
+                                f"**전략 3. ...**\n\n"
                                 f"# 절대 금지\n"
-                                f"- '일반용×요금수납' 같은 교차 조합을 제목으로 쓰지 말 것. 패턴 중심으로 묶을 것.\n"
+                                f"- '일반용×요금수납' 같은 교차 조합을 제목으로 쓰지 말 것\n"
                                 f"- 'TF 구성', '교육 실시', '매뉴얼 배포', '시스템 개편', '멘토링', '코칭' 등 뻔하거나 예산 필요한 제안\n"
+                                f"- 세부 행동끼리 같은 말 반복 금지. 각 bullet은 서로 다른 구체적 행동이어야 함.\n"
                                 f"- 특정 직원 역량을 탓하는 방향\n"
                                 f"- '전기세' → 반드시 '전기요금'\n"
                                 f"- 줄글(산문) 금지. 개조식 bullet만. 한 bullet에 1문장.\n"
                                 f"- 데이터에 없는 사실 창작 금지. 추측 시 '추정' 명시.\n"
                                 f"- 미사여구, AI 추임새 금지.\n"
                             )
-                            with st.spinner("AI가 종합 처방전 생성 중…"):
+                            with st.spinner("AI가 종합 처방전 생성 중 (검색 포함)…"):
                                 try:
                                     import urllib.request
                                     _models = ["gemini-2.5-flash", "gemini-2.5-pro", "gemini-2.5-flash-lite", "gemma-3-12b-it"]
+                                    # google_search 그라운딩: Gemini가 실시간 검색하여 CS 사례 참조
                                     _sol_pl = {
                                         "contents": [{"parts": [{"text": _sol_prompt}]}],
+                                        "tools": [{"google_search": {}}],
                                         "generationConfig": {"temperature": 0.7, "maxOutputTokens": 8192}
                                     }
                                     _ctx = ssl._create_unverified_context()
@@ -3871,12 +3873,24 @@ with tab_sol:
                                             _url, data=json.dumps(_sol_pl).encode("utf-8"),
                                             headers={"Content-Type": "application/json"}, method="POST")
                                         try:
-                                            with urllib.request.urlopen(_req, context=_ctx, timeout=90) as _rsp:
+                                            with urllib.request.urlopen(_req, context=_ctx, timeout=120) as _rsp:
                                                 _body = json.loads(_rsp.read().decode("utf-8"))
                                             break
                                         except urllib.error.HTTPError as _he:
                                             if _he.code in (429, 500, 502, 503):
                                                 continue
+                                            # google_search 미지원 모델이면 검색 없이 재시도
+                                            if _he.code == 400:
+                                                _sol_pl.pop("tools", None)
+                                                _req2 = urllib.request.Request(
+                                                    _url, data=json.dumps(_sol_pl).encode("utf-8"),
+                                                    headers={"Content-Type": "application/json"}, method="POST")
+                                                try:
+                                                    with urllib.request.urlopen(_req2, context=_ctx, timeout=90) as _rsp2:
+                                                        _body = json.loads(_rsp2.read().decode("utf-8"))
+                                                    break
+                                                except urllib.error.HTTPError:
+                                                    continue
                                             raise
                                     if _body is None:
                                         st.error("모든 AI 모델의 일일 한도가 소진되었습니다.")
