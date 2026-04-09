@@ -3828,27 +3828,32 @@ with tab_sol:
                                 f"# 리스크 요약 (참고용 — 제목에 그대로 쓰지 말 것)\n{_rx_lines}\n"
                                 f"# 고객 불만 VOC 원문 (핵심 데이터 — 반드시 패턴 분석할 것)\n"
                                 f"{_all_neg_vocs or '없음'}\n\n"
+                                f"# 현장 현실 제약 (반드시 숙지)\n"
+                                f"- 문자 발송 시스템은 이미 있음 (체크박스로 발송 가능). '문자 발송하라'는 제안 불필요.\n"
+                                f"- 만족도 조사 링크는 본사에서 일괄 발송. 사업소에서 보내는 것 아님.\n"
+                                f"- 해피콜은 이미 시행 중. '해피콜 도입'은 제안 불필요.\n"
+                                f"- 전담 창구/핫라인 지정은 소규모 사업소에서 업무 과중 유발. 특정인에게 업무 몰리는 제안 금지.\n"
+                                f"- 사업소는 콜센터가 아님. 전화 응대 전문 인력이 따로 없음.\n"
+                                f"- 실현 가능한 방향: 사업소 내 안내물·게시물 배치, 고객 동선 개선, 대기 공간 활용, 간단한 서식·양식 비치 등 물리적 환경 개선 위주.\n\n"
                                 f"# 요청\n"
-                                f"1. 위 VOC 원문을 꼼꼼히 읽고, 고객 불만의 **공통 패턴**을 2~3가지로 묶어라. (원문 인용 불필요, 패턴 요약만)\n"
-                                f"2. 각 패턴별로, 직원 10명 내외의 작은 사업소에서 **예산·본사 승인 없이 즉시 실행**할 수 있는 전략을 세워라.\n"
-                                f"3. 구글 검색을 활용하여 **전력회사·가스공사·수도공사 등 유사 공공서비스 기업의 실제 CS 우수사례**를 찾아 전략에 반영하라.\n"
-                                f"   사례를 인용할 때는 '(출처: OO공사 CS 우수사례)' 형태로 근거를 밝혀라.\n"
-                                f"4. '계약종별×업무' 조합에 매몰되지 말고, 지사 전체 CS 수준을 올리는 관점에서 쓸 것.\n\n"
+                                f"1. VOC 원문의 불만 **공통 패턴**을 2~3가지로 묶어라. (원문 인용 불필요, 패턴 요약만)\n"
+                                f"2. 구글 검색으로 **전력회사·가스공사·수도공사 등 공공서비스 기업의 실제 CS 개선 사례**를 찾아 전략에 반영하라.\n"
+                                f"3. 위 현실 제약을 반영하여, 사업소에서 진짜 할 수 있는 전략만 제안하라.\n\n"
                                 f"# 출력 형식 (반드시 이 구조로)\n"
                                 f"### 📌 불만 패턴 요약\n"
                                 f"- 패턴 1: (한 줄 요약)\n"
                                 f"- 패턴 2: ...\n\n"
                                 f"### 🛠️ 즉시 실행 전략 (정확히 3개)\n"
-                                f"**전략 1. (신박하고 구체적인 전략명)**\n"
-                                f"- 세부 행동 1\n"
-                                f"- 세부 행동 2\n\n"
+                                f"**전략 1. (구체적인 전략명)**\n"
+                                f"- 세부 행동 (각각 서로 다른 구체적 행동)\n\n"
                                 f"**전략 2. ...**\n"
                                 f"**전략 3. ...**\n\n"
                                 f"# 절대 금지\n"
                                 f"- '일반용×요금수납' 같은 교차 조합을 제목으로 쓰지 말 것\n"
                                 f"- 'TF 구성', '교육 실시', '매뉴얼 배포', '시스템 개편', '멘토링', '코칭' 등 뻔하거나 예산 필요한 제안\n"
+                                f"- 문자 발송, 만족도 조사 링크, 해피콜, 전담 창구/핫라인 등 이미 있거나 비현실적인 제안\n"
                                 f"- 세부 행동끼리 같은 말 반복 금지. 각 bullet은 서로 다른 구체적 행동이어야 함.\n"
-                                f"- 특정 직원 역량을 탓하는 방향\n"
+                                f"- 특정 직원 역량을 탓하거나 특정인에게 업무 몰리는 방향\n"
                                 f"- '전기세' → 반드시 '전기요금'\n"
                                 f"- 줄글(산문) 금지. 개조식 bullet만. 한 bullet에 1문장.\n"
                                 f"- 데이터에 없는 사실 창작 금지. 추측 시 '추정' 명시.\n"
@@ -3895,7 +3900,16 @@ with tab_sol:
                                     if _body is None:
                                         st.error("모든 AI 모델의 일일 한도가 소진되었습니다.")
                                     else:
-                                        st.session_state[_sol_ai_key] = _body["candidates"][0]["content"]["parts"][0]["text"].strip()
+                                        _ai_text = _body["candidates"][0]["content"]["parts"][0]["text"].strip()
+                                        # grounding 출처 링크 추출
+                                        _src_links = []
+                                        _gm = _body["candidates"][0].get("groundingMetadata", {})
+                                        for _gc in _gm.get("groundingChunks", []):
+                                            _web = _gc.get("web", {})
+                                            if _web.get("uri"):
+                                                _src_links.append((_web.get("title", "출처"), _web["uri"]))
+                                        st.session_state[_sol_ai_key] = _ai_text
+                                        st.session_state[_sol_ai_key + "_src"] = _src_links
                                 except Exception as _e:
                                     st.error(f"AI 분석 중 오류: {_e}")
 
@@ -3905,6 +3919,17 @@ with tab_sol:
                             'padding:28px 32px;margin:12px 0;font-size:1.05em;line-height:2.0;">\n\n'
                             f'{st.session_state[_sol_ai_key]}\n\n</div>',
                             unsafe_allow_html=True)
+                        # 검색 출처 링크 표시
+                        _cached_src = st.session_state.get(_sol_ai_key + "_src", [])
+                        if _cached_src:
+                            _links_html = " &nbsp;|&nbsp; ".join(
+                                f'<a href="{u}" target="_blank" style="color:#1565C0;font-size:0.85em;">{t}</a>'
+                                for t, u in _cached_src[:5]
+                            )
+                            st.markdown(
+                                f'<div style="margin-top:4px;padding:8px 12px;background:#e8eaf6;'
+                                f'border-radius:8px;font-size:0.85em;">📎 참고 출처: {_links_html}</div>',
+                                unsafe_allow_html=True)
 
         else:
             st.info("업무유형·계약종별 컬럼이 필요합니다.")
