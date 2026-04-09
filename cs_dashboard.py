@@ -1646,11 +1646,11 @@ if M["date"]:
 # ══════════════════════════════════════════════════════════════
 #  13. 탭 구성
 # ══════════════════════════════════════════════════════════════
-tab_weekly, tab1, tab3, tab_sol, tab5, tab_letter = st.tabs([
-    "📋  주간 리포트",
+tab1, tab3, tab_sol, tab_weekly, tab5, tab_letter = st.tabs([
     "📊  종합 현황",
     "📡  계약종별 · 업무유형별 · 항목별 분석",
     "🏢  지사 맞춤형 CS 솔루션",
+    "📋  주간 리포트",
     "🎯  민원 조기 경보 시스템",
     "💌  경험고객 서한문 생성",
 ])
@@ -4379,21 +4379,12 @@ with tab_letter:
     _lt_gifts_common = _GIFT_DB.get(_lt_season_name, {}).get("공통", [])
     _lt_gifts_region = _GIFT_DB.get(_lt_season_name, {}).get(_lt_region_type, [])
 
-    # VOC 맞춤 기념품 추출
-    _lt_voc_gifts = []
-    _seen_gifts = set()
-    for _ckw in _lt_top_complaints:
-        for _gift_item in _COMPLAINT_GIFT.get(_ckw, []):
-            if _gift_item[0] not in _seen_gifts:
-                _lt_voc_gifts.append(_gift_item)
-                _seen_gifts.add(_gift_item[0])
-
     st.markdown(f'<div class="card-teal">'
                 f'<b>📍 {_lt_sel_name} 지역유형:</b> {_lt_region_type} '
                 f'({_lt_kb.get("context", "").split(".")[0] if _lt_kb.get("context") else "정보 없음"})'
                 f'</div>', unsafe_allow_html=True)
 
-    _gc_list = st.columns([3, 2, 2])
+    _gc_list = st.columns(2)
 
     with _gc_list[0]:
         st.markdown("**공통 추천 (어떤 지사든 인기 보장)**")
@@ -4412,18 +4403,6 @@ with tab_letter:
             st.dataframe(pd.DataFrame(_gift_region_table), use_container_width=True, hide_index=True)
         else:
             st.info("공통 추천을 활용하세요.")
-
-    with _gc_list[2]:
-        if _lt_voc_gifts:
-            st.markdown("**🎯 VOC 맞춤 추천**")
-            _voc_gift_table = []
-            for _gname, _gprice, _gdesc in _lt_voc_gifts:
-                _voc_gift_table.append({"기념품": _gname, "예상 단가": _gprice, "추천 이유": _gdesc})
-            st.dataframe(pd.DataFrame(_voc_gift_table), use_container_width=True, hide_index=True)
-            st.caption("고객 의견 분석 결과 기반 추천")
-        else:
-            st.markdown("**🎯 VOC 맞춤 추천**")
-            st.info("VOC 데이터 업로드 시 표시됩니다.")
 
     # 추천 조합 카드
     st.markdown("**💡 추천 조합 (2~3천원 예산)**")
