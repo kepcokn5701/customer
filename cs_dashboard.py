@@ -3869,41 +3869,44 @@ with tab_sol:
                             with st.spinner("AI가 종합 처방전 생성 중 (검색 포함)…"):
                                 try:
                                     import urllib.request
-                                    _models = ["gemini-2.5-flash", "gemini-2.5-pro", "gemini-2.5-flash-lite", "gemma-3-12b-it"]
-                                    # google_search 그라운딩: Gemini가 실시간 검색하여 CS 사례 참조
-                                    _sol_pl = {
-                                        "contents": [{"parts": [{"text": _sol_prompt}]}],
-                                        "tools": [{"google_search": {}}],
-                                        "generationConfig": {"temperature": 0.7, "maxOutputTokens": 8192}
-                                    }
+                                    # 검색 지원 모델 우선, 미지원 모델은 검색 없이
+                                    _search_models = ["gemini-2.5-flash", "gemini-2.5-pro", "gemini-2.5-flash-lite"]
+                                    _plain_models = ["gemma-3-12b-it"]
+                                    _contents = [{"parts": [{"text": _sol_prompt}]}]
+                                    _gen_cfg = {"temperature": 0.7, "maxOutputTokens": 8192}
                                     _ctx = ssl._create_unverified_context()
                                     _body = None
-                                    for _model in _models:
+
+                                    # 1차: google_search 포함
+                                    for _model in _search_models:
+                                        _pl = {"contents": _contents, "tools": [{"google_search": {}}], "generationConfig": _gen_cfg}
                                         _url = (f"https://generativelanguage.googleapis.com/v1beta/"
                                                 f"models/{_model}:generateContent?key={_GEMINI_KEY}")
                                         _req = urllib.request.Request(
-                                            _url, data=json.dumps(_sol_pl).encode("utf-8"),
+                                            _url, data=json.dumps(_pl).encode("utf-8"),
                                             headers={"Content-Type": "application/json"}, method="POST")
                                         try:
                                             with urllib.request.urlopen(_req, context=_ctx, timeout=120) as _rsp:
                                                 _body = json.loads(_rsp.read().decode("utf-8"))
                                             break
-                                        except urllib.error.HTTPError as _he:
-                                            if _he.code in (429, 500, 502, 503):
+                                        except urllib.error.HTTPError:
+                                            continue
+
+                                    # 2차: 검색 실패 시 검색 없이
+                                    if _body is None:
+                                        for _model in _search_models + _plain_models:
+                                            _pl = {"contents": _contents, "generationConfig": _gen_cfg}
+                                            _url = (f"https://generativelanguage.googleapis.com/v1beta/"
+                                                    f"models/{_model}:generateContent?key={_GEMINI_KEY}")
+                                            _req = urllib.request.Request(
+                                                _url, data=json.dumps(_pl).encode("utf-8"),
+                                                headers={"Content-Type": "application/json"}, method="POST")
+                                            try:
+                                                with urllib.request.urlopen(_req, context=_ctx, timeout=90) as _rsp:
+                                                    _body = json.loads(_rsp.read().decode("utf-8"))
+                                                break
+                                            except urllib.error.HTTPError:
                                                 continue
-                                            # google_search 미지원 모델이면 검색 없이 재시도
-                                            if _he.code == 400:
-                                                _sol_pl.pop("tools", None)
-                                                _req2 = urllib.request.Request(
-                                                    _url, data=json.dumps(_sol_pl).encode("utf-8"),
-                                                    headers={"Content-Type": "application/json"}, method="POST")
-                                                try:
-                                                    with urllib.request.urlopen(_req2, context=_ctx, timeout=90) as _rsp2:
-                                                        _body = json.loads(_rsp2.read().decode("utf-8"))
-                                                    break
-                                                except urllib.error.HTTPError:
-                                                    continue
-                                            raise
                                     if _body is None:
                                         st.error("모든 AI 모델의 일일 한도가 소진되었습니다.")
                                     else:
