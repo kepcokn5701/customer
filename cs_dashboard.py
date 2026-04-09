@@ -1868,22 +1868,10 @@ with tab_weekly:
                 html_s2 += f'<td style="border:1px solid {_bdr};padding:5px;">{_s2_data[bt][0]:,}</td>'
             html_s2 += '</tr>'
 
-            # 행: 금주 (증감 포함)
+            # 행: 금주 점수
             html_s2 += f'<tr><td style="border:1px solid {_bdr};padding:5px 8px;font-weight:bold;background:#f9f9f9;">금주</td>'
             for bt in _biz_types:
-                html_s2 += f'<td style="border:1px solid {_bdr};padding:5px;font-weight:bold;">{_fv_delta(_s2_data[bt][1], _s2_data[bt][2])}</td>'
-            html_s2 += '</tr>'
-
-            # 행: 전주
-            html_s2 += f'<tr><td style="border:1px solid {_bdr};padding:5px 8px;font-weight:bold;background:#f9f9f9;">전주</td>'
-            for bt in _biz_types:
-                html_s2 += f'<td style="border:1px solid {_bdr};padding:5px;">{_fv(_s2_data[bt][2])}</td>'
-            html_s2 += '</tr>'
-
-            # 행: 월 누계
-            html_s2 += f'<tr><td style="border:1px solid {_bdr};padding:5px 8px;font-weight:bold;background:#f9f9f9;">월 누계</td>'
-            for bt in _biz_types:
-                html_s2 += f'<td style="border:1px solid {_bdr};padding:5px;">{_fv(_s2_data[bt][3])}</td>'
+                html_s2 += f'<td style="border:1px solid {_bdr};padding:5px;font-weight:bold;">{_fv(_s2_data[bt][1])}</td>'
             html_s2 += '</tr>'
 
             html_s2 += '</table>'
@@ -1891,11 +1879,10 @@ with tab_weekly:
             st.markdown(html_s2, unsafe_allow_html=True)
 
             # 엑셀 다운로드
-            _s2_dl_data = {"구분": ["응답건수(금주)", "금주(증감)", "전주", "월누계"]}
+            _s2_dl_data = {"구분": ["응답건수(금주)", "금주"]}
             for bt in _biz_types:
                 d = _s2_data[bt]
-                _s2_dl_data[bt] = [d[0], _fv_delta_txt(d[1], d[2]),
-                                   _fv(d[2]), _fv(d[3])]
+                _s2_dl_data[bt] = [d[0], _fv(d[1])]
             _s2_dl = pd.DataFrame(_s2_dl_data)
             st.download_button("📥 업무유형별 분석 다운로드", df_to_excel_bytes(_s2_dl),
                                "업무유형별_조사결과.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
