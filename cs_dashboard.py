@@ -1656,23 +1656,17 @@ def _fv(v):
     """float → '85.3' / None → '-'"""
     return f"{v:.1f}" if v is not None else "-"
 
-def _delta_html(cur, prev):
-    """전주 대비 증감 HTML 스팬"""
-    if cur is None or prev is None:
+def _fv_delta(cur, prev):
+    """금주 점수 + 증감을 한 셀에: '94.3 (△3.5)' / 점수만 / '-'"""
+    if cur is None:
         return "-"
-    d = cur - prev
-    c = "#1565C0" if d >= 0 else "#C62828"
-    arr = "▲" if d >= 0 else "▼"
-    return f'<span style="color:{c};">{arr}{abs(d):.1f}점</span>'
-
-def _delta_html_short(cur, prev):
-    """증감 (점 빼고)"""
-    if cur is None or prev is None:
-        return "-"
-    d = cur - prev
-    c = "#1565C0" if d >= 0 else "#C62828"
-    arr = "▲" if d >= 0 else "▼"
-    return f'<span style="color:{c};">{arr}{abs(d):.1f}</span>'
+    s = f"{cur:.1f}"
+    if prev is not None:
+        d = cur - prev
+        c = "#1565C0" if d >= 0 else "#C62828"
+        arr = "△" if d >= 0 else "▽"
+        s += f' <span style="color:{c};font-size:0.88em;">({arr}{abs(d):.1f})</span>'
+    return s
 
 with tab_weekly:
     if not _wr_week_available:
@@ -1744,9 +1738,8 @@ with tab_weekly:
 
                 _s1_rows = []
                 for ofc, tt, tr, tw_sc, lw_sc, mo_sc in _s1_raw:
-                    _dlt = _delta_html(_tw_sc, lw_sc)
                     _rank_str = f"{_rank_map[ofc]}/{_total_ranked}위" if ofc in _rank_map else "-"
-                    _s1_rows.append((ofc, tt, tr, tw_sc, _dlt, lw_sc, mo_sc, _rank_str))
+                    _s1_rows.append((ofc, tt, tr, tw_sc, lw_sc, mo_sc, _rank_str))
             else:
                 # ── 개별 지사: 업무유형별 행 ──
                 _s1_rows = []
@@ -1761,14 +1754,14 @@ with tab_weekly:
                         _tw_sc = _tw["_점수100"].mean() if "_점수100" in _tw.columns and not _tw["_점수100"].dropna().empty else None
                         _lw_sc = _lw["_점수100"].mean() if "_점수100" in _lw.columns and not _lw["_점수100"].dropna().empty else None
                         _mo_sc = _mo["_점수100"].mean() if "_점수100" in _mo.columns and not _mo["_점수100"].dropna().empty else None
-                        _s1_rows.append((bt, _tw_total, _tw_resp, _tw_sc, _delta_html(_tw_sc, _lw_sc), _lw_sc, _mo_sc, "-"))
+                        _s1_rows.append((bt, _tw_total, _tw_resp, _tw_sc, _lw_sc, _mo_sc, "-"))
                 else:
                     _tw_total = len(_wr_tw_view)
                     _tw_resp = int(_wr_tw_view["_점수100"].dropna().count()) if "_점수100" in _wr_tw_view.columns else _tw_total
                     _tw_sc = _wr_tw_view["_점수100"].mean() if "_점수100" in _wr_tw_view.columns and not _wr_tw_view["_점수100"].dropna().empty else None
                     _lw_sc = _wr_lw_view["_점수100"].mean() if "_점수100" in _wr_lw_view.columns and not _wr_lw_view["_점수100"].dropna().empty else None
                     _mo_sc = _wr_mo_view["_점수100"].mean() if "_점수100" in _wr_mo_view.columns and not _wr_mo_view["_점수100"].dropna().empty else None
-                    _s1_rows.append((_wr_sel_view, _tw_total, _tw_resp, _tw_sc, _delta_html(_tw_sc, _lw_sc), _lw_sc, _mo_sc, "-"))
+                    _s1_rows.append((_wr_sel_view, _tw_total, _tw_resp, _tw_sc, _lw_sc, _mo_sc, "-"))
 
             # 합계 행
             _tw_all_t = len(_wr_tw_view)
@@ -1777,32 +1770,29 @@ with tab_weekly:
             _lw_all_s = _wr_lw_view["_점수100"].mean() if "_점수100" in _wr_lw_view.columns and not _wr_lw_view["_점수100"].dropna().empty else None
             _mo_all_s = _wr_mo_view["_점수100"].mean() if "_점수100" in _wr_mo_view.columns and not _wr_mo_view["_점수100"].dropna().empty else None
 
-            # 열: 구분 | 업무처리건수 | 응답호수 | 조사결과(금주, 증감, 전주) | 월별누계 | 비고(순위)
             _row_label = "구분" if _wr_sel_view == "전체 (본부 종합)" else "업무유형"
             html_s1 = '<div style="overflow-x:auto;"><table style="border-collapse:collapse;width:100%;font-size:0.85em;text-align:center;">'
-            # 1단 헤더: 조사결과 colspan=3
+            # 1단 헤더: 조사결과 colspan=2
             html_s1 += f'<tr style="background:{_hdr};font-weight:bold;">'
             html_s1 += f'<th rowspan="2" style="border:1px solid {_bdr};padding:6px 8px;">{_row_label}</th>'
             html_s1 += f'<th rowspan="2" style="border:1px solid {_bdr};padding:6px 8px;">업무처리<br>건수</th>'
             html_s1 += f'<th rowspan="2" style="border:1px solid {_bdr};padding:6px 8px;">응답<br>호수</th>'
-            html_s1 += f'<th colspan="3" style="border:1px solid {_bdr};padding:6px 8px;">조사결과</th>'
+            html_s1 += f'<th colspan="2" style="border:1px solid {_bdr};padding:6px 8px;">조사결과</th>'
             html_s1 += f'<th rowspan="2" style="border:1px solid {_bdr};padding:6px 8px;">월별<br>누계</th>'
             html_s1 += f'<th rowspan="2" style="border:1px solid {_bdr};padding:6px 8px;">비고</th>'
             html_s1 += '</tr>'
-            # 2단 헤더: 금주 / 증감 / 전주
+            # 2단 헤더: 금주 / 전주
             html_s1 += f'<tr style="background:{_hdr};font-weight:bold;font-size:0.92em;">'
             html_s1 += f'<th style="border:1px solid {_bdr};padding:4px 6px;">금주</th>'
-            html_s1 += f'<th style="border:1px solid {_bdr};padding:4px 6px;">증감</th>'
             html_s1 += f'<th style="border:1px solid {_bdr};padding:4px 6px;">전주</th>'
             html_s1 += '</tr>'
 
-            for name, tt, tr, tw_s, dlt, lw_s, mo_s, rank_str in _s1_rows:
+            for name, tt, tr, tw_s, lw_s, mo_s, rank_str in _s1_rows:
                 html_s1 += '<tr>'
                 html_s1 += f'<td style="border:1px solid {_bdr};padding:5px 8px;font-weight:bold;background:#f9f9f9;">{name}</td>'
                 html_s1 += f'<td style="border:1px solid {_bdr};padding:5px;">{tt:,}</td>'
                 html_s1 += f'<td style="border:1px solid {_bdr};padding:5px;">{tr:,}</td>'
-                html_s1 += f'<td style="border:1px solid {_bdr};padding:5px;font-weight:bold;">{_fv(tw_s)}</td>'
-                html_s1 += f'<td style="border:1px solid {_bdr};padding:5px;">{dlt}</td>'
+                html_s1 += f'<td style="border:1px solid {_bdr};padding:5px;font-weight:bold;">{_fv_delta(tw_s, lw_s)}</td>'
                 html_s1 += f'<td style="border:1px solid {_bdr};padding:5px;">{_fv(lw_s)}</td>'
                 html_s1 += f'<td style="border:1px solid {_bdr};padding:5px;">{_fv(mo_s)}</td>'
                 html_s1 += f'<td style="border:1px solid {_bdr};padding:5px;">{rank_str}</td>'
@@ -1813,8 +1803,7 @@ with tab_weekly:
             html_s1 += f'<td style="border:1px solid {_bdr};padding:5px 8px;">합계</td>'
             html_s1 += f'<td style="border:1px solid {_bdr};padding:5px;">{_tw_all_t:,}</td>'
             html_s1 += f'<td style="border:1px solid {_bdr};padding:5px;">{_tw_all_r:,}</td>'
-            html_s1 += f'<td style="border:1px solid {_bdr};padding:5px;">{_fv(_tw_all_s)}</td>'
-            html_s1 += f'<td style="border:1px solid {_bdr};padding:5px;">{_delta_html(_tw_all_s, _lw_all_s)}</td>'
+            html_s1 += f'<td style="border:1px solid {_bdr};padding:5px;">{_fv_delta(_tw_all_s, _lw_all_s)}</td>'
             html_s1 += f'<td style="border:1px solid {_bdr};padding:5px;">{_fv(_lw_all_s)}</td>'
             html_s1 += f'<td style="border:1px solid {_bdr};padding:5px;">{_fv(_mo_all_s)}</td>'
             html_s1 += f'<td style="border:1px solid {_bdr};padding:5px;">-</td>'
@@ -1823,10 +1812,16 @@ with tab_weekly:
             st.markdown(html_s1, unsafe_allow_html=True)
 
             # 엑셀 다운로드
-            _s1_dl_rows = [(n, tt, tr, _fv(tw), dlt, _fv(lw), _fv(mo), rk) for n, tt, tr, tw, dlt, lw, mo, rk in _s1_rows]
-            _s1_dl = pd.DataFrame(_s1_dl_rows, columns=[_row_label,"업무처리건수","응답호수","금주","증감","전주","월별누계","비고(순위)"])
-            _s1_dl["증감"] = _s1_dl["증감"].astype(str).str.replace(r"<[^>]+>", "", regex=True)
-            _s1_dl.loc[len(_s1_dl)] = ["합계", _tw_all_t, _tw_all_r, _fv(_tw_all_s), "", _fv(_lw_all_s), _fv(_mo_all_s), ""]
+            def _fv_delta_txt(c, p):
+                if c is None: return "-"
+                s = f"{c:.1f}"
+                if p is not None:
+                    d = c - p
+                    s += f' ({"△" if d>=0 else "▽"}{abs(d):.1f})'
+                return s
+            _s1_dl_rows = [(n, tt, tr, _fv_delta_txt(tw, lw), _fv(lw), _fv(mo), rk) for n, tt, tr, tw, lw, mo, rk in _s1_rows]
+            _s1_dl = pd.DataFrame(_s1_dl_rows, columns=[_row_label,"업무처리건수","응답호수","금주(증감)","전주","월별누계","비고(순위)"])
+            _s1_dl.loc[len(_s1_dl)] = ["합계", _tw_all_t, _tw_all_r, _fv_delta_txt(_tw_all_s, _lw_all_s), _fv(_lw_all_s), _fv(_mo_all_s), ""]
             st.download_button("📥 주간 조사 결과 다운로드", df_to_excel_bytes(_s1_dl),
                                "주간_조사결과.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                                key="dl_weekly_s1")
@@ -1851,11 +1846,10 @@ with tab_weekly:
                 _tw_bs = _tw_b["_점수100"].mean() if "_점수100" in _tw_b.columns and not _tw_b["_점수100"].dropna().empty else None
                 _lw_bs = _lw_b["_점수100"].mean() if "_점수100" in _lw_b.columns and not _lw_b["_점수100"].dropna().empty else None
                 _mo_bs = _mo_b["_점수100"].mean() if "_점수100" in _mo_b.columns and not _mo_b["_점수100"].dropna().empty else None
-                _s2_data[bt] = (_tw_cnt, _tw_bs, _lw_bs, _delta_html_short(_tw_bs, _lw_bs), _mo_bs)
+                _s2_data[bt] = (_tw_cnt, _tw_bs, _lw_bs, _mo_bs)
 
-            # 가로형 테이블: 열=업무유형, 행=응답건수/금주/전주/증감/월누계
+            # 가로형 테이블: 열=업무유형, 행=응답건수/금주(증감)/전주/월누계
             html_s2 = '<div style="overflow-x:auto;"><table style="border-collapse:collapse;width:100%;font-size:0.85em;text-align:center;">'
-            # 헤더: 구분 | 업무유형들...
             html_s2 += f'<tr style="background:{_hdr};font-weight:bold;">'
             html_s2 += f'<th style="border:1px solid {_bdr};padding:6px 10px;min-width:90px;">구분</th>'
             for bt in _biz_types:
@@ -1868,16 +1862,10 @@ with tab_weekly:
                 html_s2 += f'<td style="border:1px solid {_bdr};padding:5px;">{_s2_data[bt][0]:,}</td>'
             html_s2 += '</tr>'
 
-            # 행: 금주
+            # 행: 금주 (증감 포함)
             html_s2 += f'<tr><td style="border:1px solid {_bdr};padding:5px 8px;font-weight:bold;background:#f9f9f9;">금주</td>'
             for bt in _biz_types:
-                html_s2 += f'<td style="border:1px solid {_bdr};padding:5px;font-weight:bold;">{_fv(_s2_data[bt][1])}</td>'
-            html_s2 += '</tr>'
-
-            # 행: 증감 (금주 바로 아래)
-            html_s2 += f'<tr><td style="border:1px solid {_bdr};padding:5px 8px;font-weight:bold;background:#f9f9f9;">증감</td>'
-            for bt in _biz_types:
-                html_s2 += f'<td style="border:1px solid {_bdr};padding:5px;">{_s2_data[bt][3]}</td>'
+                html_s2 += f'<td style="border:1px solid {_bdr};padding:5px;font-weight:bold;">{_fv_delta(_s2_data[bt][1], _s2_data[bt][2])}</td>'
             html_s2 += '</tr>'
 
             # 행: 전주
@@ -1889,7 +1877,7 @@ with tab_weekly:
             # 행: 월 누계
             html_s2 += f'<tr><td style="border:1px solid {_bdr};padding:5px 8px;font-weight:bold;background:#f9f9f9;">월 누계</td>'
             for bt in _biz_types:
-                html_s2 += f'<td style="border:1px solid {_bdr};padding:5px;">{_fv(_s2_data[bt][4])}</td>'
+                html_s2 += f'<td style="border:1px solid {_bdr};padding:5px;">{_fv(_s2_data[bt][3])}</td>'
             html_s2 += '</tr>'
 
             html_s2 += '</table>'
@@ -1897,14 +1885,11 @@ with tab_weekly:
             st.markdown(html_s2, unsafe_allow_html=True)
 
             # 엑셀 다운로드
-            _s2_dl_data = {"구분": ["응답건수(금주)", "금주", "전주", "증감", "월누계"]}
+            _s2_dl_data = {"구분": ["응답건수(금주)", "금주(증감)", "전주", "월누계"]}
             for bt in _biz_types:
                 d = _s2_data[bt]
-                _dv = (d[1] - d[2]) if d[1] is not None and d[2] is not None else None
-                _s2_dl_data[bt] = [d[0], round(d[1],1) if d[1] is not None else "",
-                                   round(d[2],1) if d[2] is not None else "",
-                                   round(_dv,1) if _dv is not None else "",
-                                   round(d[4],1) if d[4] is not None else ""]
+                _s2_dl_data[bt] = [d[0], _fv_delta_txt(d[1], d[2]),
+                                   _fv(d[2]), _fv(d[3])]
             _s2_dl = pd.DataFrame(_s2_dl_data)
             st.download_button("📥 업무유형별 분석 다운로드", df_to_excel_bytes(_s2_dl),
                                "업무유형별_조사결과.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
