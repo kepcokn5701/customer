@@ -1762,9 +1762,19 @@ with tab_weekly:
 
             _row_label = "구분" if _wr_sel_view == "전체 (본부 종합)" else "업무유형"
             html_s1 = '<div style="overflow-x:auto;"><table style="border-collapse:collapse;width:100%;font-size:0.85em;text-align:center;">'
+            # 1단 헤더: 조사결과 colspan=2
             html_s1 += f'<tr style="background:{_hdr};font-weight:bold;">'
-            for h in [_row_label, "업무처리<br>건수", "응답<br>호수", "조사결과<br>(금주)", "조사결과<br>(전주)", "월별<br>누계", "비고"]:
-                html_s1 += f'<th style="border:1px solid {_bdr};padding:6px 8px;">{h}</th>'
+            html_s1 += f'<th rowspan="2" style="border:1px solid {_bdr};padding:6px 8px;">{_row_label}</th>'
+            html_s1 += f'<th rowspan="2" style="border:1px solid {_bdr};padding:6px 8px;">업무처리<br>건수</th>'
+            html_s1 += f'<th rowspan="2" style="border:1px solid {_bdr};padding:6px 8px;">응답<br>호수</th>'
+            html_s1 += f'<th colspan="2" style="border:1px solid {_bdr};padding:6px 8px;">조사결과</th>'
+            html_s1 += f'<th rowspan="2" style="border:1px solid {_bdr};padding:6px 8px;">월별<br>누계</th>'
+            html_s1 += f'<th rowspan="2" style="border:1px solid {_bdr};padding:6px 8px;">비고</th>'
+            html_s1 += '</tr>'
+            # 2단 헤더: 금주 / 전주
+            html_s1 += f'<tr style="background:{_hdr};font-weight:bold;font-size:0.92em;">'
+            html_s1 += f'<th style="border:1px solid {_bdr};padding:4px 6px;">금주</th>'
+            html_s1 += f'<th style="border:1px solid {_bdr};padding:4px 6px;">전주</th>'
             html_s1 += '</tr>'
 
             for ofc, tt, tr, tw_s, lw_s, mo_s, rmk in _s1_rows:
@@ -1812,7 +1822,8 @@ with tab_weekly:
         if _wr_biz and _wr_score:
             _biz_types = sorted(_wr_tw_view[_wr_biz].dropna().unique().tolist()) if not _wr_tw_view.empty else sorted(df_f[_wr_biz].dropna().unique().tolist())
 
-            _s2_rows = []
+            # 업무유형별 데이터 수집
+            _s2_data = {}  # {업무유형: (tw_cnt, tw_score, lw_score, delta, mo_score)}
             for bt in _biz_types:
                 _tw_b = _wr_tw_view[_wr_tw_view[_wr_biz] == bt]
                 _lw_b = _wr_lw_view[_wr_lw_view[_wr_biz] == bt]
@@ -1821,31 +1832,61 @@ with tab_weekly:
                 _tw_bs = _tw_b["_점수100"].mean() if "_점수100" in _tw_b.columns and not _tw_b["_점수100"].dropna().empty else None
                 _lw_bs = _lw_b["_점수100"].mean() if "_점수100" in _lw_b.columns and not _lw_b["_점수100"].dropna().empty else None
                 _mo_bs = _mo_b["_점수100"].mean() if "_점수100" in _mo_b.columns and not _mo_b["_점수100"].dropna().empty else None
-                _s2_rows.append((bt, _tw_cnt, _tw_bs, _lw_bs, _delta_html_short(_tw_bs, _lw_bs), _mo_bs))
+                _s2_data[bt] = (_tw_cnt, _tw_bs, _lw_bs, _delta_html_short(_tw_bs, _lw_bs), _mo_bs)
 
+            # 가로형 테이블: 열=업무유형, 행=응답건수/금주/전주/증감/월누계
             html_s2 = '<div style="overflow-x:auto;"><table style="border-collapse:collapse;width:100%;font-size:0.85em;text-align:center;">'
+            # 헤더: 구분 | 업무유형들...
             html_s2 += f'<tr style="background:{_hdr};font-weight:bold;">'
-            for h in ["업무유형", "응답건수<br>(금주)", "금주", "전주", "증감", "월 누계"]:
-                html_s2 += f'<th style="border:1px solid {_bdr};padding:6px 8px;">{h}</th>'
+            html_s2 += f'<th style="border:1px solid {_bdr};padding:6px 10px;min-width:90px;">구분</th>'
+            for bt in _biz_types:
+                html_s2 += f'<th style="border:1px solid {_bdr};padding:6px 6px;">{bt}</th>'
             html_s2 += '</tr>'
 
-            for bt, cnt, tw_s, lw_s, chg, mo_s in _s2_rows:
-                html_s2 += '<tr>'
-                html_s2 += f'<td style="border:1px solid {_bdr};padding:5px 8px;font-weight:bold;background:#f9f9f9;">{bt}</td>'
-                html_s2 += f'<td style="border:1px solid {_bdr};padding:5px;">{cnt:,}</td>'
-                html_s2 += f'<td style="border:1px solid {_bdr};padding:5px;font-weight:bold;">{_fv(tw_s)}</td>'
-                html_s2 += f'<td style="border:1px solid {_bdr};padding:5px;">{_fv(lw_s)}</td>'
-                html_s2 += f'<td style="border:1px solid {_bdr};padding:5px;">{chg}</td>'
-                html_s2 += f'<td style="border:1px solid {_bdr};padding:5px;">{_fv(mo_s)}</td>'
-                html_s2 += '</tr>'
+            # 행: 응답건수(금주)
+            html_s2 += f'<tr><td style="border:1px solid {_bdr};padding:5px 8px;font-weight:bold;background:#f9f9f9;">응답건수(금주)</td>'
+            for bt in _biz_types:
+                html_s2 += f'<td style="border:1px solid {_bdr};padding:5px;">{_s2_data[bt][0]:,}</td>'
+            html_s2 += '</tr>'
+
+            # 행: 금주
+            html_s2 += f'<tr><td style="border:1px solid {_bdr};padding:5px 8px;font-weight:bold;background:#f9f9f9;">금주</td>'
+            for bt in _biz_types:
+                html_s2 += f'<td style="border:1px solid {_bdr};padding:5px;font-weight:bold;">{_fv(_s2_data[bt][1])}</td>'
+            html_s2 += '</tr>'
+
+            # 행: 전주
+            html_s2 += f'<tr><td style="border:1px solid {_bdr};padding:5px 8px;font-weight:bold;background:#f9f9f9;">전주</td>'
+            for bt in _biz_types:
+                html_s2 += f'<td style="border:1px solid {_bdr};padding:5px;">{_fv(_s2_data[bt][2])}</td>'
+            html_s2 += '</tr>'
+
+            # 행: 증감
+            html_s2 += f'<tr><td style="border:1px solid {_bdr};padding:5px 8px;font-weight:bold;background:#f9f9f9;">증감</td>'
+            for bt in _biz_types:
+                html_s2 += f'<td style="border:1px solid {_bdr};padding:5px;">{_s2_data[bt][3]}</td>'
+            html_s2 += '</tr>'
+
+            # 행: 월 누계
+            html_s2 += f'<tr><td style="border:1px solid {_bdr};padding:5px 8px;font-weight:bold;background:#f9f9f9;">월 누계</td>'
+            for bt in _biz_types:
+                html_s2 += f'<td style="border:1px solid {_bdr};padding:5px;">{_fv(_s2_data[bt][4])}</td>'
+            html_s2 += '</tr>'
 
             html_s2 += '</table>'
             html_s2 += '<div style="text-align:right;font-size:0.8em;margin-top:4px;color:#555;">(단위 : 건, 점)</div></div>'
             st.markdown(html_s2, unsafe_allow_html=True)
 
             # 엑셀 다운로드
-            _s2_dl = pd.DataFrame(_s2_rows, columns=["업무유형","응답건수(금주)","금주","전주","증감","월누계"])
-            _s2_dl["증감"] = _s2_dl["증감"].astype(str).str.replace(r"<[^>]+>", "", regex=True)
+            _s2_dl_data = {"구분": ["응답건수(금주)", "금주", "전주", "증감", "월누계"]}
+            for bt in _biz_types:
+                d = _s2_data[bt]
+                _dv = (d[1] - d[2]) if d[1] is not None and d[2] is not None else None
+                _s2_dl_data[bt] = [d[0], round(d[1],1) if d[1] is not None else "",
+                                   round(d[2],1) if d[2] is not None else "",
+                                   round(_dv,1) if _dv is not None else "",
+                                   round(d[4],1) if d[4] is not None else ""]
+            _s2_dl = pd.DataFrame(_s2_dl_data)
             st.download_button("📥 업무유형별 분석 다운로드", df_to_excel_bytes(_s2_dl),
                                "업무유형별_조사결과.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                                key="dl_weekly_s2")
