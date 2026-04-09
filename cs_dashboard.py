@@ -3641,108 +3641,8 @@ with tab_sol:
                 if not _real_top3 and not _drop_top3:
                     st.success("✅ 모든 업무×계약종별 조합이 본부 평균 이상입니다.")
 
-                # ── AI 종합 처방전 (실질+급락 전체) ──────────────
-                if _real_top3 or _drop_top3:
-                    st.markdown("---")
-                    _office_kb = _get_office_kb(_sel_off)
-                    _kb_ctx = _office_kb["context"] if _office_kb else "지역 특성 정보 없음"
-                    _kb_act = _office_kb["action"] if _office_kb else ""
-
-                    # 리스크 요약 텍스트 생성
-                    _rx_lines = ""
-                    if _real_top3:
-                        _rx_lines += "■ 실질적 리스크 (건수 多 & 평균 이하):\n"
-                        for _ri, _rk in enumerate(_real_top3, 1):
-                            _rx_lines += f"  {_ri}. {_rk['계약종별']}×{_rk['업무']}: {_rk['점수']}점, {_rk['건수']}건, 최저항목={_rk['최저항목']}({_rk['최저점수']}점)"
-                            if _rk["voc"]:
-                                _rx_lines += f", VOC=\"{_rk['voc']}\""
-                            _rx_lines += "\n"
-                    if _drop_top3:
-                        _rx_lines += "■ 급락 리스크 (건수 少 & 점수 급락):\n"
-                        for _di, _dk in enumerate(_drop_top3, 1):
-                            _rx_lines += f"  {_di}. {_dk['계약종별']}×{_dk['업무']}: {_dk['점수']}점, {_dk['건수']}건, 최저항목={_dk['최저항목']}({_dk['최저점수']}점)"
-                            if _dk["voc"]:
-                                _rx_lines += f", VOC=\"{_dk['voc']}\""
-                            _rx_lines += "\n"
-
-                    # 전체 VOC 수집
-                    _all_neg_vocs = ""
-                    if M.get("voc"):
-                        _all_voc_df = _df_sel[_df_sel["_점수100"] < 70][M["voc"]].dropna().astype(str)
-                        _all_voc_list = [v.strip() for v in _all_voc_df.tolist() if v.strip() not in _VOC_EMPTY and len(v.strip()) > 2]
-                        if _all_voc_list:
-                            _all_neg_vocs = "\n".join(f"- {v}" for v in _all_voc_list[:15])
-
-                    _sol_ai_key = f"_ai_sol_{_sel_off}"
-                    if st.button("🤖 AI 종합 처방전 생성", key="sol_ai_total_btn",
-                                 type="primary", use_container_width=True):
-                        if not GEMINI_AVAILABLE:
-                            st.error("Gemini API 키가 설정되지 않았습니다.")
-                        else:
-                            _sol_prompt = (
-                                f"# 역할: 전력 산업 CS 컨설턴트\n"
-                                f"아래 [{_sel_off}]의 리스크 데이터를 보고, 지사장이 내일 아침 회의에서 바로 지시할 수 있는 "
-                                f"**즉시 실행 가능한 액션**만 개조식으로 제안하세요.\n\n"
-                                f"[지사 정보]\n"
-                                f"- 지사: {_sel_off} (지역 특성: {_kb_ctx})\n"
-                                f"- 지사 종합 평균: {_sel_avg:.1f}점 (본부 {avg_score_100:.1f}점)\n\n"
-                                f"[리스크 현황]\n{_rx_lines}\n"
-                                f"[불만 VOC 원문 (최대 15건)]\n{_all_neg_vocs or '없음'}\n\n"
-                                f"# 출력 형식\n"
-                                f"리스크별로 즉시 실행 전술을 1~2개씩 제안하세요.\n"
-                                f"각 전술은 아래 형태로 작성:\n"
-                                f"### 🔴 [계약종별] × [업무] — 점수\n"
-                                f"- **전술명**: 구체적 행동 한 줄\n"
-                                f"- **전술명**: 구체적 행동 한 줄\n\n"
-                                f"[절대 금지]\n"
-                                f"- 현황 분석, 원인 추정, 기대 효과 등 부가 섹션 작성 금지. 오직 전술만.\n"
-                                f"- 'TF 구성', '교육 실시', '매뉴얼 배포', '시스템 개편' 같은 뻔한 제안 금지\n"
-                                f"- 예산이나 본사 승인이 필요한 제안 금지\n"
-                                f"- 특정 직원을 저격하는 듯한 제안(멘토링, 코칭, 롤플레이 등) 금지\n"
-                                f"- '전기세' 금지 → '전기요금'\n"
-                                f"- 줄글 금지. 개조식 bullet만. 한 bullet에 1문장.\n"
-                                f"- 데이터에 없는 사실 창작 금지\n"
-                            )
-                            with st.spinner("AI가 종합 처방전 생성 중…"):
-                                try:
-                                    import urllib.request
-                                    _models = ["gemini-2.5-flash", "gemma-3-12b-it"]
-                                    _sol_pl = {
-                                        "contents": [{"parts": [{"text": _sol_prompt}]}],
-                                        "generationConfig": {"temperature": 0.7, "maxOutputTokens": 8192}
-                                    }
-                                    _ctx = ssl._create_unverified_context()
-                                    _body = None
-                                    for _model in _models:
-                                        _url = (f"https://generativelanguage.googleapis.com/v1beta/"
-                                                f"models/{_model}:generateContent?key={_GEMINI_KEY}")
-                                        _req = urllib.request.Request(
-                                            _url, data=json.dumps(_sol_pl).encode("utf-8"),
-                                            headers={"Content-Type": "application/json"}, method="POST")
-                                        try:
-                                            with urllib.request.urlopen(_req, context=_ctx, timeout=90) as _rsp:
-                                                _body = json.loads(_rsp.read().decode("utf-8"))
-                                            break
-                                        except urllib.error.HTTPError as _he:
-                                            if _he.code in (429, 503):
-                                                continue
-                                            raise
-                                    if _body is None:
-                                        st.error("모든 AI 모델의 일일 한도가 소진되었습니다.")
-                                    else:
-                                        st.session_state[_sol_ai_key] = _body["candidates"][0]["content"]["parts"][0]["text"].strip()
-                                except Exception as _e:
-                                    st.error(f"AI 분석 중 오류: {_e}")
-
-                    if _sol_ai_key in st.session_state:
-                        st.markdown(
-                            '<div style="background:#f8f9fb;border:1px solid #d0d7de;border-radius:12px;'
-                            'padding:28px 32px;margin:12px 0;font-size:1.05em;line-height:2.0;">\n\n'
-                            f'{st.session_state[_sol_ai_key]}\n\n</div>',
-                            unsafe_allow_html=True)
-
                 # ══════════════════════════════════════════
-                # 상세 분석 — 선택된 카드의 범인 특정 + VOC + AI 처방전
+                # 상세 분석 — 선택된 카드의 범인 특정 + VOC
                 # ══════════════════════════════════════════
                 # 기본값: 화면에 보이는 리스크 카드 1위 자동 선택
                 # session_state에 이전 값이 있어도, 현재 지사에 데이터 없으면 리셋
@@ -3878,6 +3778,107 @@ with tab_sol:
 
                         else:
                             st.info("세부항목 점수 데이터가 없습니다.")
+
+                # ── AI 종합 처방전 (실질+급락 전체) ──────────────
+                if _real_top3 or _drop_top3:
+                    st.markdown("---")
+                    _office_kb = _get_office_kb(_sel_off)
+                    _kb_ctx = _office_kb["context"] if _office_kb else "지역 특성 정보 없음"
+                    _kb_act = _office_kb["action"] if _office_kb else ""
+
+                    # 리스크 요약 텍스트 생성
+                    _rx_lines = ""
+                    if _real_top3:
+                        _rx_lines += "■ 실질적 리스크 (건수 多 & 평균 이하):\n"
+                        for _ri, _rk in enumerate(_real_top3, 1):
+                            _rx_lines += f"  {_ri}. {_rk['계약종별']}×{_rk['업무']}: {_rk['점수']}점, {_rk['건수']}건, 최저항목={_rk['최저항목']}({_rk['최저점수']}점)"
+                            if _rk["voc"]:
+                                _rx_lines += f", VOC=\"{_rk['voc']}\""
+                            _rx_lines += "\n"
+                    if _drop_top3:
+                        _rx_lines += "■ 급락 리스크 (건수 少 & 점수 급락):\n"
+                        for _di, _dk in enumerate(_drop_top3, 1):
+                            _rx_lines += f"  {_di}. {_dk['계약종별']}×{_dk['업무']}: {_dk['점수']}점, {_dk['건수']}건, 최저항목={_dk['최저항목']}({_dk['최저점수']}점)"
+                            if _dk["voc"]:
+                                _rx_lines += f", VOC=\"{_dk['voc']}\""
+                            _rx_lines += "\n"
+
+                    # 전체 VOC 수집
+                    _all_neg_vocs = ""
+                    if M.get("voc"):
+                        _all_voc_df = _df_sel[_df_sel["_점수100"] < 70][M["voc"]].dropna().astype(str)
+                        _all_voc_list = [v.strip() for v in _all_voc_df.tolist() if v.strip() not in _VOC_EMPTY and len(v.strip()) > 2]
+                        if _all_voc_list:
+                            _all_neg_vocs = "\n".join(f"- {v}" for v in _all_voc_list[:15])
+
+                    _sol_ai_key = f"_ai_sol_{_sel_off}"
+                    if st.button("🤖 AI 종합 처방전 생성", key="sol_ai_total_btn",
+                                 type="primary", use_container_width=True):
+                        if not GEMINI_AVAILABLE:
+                            st.error("Gemini API 키가 설정되지 않았습니다.")
+                        else:
+                            _sol_prompt = (
+                                f"# 역할: 전력 산업 CS 컨설턴트\n"
+                                f"아래 [{_sel_off}]의 리스크 데이터를 보고, 지사장이 내일 아침 회의에서 바로 지시할 수 있는 "
+                                f"**즉시 실행 가능한 액션**만 개조식으로 제안하세요.\n\n"
+                                f"[지사 정보]\n"
+                                f"- 지사: {_sel_off} (지역 특성: {_kb_ctx})\n"
+                                f"- 지사 종합 평균: {_sel_avg:.1f}점 (본부 {avg_score_100:.1f}점)\n\n"
+                                f"[리스크 현황]\n{_rx_lines}\n"
+                                f"[불만 VOC 원문 (최대 15건)]\n{_all_neg_vocs or '없음'}\n\n"
+                                f"# 출력 형식\n"
+                                f"리스크별로 즉시 실행 전술을 1~2개씩 제안하세요.\n"
+                                f"각 전술은 아래 형태로 작성:\n"
+                                f"### 🔴 [계약종별] × [업무] — 점수\n"
+                                f"- **전술명**: 구체적 행동 한 줄\n"
+                                f"- **전술명**: 구체적 행동 한 줄\n\n"
+                                f"[절대 금지]\n"
+                                f"- 현황 분석, 원인 추정, 기대 효과 등 부가 섹션 작성 금지. 오직 전술만.\n"
+                                f"- 'TF 구성', '교육 실시', '매뉴얼 배포', '시스템 개편' 같은 뻔한 제안 금지\n"
+                                f"- 예산이나 본사 승인이 필요한 제안 금지\n"
+                                f"- 특정 직원을 저격하는 듯한 제안(멘토링, 코칭, 롤플레이 등) 금지\n"
+                                f"- '전기세' 금지 → '전기요금'\n"
+                                f"- 줄글 금지. 개조식 bullet만. 한 bullet에 1문장.\n"
+                                f"- 데이터에 없는 사실 창작 금지\n"
+                            )
+                            with st.spinner("AI가 종합 처방전 생성 중…"):
+                                try:
+                                    import urllib.request
+                                    _models = ["gemini-2.5-flash", "gemma-3-12b-it"]
+                                    _sol_pl = {
+                                        "contents": [{"parts": [{"text": _sol_prompt}]}],
+                                        "generationConfig": {"temperature": 0.7, "maxOutputTokens": 8192}
+                                    }
+                                    _ctx = ssl._create_unverified_context()
+                                    _body = None
+                                    for _model in _models:
+                                        _url = (f"https://generativelanguage.googleapis.com/v1beta/"
+                                                f"models/{_model}:generateContent?key={_GEMINI_KEY}")
+                                        _req = urllib.request.Request(
+                                            _url, data=json.dumps(_sol_pl).encode("utf-8"),
+                                            headers={"Content-Type": "application/json"}, method="POST")
+                                        try:
+                                            with urllib.request.urlopen(_req, context=_ctx, timeout=90) as _rsp:
+                                                _body = json.loads(_rsp.read().decode("utf-8"))
+                                            break
+                                        except urllib.error.HTTPError as _he:
+                                            if _he.code in (429, 503):
+                                                continue
+                                            raise
+                                    if _body is None:
+                                        st.error("모든 AI 모델의 일일 한도가 소진되었습니다.")
+                                    else:
+                                        st.session_state[_sol_ai_key] = _body["candidates"][0]["content"]["parts"][0]["text"].strip()
+                                except Exception as _e:
+                                    st.error(f"AI 분석 중 오류: {_e}")
+
+                    if _sol_ai_key in st.session_state:
+                        st.markdown(
+                            '<div style="background:#f8f9fb;border:1px solid #d0d7de;border-radius:12px;'
+                            'padding:28px 32px;margin:12px 0;font-size:1.05em;line-height:2.0;">\n\n'
+                            f'{st.session_state[_sol_ai_key]}\n\n</div>',
+                            unsafe_allow_html=True)
+
         else:
             st.info("업무유형·계약종별 컬럼이 필요합니다.")
 
