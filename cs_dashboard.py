@@ -2040,7 +2040,7 @@ with tab_weekly:
             with st.spinner("AI가 주간 협조요청 분석 중…"):
                 try:
                     import urllib.request
-                    _models = ["gemini-2.5-flash", "gemma-3-12b-it"]
+                    _models = ["gemini-2.5-flash", "gemini-2.5-pro", "gemini-2.5-flash-lite", "gemma-3-12b-it"]
                     _payload = {"contents": [{"parts": [{"text": _ai_weekly_prompt}]}],
                                  "generationConfig": {"temperature": 0.7, "maxOutputTokens": 8192}}
                     _ctx = ssl._create_unverified_context()
@@ -2054,7 +2054,7 @@ with tab_weekly:
                                 _body = json.loads(_resp.read().decode("utf-8"))
                             break
                         except urllib.error.HTTPError as _http_err:
-                            if _http_err.code in (429, 503):
+                            if _http_err.code in (429, 500, 502, 503):
                                 continue
                             raise
                     if _body is None:
@@ -2836,7 +2836,7 @@ with tab3:
                     with st.spinner("AI가 업무유형별 처방전 생성 중…"):
                         try:
                             import urllib.request
-                            _models = ["gemini-2.5-flash", "gemma-3-12b-it"]
+                            _models = ["gemini-2.5-flash", "gemini-2.5-pro", "gemini-2.5-flash-lite", "gemma-3-12b-it"]
                             _payload = {"contents": [{"parts": [{"text": _ai_q_prompt}]}],
                                          "generationConfig": {"temperature": 0.7, "maxOutputTokens": 8192}}
                             _ctx = ssl._create_unverified_context()
@@ -3159,7 +3159,7 @@ with tab5:
 
                     try:
                         import urllib.request
-                        _models = ["gemini-2.5-flash", "gemma-3-12b-it"]
+                        _models = ["gemini-2.5-flash", "gemini-2.5-pro", "gemini-2.5-flash-lite", "gemma-3-12b-it"]
                         _payload = {"contents": [{"parts": [{"text": _unified_prompt}]}],
                                      "generationConfig": {"temperature": 0.7, "maxOutputTokens": 8192}}
                         _ctx = ssl._create_unverified_context()
@@ -3844,7 +3844,7 @@ with tab_sol:
                             with st.spinner("AI가 종합 처방전 생성 중…"):
                                 try:
                                     import urllib.request
-                                    _models = ["gemini-2.5-flash", "gemma-3-12b-it"]
+                                    _models = ["gemini-2.5-flash", "gemini-2.5-pro", "gemini-2.5-flash-lite", "gemma-3-12b-it"]
                                     _sol_pl = {
                                         "contents": [{"parts": [{"text": _sol_prompt}]}],
                                         "generationConfig": {"temperature": 0.7, "maxOutputTokens": 8192}
@@ -3862,7 +3862,7 @@ with tab_sol:
                                                 _body = json.loads(_rsp.read().decode("utf-8"))
                                             break
                                         except urllib.error.HTTPError as _he:
-                                            if _he.code in (429, 503):
+                                            if _he.code in (429, 500, 502, 503):
                                                 continue
                                             raise
                                     if _body is None:
