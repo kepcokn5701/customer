@@ -3837,7 +3837,8 @@ with tab_sol:
                                 f"- 실현 가능한 방향: 사업소 내 안내물·게시물 배치, 고객 동선 개선, 대기 공간 활용, 간단한 서식·양식 비치 등 물리적 환경 개선 위주.\n\n"
                                 f"# 요청\n"
                                 f"1. VOC 불만 **공통 패턴** 2~3가지 묶기 (원문 인용 불필요)\n"
-                                f"2. 구글 검색으로 **전력·가스·수도 등 공공서비스 CS 개선 사례** 찾아 반영\n"
+                                f"2. 전력·가스·수도 등 **공공서비스 기업의 실제 CS 우수사례**를 근거로 전략 수립\n"
+                                f"   - 행동 옆에 '(출처: OO공사 CS 우수사례)' 형태로 반드시 근거 명시\n"
                                 f"3. 위 현실 제약 반영, 사업소에서 진짜 할 수 있는 것만 제안\n\n"
                                 f"# 문체 규칙 (가장 중요)\n"
                                 f"- 극도로 짧은 개조식. 한 bullet = 명사형 종결 또는 짧은 서술 1개.\n"
@@ -3866,60 +3867,34 @@ with tab_sol:
                                 f"- 줄글·산문·미사여구·AI 추임새\n"
                                 f"- 데이터에 없는 사실 창작\n"
                             )
-                            with st.spinner("AI가 종합 처방전 생성 중 (검색 포함)…"):
+                            with st.spinner("AI가 종합 처방전 생성 중…"):
                                 try:
                                     import urllib.request
-                                    # 검색 지원 모델 우선, 미지원 모델은 검색 없이
-                                    _search_models = ["gemini-2.5-flash", "gemini-2.5-pro", "gemini-2.5-flash-lite"]
-                                    _plain_models = ["gemma-3-12b-it"]
-                                    _contents = [{"parts": [{"text": _sol_prompt}]}]
-                                    _gen_cfg = {"temperature": 0.7, "maxOutputTokens": 8192}
+                                    _models = ["gemini-2.5-flash", "gemini-2.5-pro", "gemini-2.5-flash-lite", "gemma-3-12b-it"]
+                                    _sol_pl = {
+                                        "contents": [{"parts": [{"text": _sol_prompt}]}],
+                                        "generationConfig": {"temperature": 0.7, "maxOutputTokens": 8192}
+                                    }
                                     _ctx = ssl._create_unverified_context()
                                     _body = None
-
-                                    # 1차: google_search 포함
-                                    for _model in _search_models:
-                                        _pl = {"contents": _contents, "tools": [{"google_search": {}}], "generationConfig": _gen_cfg}
+                                    for _model in _models:
                                         _url = (f"https://generativelanguage.googleapis.com/v1beta/"
                                                 f"models/{_model}:generateContent?key={_GEMINI_KEY}")
                                         _req = urllib.request.Request(
-                                            _url, data=json.dumps(_pl).encode("utf-8"),
+                                            _url, data=json.dumps(_sol_pl).encode("utf-8"),
                                             headers={"Content-Type": "application/json"}, method="POST")
                                         try:
-                                            with urllib.request.urlopen(_req, context=_ctx, timeout=120) as _rsp:
+                                            with urllib.request.urlopen(_req, context=_ctx, timeout=90) as _rsp:
                                                 _body = json.loads(_rsp.read().decode("utf-8"))
                                             break
-                                        except urllib.error.HTTPError:
-                                            continue
-
-                                    # 2차: 검색 실패 시 검색 없이
-                                    if _body is None:
-                                        for _model in _search_models + _plain_models:
-                                            _pl = {"contents": _contents, "generationConfig": _gen_cfg}
-                                            _url = (f"https://generativelanguage.googleapis.com/v1beta/"
-                                                    f"models/{_model}:generateContent?key={_GEMINI_KEY}")
-                                            _req = urllib.request.Request(
-                                                _url, data=json.dumps(_pl).encode("utf-8"),
-                                                headers={"Content-Type": "application/json"}, method="POST")
-                                            try:
-                                                with urllib.request.urlopen(_req, context=_ctx, timeout=90) as _rsp:
-                                                    _body = json.loads(_rsp.read().decode("utf-8"))
-                                                break
-                                            except urllib.error.HTTPError:
+                                        except urllib.error.HTTPError as _he:
+                                            if _he.code in (429, 500, 502, 503):
                                                 continue
+                                            raise
                                     if _body is None:
                                         st.error("모든 AI 모델의 일일 한도가 소진되었습니다.")
                                     else:
-                                        _ai_text = _body["candidates"][0]["content"]["parts"][0]["text"].strip()
-                                        # grounding 출처 링크 추출
-                                        _src_links = []
-                                        _gm = _body["candidates"][0].get("groundingMetadata", {})
-                                        for _gc in _gm.get("groundingChunks", []):
-                                            _web = _gc.get("web", {})
-                                            if _web.get("uri"):
-                                                _src_links.append((_web.get("title", "출처"), _web["uri"]))
-                                        st.session_state[_sol_ai_key] = _ai_text
-                                        st.session_state[_sol_ai_key + "_src"] = _src_links
+                                        st.session_state[_sol_ai_key] = _body["candidates"][0]["content"]["parts"][0]["text"].strip()
                                 except Exception as _e:
                                     st.error(f"AI 분석 중 오류: {_e}")
 
@@ -3929,17 +3904,6 @@ with tab_sol:
                             'padding:28px 32px;margin:12px 0;font-size:1.05em;line-height:2.0;">\n\n'
                             f'{st.session_state[_sol_ai_key]}\n\n</div>',
                             unsafe_allow_html=True)
-                        # 검색 출처 링크 표시
-                        _cached_src = st.session_state.get(_sol_ai_key + "_src", [])
-                        if _cached_src:
-                            _links_html = " &nbsp;|&nbsp; ".join(
-                                f'<a href="{u}" target="_blank" style="color:#1565C0;font-size:0.85em;">{t}</a>'
-                                for t, u in _cached_src[:5]
-                            )
-                            st.markdown(
-                                f'<div style="margin-top:4px;padding:8px 12px;background:#e8eaf6;'
-                                f'border-radius:8px;font-size:0.85em;">📎 참고 출처: {_links_html}</div>',
-                                unsafe_allow_html=True)
 
         else:
             st.info("업무유형·계약종별 컬럼이 필요합니다.")
