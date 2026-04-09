@@ -1874,16 +1874,16 @@ with tab_weekly:
                 html_s2 += f'<td style="border:1px solid {_bdr};padding:5px;font-weight:bold;">{_fv(_s2_data[bt][1])}</td>'
             html_s2 += '</tr>'
 
+            # 행: 증감 (금주 바로 아래)
+            html_s2 += f'<tr><td style="border:1px solid {_bdr};padding:5px 8px;font-weight:bold;background:#f9f9f9;">증감</td>'
+            for bt in _biz_types:
+                html_s2 += f'<td style="border:1px solid {_bdr};padding:5px;">{_s2_data[bt][3]}</td>'
+            html_s2 += '</tr>'
+
             # 행: 전주
             html_s2 += f'<tr><td style="border:1px solid {_bdr};padding:5px 8px;font-weight:bold;background:#f9f9f9;">전주</td>'
             for bt in _biz_types:
                 html_s2 += f'<td style="border:1px solid {_bdr};padding:5px;">{_fv(_s2_data[bt][2])}</td>'
-            html_s2 += '</tr>'
-
-            # 행: 증감
-            html_s2 += f'<tr><td style="border:1px solid {_bdr};padding:5px 8px;font-weight:bold;background:#f9f9f9;">증감</td>'
-            for bt in _biz_types:
-                html_s2 += f'<td style="border:1px solid {_bdr};padding:5px;">{_s2_data[bt][3]}</td>'
             html_s2 += '</tr>'
 
             # 행: 월 누계
