@@ -3196,6 +3196,10 @@ with tab_sol:
 
         st.markdown("#### 🏢 분석할 지사를 선택하세요")
         _sel_off = st.selectbox("", _sol_offices, key="sol_office_sel", label_visibility="collapsed")
+        # 지사 변경 시 카드 선택 초기화
+        if st.session_state.get("_sol_prev_off") != _sel_off:
+            st.session_state["_sol_prev_off"] = _sel_off
+            st.session_state.pop("sol_cell_sel", None)
         _df_sel  = df_f[df_f[M["office"]] == _sel_off].copy()
 
         if _df_sel.empty:
