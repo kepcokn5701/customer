@@ -2054,7 +2054,7 @@ with tab_weekly:
                                 _body = json.loads(_resp.read().decode("utf-8"))
                             break
                         except urllib.error.HTTPError as _http_err:
-                            if _http_err.code == 429:
+                            if _http_err.code in (429, 503):
                                 continue
                             raise
                     if _body is None:
@@ -2850,7 +2850,7 @@ with tab3:
                                         _body = json.loads(_resp.read().decode("utf-8"))
                                     break
                                 except urllib.error.HTTPError as _http_err:
-                                    if _http_err.code == 429:
+                                    if _http_err.code in (429, 503):
                                         continue
                                     raise
                             if _body is None:
@@ -3173,7 +3173,7 @@ with tab5:
                                     _body = json.loads(_resp.read().decode("utf-8"))
                                 break
                             except urllib.error.HTTPError as _http_err:
-                                if _http_err.code == 429:
+                                if _http_err.code in (429, 503):
                                     continue
                                 raise
                         if _body is None:
@@ -4310,7 +4310,7 @@ with tab_letter:
                                     _body = json.loads(_resp.read().decode("utf-8"))
                                 break
                             except urllib.error.HTTPError as _http_err:
-                                if _http_err.code == 429:
+                                if _http_err.code in (429, 503):
                                     continue
                                 raise
                         if _body is None:
