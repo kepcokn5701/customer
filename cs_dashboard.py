@@ -1409,9 +1409,27 @@ def _parse_date_from_receipt(val):
 # 우선순위: 날짜 컬럼(업무처리완료일 등) → 접수번호
 _date_parsed = False
 if M["date"]:
-    df_raw[M["date"]] = pd.to_datetime(df_raw[M["date"]], errors="coerce")
-    if df_raw[M["date"]].dropna().any():
+    _dc = M["date"]
+    # Excel 시리얼 넘버 감지 (숫자 5자리 = Excel 날짜)
+    _sample = df_raw[_dc].dropna().head(5)
+    _is_serial = False
+    if _sample.dtype in ("int64", "float64") or all(str(v).replace(".", "").isdigit() for v in _sample):
+        try:
+            _test = pd.to_numeric(_sample, errors="coerce").dropna()
+            if not _test.empty and 40000 < _test.iloc[0] < 55000:
+                _is_serial = True
+        except Exception:
+            pass
+    if _is_serial:
+        df_raw[_dc] = pd.to_timedelta(pd.to_numeric(df_raw[_dc], errors="coerce") - 2, unit="D") + pd.Timestamp("1900-01-01")
+    else:
+        df_raw[_dc] = pd.to_datetime(df_raw[_dc], errors="coerce")
+    # 연도 검증 (2020~2030 범위 밖이면 파싱 실패로 판단)
+    _valid = df_raw[_dc].dropna()
+    if not _valid.empty and 2020 <= _valid.iloc[0].year <= 2030:
         _date_parsed = True
+    else:
+        df_raw[_dc] = pd.NaT
 
 if not _date_parsed and M["receipt_no"]:
     df_raw["_접수일"] = df_raw[M["receipt_no"]].apply(_parse_date_from_receipt)
@@ -1628,6 +1646,8 @@ st.markdown("<br>", unsafe_allow_html=True)
 
 # ══════════════════════════════════════════════════════════════
 #  주간 리포트 기준일 계산
+#  - 업로드된 데이터 전체 = 금주 (목~수 고정 주기)
+#  - 전주 = 금주 시작일 - 7일 ~ 금주 시작일 - 1일
 # ══════════════════════════════════════════════════════════════
 _wr_week_available = False
 _wr_this_week = _wr_last_week = _wr_month = pd.DataFrame()
@@ -1635,15 +1655,20 @@ _wr_ref_date = _wr_week_start = _wr_week_end = _wr_last_start = _wr_last_end = N
 if M["date"]:
     _wr_dates = df_f[M["date"]].dropna()
     if not _wr_dates.empty:
-        _wr_ref_date = _wr_dates.max()
-        # 업무 주차: 목(3)~수(2) 기준
-        _wr_week_start = _wr_ref_date - pd.Timedelta(days=(_wr_ref_date.weekday() - 3) % 7)
+        # 업로드 데이터의 날짜 범위로 금주 확정
+        _wr_date_min = _wr_dates.min()
+        _wr_date_max = _wr_dates.max()
+        _wr_ref_date = _wr_date_max
+        # 목~수 주기: 데이터 최소일 기준 해당 주의 목요일 = 금주 시작
+        _wr_week_start = _wr_date_min - pd.Timedelta(days=(_wr_date_min.weekday() - 3) % 7)
         _wr_week_end = _wr_week_start + pd.Timedelta(days=6)
         _wr_last_start = _wr_week_start - pd.Timedelta(days=7)
         _wr_last_end = _wr_week_start - pd.Timedelta(days=1)
-        _wr_month_start = _wr_ref_date.replace(day=1)
-        _wr_this_week = df_f[(df_f[M["date"]] >= _wr_week_start) & (df_f[M["date"]] <= _wr_week_end)]
-        _wr_last_week = df_f[(df_f[M["date"]] >= _wr_last_start) & (df_f[M["date"]] <= _wr_last_end)]
+        _wr_month_start = _wr_date_min.replace(day=1)
+        # 금주 = 업로드 데이터 전체
+        _wr_this_week = df_f.copy()
+        # 전주 = 금주 시작 전 7일 (데이터에 있으면)
+        _wr_last_week = df_f[(df_f[M["date"]] >= _wr_last_start) & (df_f[M["date"]] < _wr_week_start)]
         _wr_month = df_f[(df_f[M["date"]] >= _wr_month_start) & (df_f[M["date"]] <= _wr_week_end)]
         _wr_week_available = len(_wr_this_week) > 0
 
