@@ -1460,6 +1460,32 @@ if M["contract"]:
     else:
         del df_raw["_계약종별"]
 
+# ── 업무유형 이름 변환 + 고정 순서 ──
+_BIZ_RENAME = {
+    "신규/증설": "신규증설", "신규 증설": "신규증설",
+    "사용자기본사항변경": "기본사항변경", "사용자 기본사항 변경": "기본사항변경",
+    "복지/대가족/수가구등": "복지할인", "복지/대가족/수가구 등": "복지할인",
+    "요금수납관련": "요금수납", "요금 수납 관련": "요금수납",
+    "전기요금문의": "요금문의", "요금 문의": "요금문의",
+    "청구서/세금계산서": "세금계산서",
+    "기타단순문의등": "기타", "기타 단순 문의 등": "기타", "기타단순문의 등": "기타",
+}
+_BIZ_ORDER = [
+    "신규증설", "기본사항변경", "계약종별변경", "계기업무", "청구서재발행",
+    "검침관련", "정전", "자동이체", "복지할인", "요금수납",
+    "요금문의", "세금계산서", "해지재사용", "휴지부활", "기타",
+]
+
+def _sort_biz(items):
+    """업무유형 고정 순서 정렬"""
+    _order = {v: i for i, v in enumerate(_BIZ_ORDER)}
+    return sorted(items, key=lambda x: _order.get(x, 999))
+
+if M["business"]:
+    df_raw[M["business"]] = df_raw[M["business"]].astype(str).str.strip().map(
+        lambda x: _BIZ_RENAME.get(x, x) if x != "nan" else x
+    )
+
 # ── 개별 점수 컬럼 자동 탐지 (부분 매칭) ──
 _SCORE_KEYWORDS = [
     "전반적 만족", "직원 친절", "처리 신속",
@@ -1527,7 +1553,7 @@ with st.sidebar:
         if sel_cont and len(sel_cont) < len(cont_opts):
             df_f = df_f[df_f[M["contract"]].astype(str).isin(sel_cont)]
     if M["business"]:
-        biz_opts = sorted(df_raw[M["business"]].dropna().astype(str).unique().tolist())
+        biz_opts = _sort_biz(df_raw[M["business"]].dropna().astype(str).unique().tolist())
         sel_biz = st.multiselect("🏢 업무구분", biz_opts, default=biz_opts, key="f_biz")
         if sel_biz and len(sel_biz) < len(biz_opts):
             df_f = df_f[df_f[M["business"]].astype(str).isin(sel_biz)]
@@ -1856,7 +1882,7 @@ with tab_weekly:
         st.markdown('<p class="sec-head">2. 업무유형별 조사결과 분석</p>', unsafe_allow_html=True)
 
         if _wr_biz and _wr_score:
-            _biz_types = sorted(_wr_tw_view[_wr_biz].dropna().unique().tolist()) if not _wr_tw_view.empty else sorted(df_f[_wr_biz].dropna().unique().tolist())
+            _biz_types = _sort_biz(_wr_tw_view[_wr_biz].dropna().unique().tolist()) if not _wr_tw_view.empty else _sort_biz(df_f[_wr_biz].dropna().unique().tolist())
 
             # 업무유형별 데이터 수집
             _s2_data = {}  # {업무유형: (tw_cnt, tw_score, lw_score, delta, mo_score)}
@@ -2262,6 +2288,11 @@ def _render_category_section(df, cat_col, cat_label, office_col, score_col, over
             _ordered = [c for c in _ct_order if c in pivot.columns]
             _rest = [c for c in pivot.columns if c not in _ct_order]
             pivot = pivot[_ordered + _rest]
+            pivot_cnt = pivot_cnt.reindex(columns=pivot.columns).fillna(0).astype(int)
+        elif cat_label == "업무유형":
+            _biz_ordered = [c for c in _BIZ_ORDER if c in pivot.columns]
+            _biz_rest = [c for c in pivot.columns if c not in _BIZ_ORDER]
+            pivot = pivot[_biz_ordered + _biz_rest]
             pivot_cnt = pivot_cnt.reindex(columns=pivot.columns).fillna(0).astype(int)
 
         if not pivot.empty:
