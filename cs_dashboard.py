@@ -2452,8 +2452,9 @@ with tab3:
                 _raw_ofc = df_raw[df_raw[M["office"]] == _ofc]  # 전체 원본
                 _completed = len(_raw_ofc)
                 if _resp_col and _resp_col in df_raw.columns:
-                    _sent = int(_raw_ofc[_resp_col].dropna().astype(str).str.strip().ne("").sum())
-                    _responded = int((_raw_ofc[_resp_col].astype(str).str.strip() == "응답").sum())
+                    _rv = _raw_ofc[_resp_col].astype(str).str.strip()
+                    _sent = int(_rv.isin(["응답", "미응답"]).sum())
+                    _responded = int((_rv == "응답").sum())
                 else:
                     _sent = "-"
                     _responded = len(_odf)
@@ -2475,8 +2476,9 @@ with tab3:
             _all_completed = len(df_raw[df_raw[M["office"]].notna()])
             if _resp_col and _resp_col in df_raw.columns:
                 _raw_with_ofc = df_raw[df_raw[M["office"]].notna()]
-                _all_sent = int(_raw_with_ofc[_resp_col].dropna().astype(str).str.strip().ne("").sum())
-                _all_responded = int((_raw_with_ofc[_resp_col].astype(str).str.strip() == "응답").sum())
+                _rv_all = _raw_with_ofc[_resp_col].astype(str).str.strip()
+                _all_sent = int(_rv_all.isin(["응답", "미응답"]).sum())
+                _all_responded = int((_rv_all == "응답").sum())
             else:
                 _all_sent = "-"
                 _all_responded = len(df_f)
