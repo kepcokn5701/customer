@@ -1385,6 +1385,7 @@ M = {
     "age":       _find_col(["연령"]),
     "date":      _find_col(["업무처리완료일", "처리완료일", "완료일", "접수일자", "조사일자", "접수일", "조사일", "일자", "날짜", "등록일"]),
     "receipt_no": _find_col(["접수번호"]),
+    "response":  _find_col(["응답여부", "응답 여부"]),
     "id":        None,
     "name":      None,
     "contact":   None,
@@ -2419,11 +2420,23 @@ with tab3:
         if M["office"] and individual_scores and "_점수100" in df_f.columns:
             st.markdown('<p class="sec-head">📋 사업소별 만족도 조사결과 — 항목별 결과</p>', unsafe_allow_html=True)
             _item_offices = _sort_offices(df_f[M["office"]].dropna().unique().tolist())
+            _resp_col = M.get("response")
             _item_rows = []
             for _ofc in _item_offices:
-                _odf = df_f[df_f[M["office"]] == _ofc]
-                _row = {"구분": _ofc, "업무처리완료고객": "-", "발송호수": "-",
-                        "응답호수": len(_odf), "응답률(%)": "-"}
+                _odf = df_f[df_f[M["office"]] == _ofc]  # 응답(점수 있는) 데이터
+                _raw_ofc = df_raw[df_raw[M["office"]] == _ofc]  # 전체 원본
+                _completed = len(_raw_ofc)
+                if _resp_col and _resp_col in df_raw.columns:
+                    _sent = int(_raw_ofc[_resp_col].dropna().astype(str).str.strip().ne("").sum())
+                    _responded = int((_raw_ofc[_resp_col].astype(str).str.strip() == "응답").sum())
+                else:
+                    _sent = "-"
+                    _responded = len(_odf)
+                _resp_rate = round(_responded / _sent * 100, 1) if isinstance(_sent, int) and _sent > 0 else "-"
+                _row = {"구분": _ofc, "업무처리완료고객": f"{_completed:,}",
+                        "발송호수": f"{_sent:,}" if isinstance(_sent, int) else _sent,
+                        "응답호수": f"{_responded:,}" if isinstance(_responded, int) else _responded,
+                        "응답률(%)": _resp_rate}
                 for _sc in individual_scores:
                     if _sc in _odf.columns:
                         _val = _odf[_sc].dropna()
@@ -2433,18 +2446,41 @@ with tab3:
                 _row["종합점수"] = round(_odf["_점수100"].mean(), 1) if len(_odf) > 0 else ""
                 _item_rows.append(_row)
 
+            # 본부 합계 행
+            _all_completed = len(df_raw[df_raw[M["office"]].notna()])
+            if _resp_col and _resp_col in df_raw.columns:
+                _raw_with_ofc = df_raw[df_raw[M["office"]].notna()]
+                _all_sent = int(_raw_with_ofc[_resp_col].dropna().astype(str).str.strip().ne("").sum())
+                _all_responded = int((_raw_with_ofc[_resp_col].astype(str).str.strip() == "응답").sum())
+            else:
+                _all_sent = "-"
+                _all_responded = len(df_f)
+            _all_resp_rate = round(_all_responded / _all_sent * 100, 1) if isinstance(_all_sent, int) and _all_sent > 0 else "-"
+            _hq_row = {"구분": "본부", "업무처리완료고객": f"{_all_completed:,}",
+                       "발송호수": f"{_all_sent:,}" if isinstance(_all_sent, int) else _all_sent,
+                       "응답호수": f"{_all_responded:,}" if isinstance(_all_responded, int) else _all_responded,
+                       "응답률(%)": _all_resp_rate}
+            for _sc in individual_scores:
+                if _sc in df_f.columns:
+                    _val = df_f[_sc].dropna()
+                    _hq_row[_sc] = round(_val.mean(), 1) if len(_val) > 0 else ""
+                else:
+                    _hq_row[_sc] = ""
+            _hq_row["종합점수"] = round(df_f["_점수100"].mean(), 1)
+            _item_rows.insert(0, _hq_row)
+
             _item_df = pd.DataFrame(_item_rows)
             # HTML 테이블 (양식1 스타일)
             _hdr_bg = "#d6e4f0"
             _border = "#b0b0b0"
-            _yellow = "#fef9e7"
             _f1_html = '<div style="overflow-x:auto;"><table style="border-collapse:collapse;width:100%;font-size:0.85em;text-align:center;">'
             _f1_html += f'<tr style="background:{_hdr_bg};font-weight:bold;">'
             for _col in _item_df.columns:
                 _f1_html += f'<th style="border:1px solid {_border};padding:6px 4px;">{_col}</th>'
             _f1_html += '</tr>'
-            for _, _row in _item_df.iterrows():
-                _f1_html += '<tr>'
+            for _ri, (_, _row) in enumerate(_item_df.iterrows()):
+                _bg = "background:#e8eef5;font-weight:bold;" if _ri == 0 else ""
+                _f1_html += f'<tr style="{_bg}">'
                 for _col in _item_df.columns:
                     _v = _row[_col]
                     if _col == "구분":
