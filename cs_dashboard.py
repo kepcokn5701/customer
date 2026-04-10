@@ -2376,6 +2376,14 @@ def _render_category_section(df, cat_col, cat_label, office_col, score_col, over
                 html += f'<td style="border:1px solid {_bdr};{_dbl}padding:4px;font-weight:bold;">{_hq_total_str}</td>'
             html += '</tr>'
 
+            # 지사별 하위 3개 업무유형 사전 계산 (업무유형 테이블만)
+            _is_biz = (cat_label == "업무유형")
+            _ofc_bottom3 = {}
+            if _is_biz:
+                for ofc in pivot.index:
+                    _row = pivot.loc[ofc].dropna().sort_values()
+                    _ofc_bottom3[ofc] = {cat: rank + 1 for rank, (cat, _) in enumerate(_row.head(3).items())}
+
             # 데이터 행
             for ofc in pivot.index:
                 html += '<tr>'
@@ -2390,7 +2398,12 @@ def _render_category_section(df, cat_col, cat_label, office_col, score_col, over
                         html += f'<td style="border:1px solid {_bdr};padding:4px;{_bg}">{v_str}</td>'
                         html += f'<td style="border:1px solid {_bdr};padding:4px;">{cnt_str}</td>'
                     else:
-                        html += f'<td style="border:1px solid {_bdr};padding:4px;{_bg}">{v_str}</td>'
+                        _rank = _ofc_bottom3.get(ofc, {}).get(c)
+                        if _rank:
+                            _mk = f' <span style="font-size:0.8em;">▼{_rank}</span>'
+                            html += f'<td style="border:1px solid {_bdr};padding:4px;{_bg}color:#d32f2f;font-weight:bold;">{v_str}{_mk}</td>'
+                        else:
+                            html += f'<td style="border:1px solid {_bdr};padding:4px;{_bg}">{v_str}</td>'
                 # 합계 열
                 _t_score = df[df[office_col] == ofc][score_col].mean()
                 _t_str = f"{_t_score:.1f}" if pd.notna(_t_score) else ""
