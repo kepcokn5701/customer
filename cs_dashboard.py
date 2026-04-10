@@ -1482,8 +1482,10 @@ def _sort_biz(items):
     return sorted(items, key=lambda x: _order.get(x, 999))
 
 if M["business"]:
-    df_raw[M["business"]] = df_raw[M["business"]].astype(str).str.strip().map(
-        lambda x: _BIZ_RENAME.get(x, x) if x != "nan" else x
+    _biz_mask = df_raw[M["business"]].notna()
+    df_raw.loc[_biz_mask, M["business"]] = (
+        df_raw.loc[_biz_mask, M["business"]].astype(str).str.strip()
+        .map(lambda x: _BIZ_RENAME.get(x, x))
     )
 
 # ── 개별 점수 컬럼 자동 탐지 (부분 매칭) ──
