@@ -2429,19 +2429,48 @@ def _render_category_section(df, cat_col, cat_label, office_col, score_col, over
                 for ofc in pivot.index:
                     _r = {"지사": ofc}
                     for c in pivot.columns:
-                        _r[f"{c}_종합점수"] = pivot.loc[ofc, c] if pd.notna(pivot.loc[ofc, c]) else ""
+                        _r[f"{c}_종합점수"] = round(pivot.loc[ofc, c], 1) if pd.notna(pivot.loc[ofc, c]) else ""
                         _r[f"{c}_응답호수"] = int(pivot_cnt.loc[ofc, c])
-                    _r["합계_종합점수"] = df[df[office_col] == ofc][score_col].mean()
+                    _r["합계_종합점수"] = round(df[df[office_col] == ofc][score_col].mean(), 1)
                     _r["합계_응답호수"] = int(df[df[office_col] == ofc][score_col].count())
                     _dl_rows.append(_r)
                 _dl_df = pd.DataFrame(_dl_rows)
+                _dl_bytes = df_to_excel_bytes(_dl_df)
             else:
-                # 업무유형/접수채널: 점수만
-                _dl_df = pivot.copy()
+                # 업무유형/접수채널: 점수만 (소수점 1자리 + 스타일링)
+                _dl_df = pivot.copy().round(1)
                 _dl_df.index.name = "지사"
-                _dl_df["합계"] = [df[df[office_col] == ofc][score_col].mean() for ofc in _dl_df.index]
+                _dl_df["합계"] = [round(df[df[office_col] == ofc][score_col].mean(), 1) for ofc in _dl_df.index]
                 _dl_df = _dl_df.reset_index()
-            _dl_bytes = df_to_excel_bytes(_dl_df)
+                # openpyxl 스타일링 (보라배경 + 빨간볼드 하위3개)
+                from openpyxl.styles import PatternFill, Font
+                _red_ft = Font(color="D32F2F", bold=True)
+                _buf = io.BytesIO()
+                with pd.ExcelWriter(_buf, engine="openpyxl") as _w:
+                    _dl_df.to_excel(_w, index=False, sheet_name="Sheet1")
+                    _ws = _w.sheets["Sheet1"]
+                    _col_names = list(_dl_df.columns)
+                    for _ri, _ofc in enumerate(_dl_df["지사"], start=2):
+                        for _ci, _cn in enumerate(_col_names, start=1):
+                            if _ci == 1 or _cn == "합계":
+                                continue
+                            _cell = _ws.cell(row=_ri, column=_ci)
+                            _cv = _cell.value
+                            if _cv is None:
+                                continue
+                            # 본부 평균 미만 → 라벤더 배경
+                            _ha = _hq_avgs.get(_cn)
+                            if _ha is not None and _cv < _ha:
+                                _g = min((_ha - _cv) / 10.0, 1.0)
+                                _cr = int(237 - (237 - 167) * _g)
+                                _cg = int(233 - (233 - 139) * _g)
+                                _cb = int(254 - (254 - 250) * _g)
+                                _cell.fill = PatternFill(start_color=f"{_cr:02X}{_cg:02X}{_cb:02X}",
+                                                         end_color=f"{_cr:02X}{_cg:02X}{_cb:02X}", fill_type="solid")
+                            # 하위 3개 → 빨간 볼드
+                            if _ofc_bottom3.get(_ofc, {}).get(_cn):
+                                _cell.font = _red_ft
+                _dl_bytes = _buf.getvalue()
             st.download_button(
                 label=f"📥 {cat_label} 테이블 엑셀 다운로드",
                 data=_dl_bytes,
