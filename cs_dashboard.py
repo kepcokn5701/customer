@@ -1503,38 +1503,38 @@ with st.sidebar:
     if M["office"]:
         office_opts = _sort_offices(df_raw[M["office"]].dropna().astype(str).unique().tolist())
         sel_office = st.multiselect("🏬 지사", office_opts, default=office_opts, key="f_office")
-        if sel_office:
-            df_f = df_f[df_f[M["office"]].isna() | df_f[M["office"]].astype(str).isin(sel_office)]
+        if sel_office and len(sel_office) < len(office_opts):
+            df_f = df_f[df_f[M["office"]].astype(str).isin(sel_office)]
     if M["channel"]:
         chan_opts = sorted(df_raw[M["channel"]].dropna().astype(str).unique().tolist())
         sel_chan = st.multiselect("📡 접수자구분", chan_opts, default=chan_opts, key="f_chan")
-        if sel_chan:
-            df_f = df_f[df_f[M["channel"]].isna() | df_f[M["channel"]].astype(str).isin(sel_chan)]
+        if sel_chan and len(sel_chan) < len(chan_opts):
+            df_f = df_f[df_f[M["channel"]].astype(str).isin(sel_chan)]
     if M["method"]:
         method_opts = sorted(df_raw[M["method"]].dropna().astype(str).unique().tolist())
         sel_method = st.multiselect("📞 신청방법", method_opts, default=method_opts, key="f_method")
-        if sel_method:
-            df_f = df_f[df_f[M["method"]].isna() | df_f[M["method"]].astype(str).isin(sel_method)]
+        if sel_method and len(sel_method) < len(method_opts):
+            df_f = df_f[df_f[M["method"]].astype(str).isin(sel_method)]
     if M["reception"]:
         recep_opts = sorted(df_raw[M["reception"]].dropna().astype(str).unique().tolist())
         sel_recep = st.multiselect("📝 접수종류", recep_opts, default=recep_opts, key="f_recep")
-        if sel_recep:
-            df_f = df_f[df_f[M["reception"]].isna() | df_f[M["reception"]].astype(str).isin(sel_recep)]
+        if sel_recep and len(sel_recep) < len(recep_opts):
+            df_f = df_f[df_f[M["reception"]].astype(str).isin(sel_recep)]
     if M["contract"]:
         cont_opts = sorted(df_raw[M["contract"]].dropna().astype(str).unique().tolist())
         sel_cont = st.multiselect("📋 계약종별", cont_opts, default=cont_opts, key="f_cont")
-        if sel_cont:
-            df_f = df_f[df_f[M["contract"]].isna() | df_f[M["contract"]].astype(str).isin(sel_cont)]
+        if sel_cont and len(sel_cont) < len(cont_opts):
+            df_f = df_f[df_f[M["contract"]].astype(str).isin(sel_cont)]
     if M["business"]:
         biz_opts = sorted(df_raw[M["business"]].dropna().astype(str).unique().tolist())
         sel_biz = st.multiselect("🏢 업무구분", biz_opts, default=biz_opts, key="f_biz")
-        if sel_biz:
-            df_f = df_f[df_f[M["business"]].isna() | df_f[M["business"]].astype(str).isin(sel_biz)]
+        if sel_biz and len(sel_biz) < len(biz_opts):
+            df_f = df_f[df_f[M["business"]].astype(str).isin(sel_biz)]
     if M["age"]:
         age_opts = sorted(df_raw[M["age"]].dropna().astype(str).unique().tolist())
         sel_age = st.multiselect("👥 연령대", age_opts, default=age_opts, key="f_age")
-        if sel_age:
-            df_f = df_f[df_f[M["age"]].isna() | df_f[M["age"]].astype(str).isin(sel_age)]
+        if sel_age and len(sel_age) < len(age_opts):
+            df_f = df_f[df_f[M["age"]].astype(str).isin(sel_age)]
     if M["score"]:
         sc_s = pd.to_numeric(df_raw[M["score"]], errors="coerce").dropna()
         if not sc_s.empty:
