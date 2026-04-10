@@ -1655,15 +1655,14 @@ _wr_ref_date = _wr_week_start = _wr_week_end = _wr_last_start = _wr_last_end = N
 if M["date"]:
     _wr_dates = df_f[M["date"]].dropna()
     if not _wr_dates.empty:
-        # 업로드 데이터의 날짜 범위로 금주 확정
+        # 업로드 데이터의 실제 날짜 범위 = 금주
         _wr_date_min = _wr_dates.min()
         _wr_date_max = _wr_dates.max()
         _wr_ref_date = _wr_date_max
-        # 목~수 주기: 데이터 최소일 기준 해당 주의 목요일 = 금주 시작
-        _wr_week_start = _wr_date_min - pd.Timedelta(days=(_wr_date_min.weekday() - 3) % 7)
-        _wr_week_end = _wr_week_start + pd.Timedelta(days=6)
-        _wr_last_start = _wr_week_start - pd.Timedelta(days=7)
+        _wr_week_start = _wr_date_min
+        _wr_week_end = _wr_date_max
         _wr_last_end = _wr_week_start - pd.Timedelta(days=1)
+        _wr_last_start = _wr_last_end - pd.Timedelta(days=6)
         _wr_month_start = _wr_date_min.replace(day=1)
         # 금주 = 업로드 데이터 전체
         _wr_this_week = df_f.copy()
@@ -1688,19 +1687,19 @@ tab1, tab3, tab_sol, tab_weekly, tab5, tab_letter = st.tabs([
 #  TAB WEEKLY  주간 리포트
 # ─────────────────────────────────────────────────────────────
 def _fv(v):
-    """float → '85.3' / None → '-'"""
-    return f"{v:.1f}" if v is not None else "-"
+    """float → '85.345' / None → '-'"""
+    return f"{v:.3f}" if v is not None else "-"
 
 def _fv_delta(cur, prev):
-    """금주 점수 + 증감을 한 셀에: '94.3 (△3.5)' / 점수만 / '-'"""
+    """금주 점수 + 증감을 한 셀에: '94.321 (△3.512)' / 점수만 / '-'"""
     if cur is None:
         return "-"
-    s = f"{cur:.1f}"
+    s = f"{cur:.3f}"
     if prev is not None:
         d = cur - prev
         c = "#1565C0" if d >= 0 else "#C62828"
         arr = "△" if d >= 0 else "▽"
-        s += f' <span style="color:{c};font-size:0.88em;">({arr}{abs(d):.1f})</span>'
+        s += f' <span style="color:{c};font-size:0.88em;">({arr}{abs(d):.3f})</span>'
     return s
 
 with tab_weekly:
@@ -1837,10 +1836,10 @@ with tab_weekly:
             # 엑셀 다운로드
             def _fv_delta_txt(c, p):
                 if c is None: return "-"
-                s = f"{c:.1f}"
+                s = f"{c:.3f}"
                 if p is not None:
                     d = c - p
-                    s += f' ({"△" if d>=0 else "▽"}{abs(d):.1f})'
+                    s += f' ({"△" if d>=0 else "▽"}{abs(d):.3f})'
                 return s
             _s1_dl_rows = [(n, tt, tr, _fv_delta_txt(tw, lw), _fv(lw), _fv(mo), rk) for n, tt, tr, tw, lw, mo, rk in _s1_rows]
             _s1_dl = pd.DataFrame(_s1_dl_rows, columns=[_row_label,"업무처리건수","응답호수","금주(증감)","전주","월별누계","비고(순위)"])
