@@ -2148,7 +2148,7 @@ with tab1:
                                 annotation_font_size=12, annotation_font_color=C["navy"],
                                 annotation_position="top", annotation_yshift=10)
             fig_bench.update_layout(height=max(350, len(_ofc_grp_bar) * 35 + 80),
-                                     margin=dict(t=80, b=20, l=10, r=100), legend_title_text="",
+                                     margin=dict(t=80, b=20, l=10, r=160), legend_title_text="",
                                      title_font=dict(size=14, color=C["navy"]))
             st.plotly_chart(fig_bench, use_container_width=True, config={'staticPlot': True})
 
