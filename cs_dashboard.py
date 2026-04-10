@@ -2456,7 +2456,7 @@ def _render_category_section(df, cat_col, cat_label, office_col, score_col, over
                                 continue
                             _cell = _ws.cell(row=_ri, column=_ci)
                             _cv = _cell.value
-                            if _cv is None:
+                            if not isinstance(_cv, (int, float)):
                                 continue
                             # 본부 평균 미만 → 라벤더 배경
                             _ha = _hq_avgs.get(_cn)
