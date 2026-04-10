@@ -2400,7 +2400,7 @@ def _render_category_section(df, cat_col, cat_label, office_col, score_col, over
                     else:
                         _rank = _ofc_bottom3.get(ofc, {}).get(c)
                         if _rank:
-                            _mk = f' <span style="font-size:0.8em;">▼{_rank}</span>'
+                            _mk = f' <span style="font-size:0.8em;">(▼{_rank})</span>'
                             html += f'<td style="border:1px solid {_bdr};padding:4px;{_bg}color:#d32f2f;font-weight:bold;">{v_str}{_mk}</td>'
                         else:
                             html += f'<td style="border:1px solid {_bdr};padding:4px;{_bg}">{v_str}</td>'
