@@ -1932,6 +1932,42 @@ with tab_weekly:
             st.download_button("📥 업무유형별 분석 다운로드", df_to_excel_bytes(_s2_dl),
                                "업무유형별_조사결과.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                                key="dl_weekly_s2")
+
+            # ── 함안의령지사 함안/의령 분리 테이블 ──
+            if _wr_office and _wr_biz:
+                _ha_ui_data = _wr_tw_view[_wr_tw_view[_wr_office].astype(str).str.contains("함안의령", na=False)]
+                _ha_ui_col = None
+                if len(_ha_ui_data) > 0:
+                    for _cc in _ha_ui_data.columns:
+                        if _cc in (_wr_office, _wr_biz, _wr_score, "_점수100"):
+                            continue
+                        _vals = set(_ha_ui_data[_cc].dropna().astype(str).str.strip().unique())
+                        if _vals & {"함안", "의령"}:
+                            _ha_ui_col = _cc
+                            break
+                if _ha_ui_col:
+                    st.markdown(f'<p style="font-size:0.95em;font-weight:bold;margin:16px 0 6px;">📍 함안의령지사 상세</p>', unsafe_allow_html=True)
+                    _ha_ui_html = '<div style="overflow-x:auto;"><table style="border-collapse:collapse;width:100%;font-size:0.85em;text-align:center;">'
+                    _ha_ui_html += f'<tr style="background:{_hdr};font-weight:bold;">'
+                    _ha_ui_html += f'<th style="border:1px solid {_bdr};padding:6px 10px;min-width:90px;">구분</th>'
+                    for bt in _biz_types:
+                        _ha_ui_html += f'<th style="border:1px solid {_bdr};padding:6px 6px;">{bt}</th>'
+                    _ha_ui_html += f'<th style="border:1px solid {_bdr};padding:6px 6px;">평균</th>'
+                    _ha_ui_html += '</tr>'
+                    for _region in ["함안", "의령"]:
+                        _rg_data = _ha_ui_data[_ha_ui_data[_ha_ui_col].astype(str).str.strip() == _region]
+                        _rg_avg = _rg_data["_점수100"].mean() if "_점수100" in _rg_data.columns and not _rg_data["_점수100"].dropna().empty else None
+                        _rg_avg_str = f"({_rg_avg:.1f})" if _rg_avg is not None else ""
+                        _ha_ui_html += '<tr>'
+                        _ha_ui_html += f'<td style="border:1px solid {_bdr};padding:5px 8px;font-weight:bold;background:#f9f9f9;">{_region}<br><span style="font-size:0.8em;color:#888;">{_rg_avg_str}</span></td>'
+                        for bt in _biz_types:
+                            _rg_bt = _rg_data[_rg_data[_wr_biz] == bt]
+                            _rg_bt_s = _rg_bt["_점수100"].mean() if "_점수100" in _rg_bt.columns and not _rg_bt["_점수100"].dropna().empty else None
+                            _ha_ui_html += f'<td style="border:1px solid {_bdr};padding:5px;">{_fv(_rg_bt_s)}</td>'
+                        _ha_ui_html += f'<td style="border:1px solid {_bdr};padding:5px;font-weight:bold;">{_fv(_rg_avg)}</td>'
+                        _ha_ui_html += '</tr>'
+                    _ha_ui_html += '</table></div>'
+                    st.markdown(_ha_ui_html, unsafe_allow_html=True)
         else:
             st.info("업무구분 컬럼과 점수 컬럼이 모두 매핑되어야 업무유형별 분석을 표시할 수 있습니다.")
 
