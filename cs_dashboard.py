@@ -1469,6 +1469,7 @@ _BIZ_RENAME = {
     "전기요금문의": "요금문의", "요금 문의": "요금문의",
     "청구서/세금계산서": "세금계산서",
     "기타단순문의등": "기타", "기타 단순 문의 등": "기타", "기타단순문의 등": "기타",
+    "해지/재사용": "해지재사용", "휴지/부활": "휴지부활",
 }
 _BIZ_ORDER = [
     "신규증설", "기본사항변경", "계약종별변경", "계기업무", "청구서재발행",
@@ -2298,35 +2299,26 @@ def _render_category_section(df, cat_col, cat_label, office_col, score_col, over
             pivot_cnt = pivot_cnt.reindex(columns=pivot.columns).fillna(0).astype(int)
 
         if not pivot.empty:
-            # 점수 범위 (색상 스케일용)
-            _all_vals = pivot.values.flatten()
-            _all_vals = _all_vals[~np.isnan(_all_vals)]
-            _vmin = float(_all_vals.min()) if len(_all_vals) > 0 else 0
-            _vmax = float(_all_vals.max()) if len(_all_vals) > 0 else 100
+            # ── 본부 평균 사전 계산 (카테고리별) ──
+            _hq_avgs = {}
+            for c in pivot.columns:
+                _hq_s = df.loc[df[cat_col].eq(c), score_col].mean()
+                _hq_avgs[c] = float(_hq_s) if pd.notna(_hq_s) else None
+            _hq_total_avg = float(df[score_col].mean()) if pd.notna(df[score_col].mean()) else None
 
-            def _score_color(v):
-                """점수 → RdYlGn 배경색 (plotly 히트맵과 동일 채도)"""
-                if pd.isna(v):
+            def _below_avg_color(v, hq_avg):
+                """본부 평균 미만 → 연노랑~주황 그라데이션, 이상 → 투명"""
+                if pd.isna(v) or hq_avg is None:
                     return ""
-                t = max(0, min(1, (v - _vmin) / (_vmax - _vmin))) if _vmax > _vmin else 0.5
-                # plotly RdYlGn 5-stop: 빨강(0) → 주황(0.25) → 노랑(0.5) → 연두(0.75) → 초록(1)
-                stops = [
-                    (0.0, 215, 48, 39),
-                    (0.25, 252, 141, 89),
-                    (0.5, 255, 255, 191),
-                    (0.75, 145, 207, 96),
-                    (1.0, 26, 152, 80),
-                ]
-                for i in range(len(stops) - 1):
-                    t0, r0, g0, b0 = stops[i]
-                    t1, r1, g1, b1 = stops[i + 1]
-                    if t <= t1:
-                        p = (t - t0) / (t1 - t0) if t1 > t0 else 0
-                        r = int(r0 + (r1 - r0) * p)
-                        g = int(g0 + (g1 - g0) * p)
-                        b = int(b0 + (b1 - b0) * p)
-                        return f"background:rgba({r},{g},{b},0.85);"
-                return f"background:rgba(26,152,80,0.85);"
+                gap = hq_avg - v
+                if gap <= 0:
+                    return ""
+                # gap 0→10+ : 연노랑(255,249,196) → 주황(255,138,0)
+                t = min(gap / 10.0, 1.0)
+                r = 255
+                g = int(249 - (249 - 138) * t)
+                b = int(196 - 196 * t)
+                return f"background:rgba({r},{g},{b},0.7);"
 
             _hdr = "#d6e4f0"
             _bdr = "#b0b0b0"
@@ -2391,7 +2383,7 @@ def _render_category_section(df, cat_col, cat_label, office_col, score_col, over
                 for c in _cols:
                     v = pivot.loc[ofc, c]
                     v_str = f"{v:.1f}" if pd.notna(v) else ""
-                    _bg = _score_color(v)
+                    _bg = _below_avg_color(v, _hq_avgs.get(c))
                     if _is_contract:
                         cnt = int(pivot_cnt.loc[ofc, c])
                         cnt_str = str(cnt) if cnt > 0 else ""
@@ -2402,7 +2394,7 @@ def _render_category_section(df, cat_col, cat_label, office_col, score_col, over
                 # 합계 열
                 _t_score = df[df[office_col] == ofc][score_col].mean()
                 _t_str = f"{_t_score:.1f}" if pd.notna(_t_score) else ""
-                _t_bg = _score_color(_t_score)
+                _t_bg = _below_avg_color(_t_score, _hq_total_avg)
                 if _is_contract:
                     _t_cnt = int(df[df[office_col] == ofc][score_col].count())
                     html += f'<td style="border:1px solid {_bdr};padding:4px;font-weight:bold;">{_t_str}</td>'
