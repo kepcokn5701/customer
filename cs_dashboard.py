@@ -2442,6 +2442,12 @@ def _render_category_section(df, cat_col, cat_label, office_col, score_col, over
                 _dl_df.index.name = "지사"
                 _dl_df["합계"] = [round(df[df[office_col] == ofc][score_col].mean(), 1) for ofc in _dl_df.index]
                 _dl_df = _dl_df.reset_index()
+                # 본부 행 맨 위 삽입
+                _hq_row = {"지사": "본부"}
+                for _c in pivot.columns:
+                    _hq_row[_c] = round(_hq_avgs[_c], 1) if _hq_avgs.get(_c) is not None else ""
+                _hq_row["합계"] = round(_hq_total_avg, 1) if _hq_total_avg is not None else ""
+                _dl_df = pd.concat([pd.DataFrame([_hq_row]), _dl_df], ignore_index=True)
                 # openpyxl 스타일링 (보라배경 + 빨간볼드 하위3개)
                 from openpyxl.styles import PatternFill, Font
                 _red_ft = Font(color="D32F2F", bold=True)
