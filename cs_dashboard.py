@@ -1770,11 +1770,19 @@ with tab_weekly:
                     _mo_sc = _wr_mo_view["_점수100"].mean() if "_점수100" in _wr_mo_view.columns and not _wr_mo_view["_점수100"].dropna().empty else None
                     _s1_rows.append((_wr_sel_view, _tw_total, _tw_resp, _tw_sc, _lw_sc, _mo_sc, "-"))
 
-            # 합계 행
-            _tw_all_t = len(_wr_tw_view)
-            _tw_all_r = int(_wr_tw_view["_점수100"].dropna().count()) if "_점수100" in _wr_tw_view.columns else _tw_all_t
-            _tw_all_s = _wr_tw_view["_점수100"].mean() if "_점수100" in _wr_tw_view.columns and not _wr_tw_view["_점수100"].dropna().empty else None
-            _lw_all_s = _wr_lw_view["_점수100"].mean() if "_점수100" in _wr_lw_view.columns and not _wr_lw_view["_점수100"].dropna().empty else None
+            # 합계 행 — 표시된 행들 기준 (테이블과 일치)
+            _tw_all_t = sum(r[1] for r in _s1_rows)
+            _tw_all_r = sum(r[2] for r in _s1_rows)
+            # 금주: 가중 평균 (응답건수 기준)
+            _tw_all_s = sum(r[3] * r[2] for r in _s1_rows if r[3] is not None) / _tw_all_r if _tw_all_r > 0 and any(r[3] is not None for r in _s1_rows) else None
+            # 전주: 표시된 행 중 전주 점수가 있는 것만 — 없으면 None
+            _lw_all_s = None
+            _lw_with = [(r[4], r[2]) for r in _s1_rows if r[4] is not None]
+            if _lw_with:
+                _lw_w_sum = sum(s * max(w, 1) for s, w in _lw_with)
+                _lw_w_cnt = sum(max(w, 1) for _, w in _lw_with)
+                _lw_all_s = _lw_w_sum / _lw_w_cnt if _lw_w_cnt > 0 else None
+            # 월누계
             _mo_all_s = _wr_mo_view["_점수100"].mean() if "_점수100" in _wr_mo_view.columns and not _wr_mo_view["_점수100"].dropna().empty else None
 
             _row_label = "구분" if _wr_sel_view == "전체 (본부 종합)" else "업무유형"
