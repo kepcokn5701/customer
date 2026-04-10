@@ -2307,18 +2307,18 @@ def _render_category_section(df, cat_col, cat_label, office_col, score_col, over
             _hq_total_avg = float(df[score_col].mean()) if pd.notna(df[score_col].mean()) else None
 
             def _below_avg_color(v, hq_avg):
-                """본부 평균 미만 → 연노랑~주황 그라데이션, 이상 → 투명"""
+                """본부 평균 미만 → 연라벤더~진보라 그라데이션, 이상 → 투명"""
                 if pd.isna(v) or hq_avg is None:
                     return ""
                 gap = hq_avg - v
                 if gap <= 0:
                     return ""
-                # gap 0→10+ : 연노랑(255,249,196) → 주황(255,138,0)
+                # gap 0→10+ : 연라벤더(237,233,254) → 진보라(167,139,250)
                 t = min(gap / 10.0, 1.0)
-                r = 255
-                g = int(249 - (249 - 138) * t)
-                b = int(196 - 196 * t)
-                return f"background:rgba({r},{g},{b},0.7);"
+                r = int(237 - (237 - 167) * t)
+                g = int(233 - (233 - 139) * t)
+                b = int(254 - (254 - 250) * t)
+                return f"background:rgba({r},{g},{b},0.55);"
 
             _hdr = "#d6e4f0"
             _bdr = "#b0b0b0"
