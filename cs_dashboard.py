@@ -2133,12 +2133,16 @@ with tab1:
             _bar_avg = df_f["_점수100"].mean()
             _ofc_grp_bar["그룹"] = _ofc_grp_bar["평균만족도"].apply(
                 lambda v: "⬆ 본부평균 이상" if v >= _bar_avg else "⬇ 본부평균 미달")
+            _ofc_grp_bar["_차이"] = _ofc_grp_bar["평균만족도"] - _bar_avg
+            _ofc_grp_bar["_표시"] = _ofc_grp_bar.apply(
+                lambda r: f"{r['평균만족도']:.1f} ({'+' if r['_차이']>=0 else ''}{r['_차이']:.1f}점)", axis=1)
             fig_bench = px.bar(_ofc_grp_bar, x="평균만족도", y="사업소", color="그룹",
                                color_discrete_map={"⬆ 본부평균 이상": C["teal"], "⬇ 본부평균 미달": C["red"]},
-                               orientation="h", text="평균만족도", template=PLOTLY_TPL,
+                               orientation="h", text="_표시", template=PLOTLY_TPL,
                                title=f"사업소별 평균 만족도 — 본부 평균: {_bar_avg:.1f}점")
-            fig_bench.update_traces(texttemplate="%{text:.1f}", textposition="outside",
-                                    hovertemplate="%{y}<br>평균: %{x:.1f}점<extra></extra>")
+            fig_bench.update_traces(texttemplate="%{text}", textposition="outside",
+                                    hovertemplate="%{y}<br>평균: %{x:.1f}점<br>본부 대비: %{customdata[0]:+.1f}점<extra></extra>",
+                                    customdata=_ofc_grp_bar[["_차이"]].values)
             fig_bench.add_vline(x=_bar_avg, line_color=C["navy"], line_dash="dash", line_width=2.5,
                                 annotation_text=f"▼ 본부 평균 {_bar_avg:.1f}",
                                 annotation_font_size=12, annotation_font_color=C["navy"],
