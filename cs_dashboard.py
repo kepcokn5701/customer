@@ -1214,7 +1214,7 @@ st.markdown("""
   <h1>⚡ AI 활용 고객경험관리시스템 조사결과 분석</h1>
   <p>경남본부 CS 만족도 조사 데이터 기반 · AI 자동 분석 리포트</p>
   <span class="dash-badge">📊 종합 현황</span>
-  <span class="dash-badge">📡 계약종별 · 업무유형별 · 항목별 분석</span>
+  <span class="dash-badge">📡 항목별 · 계약종별 · 업무유형별 분석</span>
   <span class="dash-badge">🏢 지사 맞춤형 CS 솔루션</span>
   <span class="dash-badge">🎯 민원 조기 경보 시스템</span>
   <span class="dash-badge">💌 경험고객 서한문 생성</span>
@@ -1234,7 +1234,7 @@ if uploaded_file is None:
 2. 업로드 즉시 컬럼이 자동 인식되어 분석이 시작됩니다.
 3. 사이드바 필터(지사·채널 등)로 데이터 범위를 조정하세요.
 4. **📊 종합 현황** — 구간별 비중·사업소별 점수 등 전체 현황
-5. **📡 계약종별 · 업무유형별 · 항목별 분석** — 교차 분석 및 사분면 비교
+5. **📡 항목별 · 계약종별 · 업무유형별 분석** — 교차 분석 및 사분면 비교
 6. **🏢 지사 맞춤형 CS 솔루션** — 지사 선택 후 단계별 정밀 진단
 7. **🎯 민원 조기 경보 시스템** — 잠재 민원고객 사전케어 리스트
 8. **💌 경험고객 서한문 생성** — 지사별 맞춤 서한문 생성 및 기념품 추천
@@ -1676,7 +1676,7 @@ if M["date"]:
 # ══════════════════════════════════════════════════════════════
 tab1, tab3, tab_sol, tab_weekly, tab5, tab_letter = st.tabs([
     "📊  종합 현황",
-    "📡  계약종별 · 업무유형별 · 항목별 분석",
+    "📡  항목별 · 계약종별 · 업무유형별 분석",
     "🏢  지사 맞춤형 CS 솔루션",
     "📋  주간 리포트",
     "🎯  민원 조기 경보 시스템",
@@ -2416,21 +2416,7 @@ with tab3:
     if not M["score"]:
         st.warning("만족도 점수 컬럼이 필요합니다.")
     else:
-        # ── ① 계약종별 분석 ──
-        if M["contract"]:
-            st.markdown('<p class="sec-head">📋 계약종별 만족도 분석</p>', unsafe_allow_html=True)
-            _render_category_section(df_f, M["contract"], "계약종별",
-                                     M["office"], "_점수100", avg_score_100)
-            st.markdown("---")
-
-        # ── ② 업무유형별 분석 ──
-        if M["business"]:
-            st.markdown('<p class="sec-head">🏢 업무유형별 만족도 분석</p>', unsafe_allow_html=True)
-            _render_category_section(df_f, M["business"], "업무유형",
-                                     M["office"], "_점수100", avg_score_100)
-            st.markdown("---")
-
-        # ── ④ 항목별 결과 (양식1) ──
+        # ── ① 항목별 결과 (양식1) ──
         if M["office"] and individual_scores and "_점수100" in df_f.columns:
             st.markdown('<p class="sec-head">📋 사업소별 만족도 조사결과 — 항목별 결과</p>', unsafe_allow_html=True)
             _item_offices = _sort_offices(df_f[M["office"]].dropna().unique().tolist())
@@ -2477,6 +2463,20 @@ with tab3:
             st.download_button("📥 항목별 결과 Excel 다운로드", _f1_xl,
                                file_name="항목별_결과.xlsx",
                                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+            st.markdown("---")
+
+        # ── ② 계약종별 분석 ──
+        if M["contract"]:
+            st.markdown('<p class="sec-head">📋 계약종별 만족도 분석</p>', unsafe_allow_html=True)
+            _render_category_section(df_f, M["contract"], "계약종별",
+                                     M["office"], "_점수100", avg_score_100)
+            st.markdown("---")
+
+        # ── ③ 업무유형별 분석 ──
+        if M["business"]:
+            st.markdown('<p class="sec-head">🏢 업무유형별 만족도 분석</p>', unsafe_allow_html=True)
+            _render_category_section(df_f, M["business"], "업무유형",
+                                     M["office"], "_점수100", avg_score_100)
             st.markdown("---")
 
         # ── ⑤ 업무유형별 사분면 버블 차트 ──
