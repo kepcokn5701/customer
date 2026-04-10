@@ -1330,7 +1330,8 @@ def load_data(raw_bytes, file_name=""):
     orig = len(df)
     df.dropna(how="all", inplace=True)
     df.dropna(axis=1, how="all", inplace=True)
-    df = df[[c for c in df.columns if not str(c).startswith("Unnamed")]]
+    # Unnamed 컬럼 중 실제 데이터가 있는 컬럼은 유지
+    df = df[[c for c in df.columns if not str(c).startswith("Unnamed") or df[c].dropna().astype(str).str.strip().replace("", pd.NA).dropna().any()]]
     df.columns = [str(c).strip() for c in df.columns]
     return df, orig
 
