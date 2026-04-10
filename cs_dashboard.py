@@ -2326,6 +2326,31 @@ def _render_category_section(df, cat_col, cat_label, office_col, score_col, over
                 html += f'<th style="border:1px solid {_bdr};padding:6px 4px;">합계</th>'
                 html += '</tr>'
 
+            # 본부 합계 행
+            _dbl = f"border-bottom:3px double {_bdr};"
+            html += f'<tr style="background:#e8eef5;font-weight:bold;">'
+            html += f'<td style="border:1px solid {_bdr};{_dbl}padding:5px 8px;font-weight:bold;background:#dce6f0;">본부</td>'
+            for c in _cols:
+                _hq_v = df[cat_col].eq(c).astype(int)
+                _hq_score = df.loc[_hq_v == 1, score_col].mean()
+                _hq_str = f"{_hq_score:.1f}" if pd.notna(_hq_score) else ""
+                if _is_contract:
+                    _hq_cnt = int(df.loc[_hq_v == 1, score_col].count())
+                    html += f'<td style="border:1px solid {_bdr};{_dbl}padding:4px;">{_hq_str}</td>'
+                    html += f'<td style="border:1px solid {_bdr};{_dbl}padding:4px;">{_hq_cnt}</td>'
+                else:
+                    html += f'<td style="border:1px solid {_bdr};{_dbl}padding:4px;">{_hq_str}</td>'
+            # 본부 합계 총합
+            _hq_total = df[score_col].mean()
+            _hq_total_str = f"{_hq_total:.1f}" if pd.notna(_hq_total) else ""
+            if _is_contract:
+                _hq_total_cnt = int(df[score_col].count())
+                html += f'<td style="border:1px solid {_bdr};{_dbl}padding:4px;font-weight:bold;">{_hq_total_str}</td>'
+                html += f'<td style="border:1px solid {_bdr};{_dbl}padding:4px;">{_hq_total_cnt}</td>'
+            else:
+                html += f'<td style="border:1px solid {_bdr};{_dbl}padding:4px;font-weight:bold;">{_hq_total_str}</td>'
+            html += '</tr>'
+
             # 데이터 행
             for ofc in pivot.index:
                 html += '<tr>'
@@ -2479,16 +2504,19 @@ with tab3:
                 _f1_html += f'<th style="border:1px solid {_border};padding:6px 4px;">{_col}</th>'
             _f1_html += '</tr>'
             for _ri, (_, _row) in enumerate(_item_df.iterrows()):
-                _bg = "background:#e8eef5;font-weight:bold;" if _ri == 0 else ""
+                _is_hq = (_ri == 0)
+                _bg = "background:#e8eef5;font-weight:bold;" if _is_hq else ""
+                _dbl_b = f"border-bottom:3px double {_border};" if _is_hq else ""
                 _f1_html += f'<tr style="{_bg}">'
                 for _col in _item_df.columns:
                     _v = _row[_col]
                     if _col == "구분":
-                        _f1_html += f'<td style="border:1px solid {_border};padding:5px 8px;font-weight:bold;background:#f9f9f9;">{_v}</td>'
+                        _cell_bg = "background:#dce6f0;" if _is_hq else "background:#f9f9f9;"
+                        _f1_html += f'<td style="border:1px solid {_border};{_dbl_b}padding:5px 8px;font-weight:bold;{_cell_bg}">{_v}</td>'
                     elif _col == "종합점수":
-                        _f1_html += f'<td style="border:1px solid {_border};padding:4px;font-weight:bold;">{_v}</td>'
+                        _f1_html += f'<td style="border:1px solid {_border};{_dbl_b}padding:4px;font-weight:bold;">{_v}</td>'
                     else:
-                        _f1_html += f'<td style="border:1px solid {_border};padding:4px;">{_v}</td>'
+                        _f1_html += f'<td style="border:1px solid {_border};{_dbl_b}padding:4px;">{_v}</td>'
                 _f1_html += '</tr>'
             _f1_html += '</table>'
             _f1_html += f'<div style="text-align:right;font-size:0.8em;margin-top:4px;color:#555;">(단위 : 호, 점)</div>'
