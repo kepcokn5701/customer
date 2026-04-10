@@ -1384,7 +1384,7 @@ M = {
     "score":     _find_col(["종합 점수", "종합점수"]),
     "voc":       _find_col(["서술 의견", "서술의견"]),
     "age":       _find_col(["연령"]),
-    "date":      _find_col(["접수일자", "조사일자", "접수일", "조사일", "일자", "날짜", "등록일"]),
+    "date":      _find_col(["업무처리완료일", "처리완료일", "완료일", "접수일자", "조사일자", "접수일", "조사일", "일자", "날짜", "등록일"]),
     "receipt_no": _find_col(["접수번호"]),
     "id":        None,
     "name":      None,
@@ -1406,18 +1406,21 @@ def _parse_date_from_receipt(val):
                 continue
     return pd.NaT
 
-# 우선순위: 접수번호 → 날짜 컬럼
+# 우선순위: 날짜 컬럼(업무처리완료일 등) → 접수번호
 _date_parsed = False
-if M["receipt_no"]:
+if M["date"]:
+    df_raw[M["date"]] = pd.to_datetime(df_raw[M["date"]], errors="coerce")
+    if df_raw[M["date"]].dropna().any():
+        _date_parsed = True
+
+if not _date_parsed and M["receipt_no"]:
     df_raw["_접수일"] = df_raw[M["receipt_no"]].apply(_parse_date_from_receipt)
     if df_raw["_접수일"].dropna().any():
         M["date"] = "_접수일"
         _date_parsed = True
 
-if not _date_parsed and M["date"]:
-    df_raw[M["date"]] = pd.to_datetime(df_raw[M["date"]], errors="coerce")
-    if df_raw[M["date"]].dropna().empty:
-        M["date"] = None
+if not _date_parsed:
+    M["date"] = None
 
 if M["date"]:
     _valid_dates = df_raw[M["date"]].dropna()
