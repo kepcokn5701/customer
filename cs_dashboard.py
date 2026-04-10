@@ -1633,7 +1633,8 @@ if M["date"]:
     _wr_dates = df_f[M["date"]].dropna()
     if not _wr_dates.empty:
         _wr_ref_date = _wr_dates.max()
-        _wr_week_start = _wr_ref_date - pd.Timedelta(days=_wr_ref_date.weekday())
+        # 업무 주차: 목(3)~수(2) 기준
+        _wr_week_start = _wr_ref_date - pd.Timedelta(days=(_wr_ref_date.weekday() - 3) % 7)
         _wr_week_end = _wr_week_start + pd.Timedelta(days=6)
         _wr_last_start = _wr_week_start - pd.Timedelta(days=7)
         _wr_last_end = _wr_week_start - pd.Timedelta(days=1)
