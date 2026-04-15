@@ -2669,10 +2669,58 @@ with tab3:
 
         # ── 통합 다운로드 버튼 채우기 ──
         if _dl_sheets:
+            from openpyxl.styles import PatternFill, Font
             _all_buf = io.BytesIO()
             with pd.ExcelWriter(_all_buf, engine="openpyxl") as _aw:
                 for _sname, _sdf in _dl_sheets.items():
                     _sdf.to_excel(_aw, index=False, sheet_name=_sname)
+                # 업무유형 시트 스타일링
+                if "업무유형" in _dl_sheets and "업무유형" in _aw.sheets:
+                    _bz_df = _dl_sheets["업무유형"]
+                    _ws = _aw.sheets["업무유형"]
+                    _bz_cols = list(_bz_df.columns)
+                    # 본부 행(row 2)에서 평균값 추출
+                    _bz_hq = {}
+                    for _ci, _cn in enumerate(_bz_cols, start=1):
+                        if _ci == 1 or _cn == "합계":
+                            continue
+                        _cv = _ws.cell(row=2, column=_ci).value
+                        if isinstance(_cv, (int, float)):
+                            _bz_hq[_cn] = _cv
+                    # 하위 3개 계산 (지사별)
+                    _bz_bottom3 = {}
+                    for _ri in range(3, len(_bz_df) + 2):
+                        _ofc = _ws.cell(row=_ri, column=1).value
+                        _scores = {}
+                        for _ci, _cn in enumerate(_bz_cols[1:], start=2):
+                            if _cn == "합계":
+                                continue
+                            _cv = _ws.cell(row=_ri, column=_ci).value
+                            if isinstance(_cv, (int, float)):
+                                _scores[_cn] = _cv
+                        if _scores:
+                            _sorted = sorted(_scores.items(), key=lambda x: x[1])
+                            _bz_bottom3[_ri] = {k: i + 1 for i, (k, _) in enumerate(_sorted[:3])}
+                    # 스타일 적용
+                    _red_ft = Font(color="D32F2F", bold=True)
+                    for _ri in range(3, len(_bz_df) + 2):
+                        for _ci, _cn in enumerate(_bz_cols, start=1):
+                            if _ci == 1 or _cn == "합계":
+                                continue
+                            _cell = _ws.cell(row=_ri, column=_ci)
+                            _cv = _cell.value
+                            if not isinstance(_cv, (int, float)):
+                                continue
+                            _ha = _bz_hq.get(_cn)
+                            if _ha is not None and _cv < _ha:
+                                _g = min((_ha - _cv) / 10.0, 1.0)
+                                _cr = int(237 - (237 - 167) * _g)
+                                _cg = int(233 - (233 - 139) * _g)
+                                _cb = int(254 - (254 - 250) * _g)
+                                _cell.fill = PatternFill(start_color=f"{_cr:02X}{_cg:02X}{_cb:02X}",
+                                                         end_color=f"{_cr:02X}{_cg:02X}{_cb:02X}", fill_type="solid")
+                            if _bz_bottom3.get(_ri, {}).get(_cn):
+                                _cell.font = _red_ft
             _dl_all_placeholder.download_button(
                 label="📥 항목별 · 계약종별 · 업무유형별 통합 다운로드",
                 data=_all_buf.getvalue(),
