@@ -2269,7 +2269,8 @@ with tab1:
 #  TAB 3  계약종별 · 업무유형별 분석
 # ─────────────────────────────────────────────────────────────
 def _render_category_section(df, cat_col, cat_label, office_col, score_col, overall_avg):
-    """범주별 분석 공통 렌더링: 전체 막대 + 지사별 히트맵 + 하위 3개 카드"""
+    """범주별 분석 공통 렌더링: 전체 막대 + 지사별 히트맵 + 하위 3개 카드. returns download DataFrame."""
+    _return_dl_df = None
     grp = df.groupby(cat_col)[score_col].agg(["mean","count"]).reset_index()
     grp.columns = [cat_label, "평균만족도", "응답수"]
     grp = grp.sort_values("평균만족도", ascending=True)
@@ -2514,6 +2515,7 @@ def _render_category_section(df, cat_col, cat_label, office_col, score_col, over
                             if _ofc_bottom3.get(_ofc, {}).get(_cn):
                                 _cell.font = _red_ft
                 _dl_bytes = _buf.getvalue()
+            _return_dl_df = _dl_df
             st.download_button(
                 label=f"📥 {cat_label} 테이블 엑셀 다운로드",
                 data=_dl_bytes,
@@ -2546,11 +2548,17 @@ def _render_category_section(df, cat_col, cat_label, office_col, score_col, over
             else:
                 st.success("60점 이하 데이터가 없습니다.")
 
+    return _return_dl_df
+
 
 with tab3:
     if not M["score"]:
         st.warning("만족도 점수 컬럼이 필요합니다.")
     else:
+        # ── 통합 다운로드 placeholder ──
+        _dl_all_placeholder = st.empty()
+        _dl_sheets = {}  # {시트명: DataFrame}
+
         # ── ① 항목별 결과 (양식1) ──
         if M["office"] and individual_scores and "_점수100" in df_f.columns:
             st.markdown('<p class="sec-head">📋 사업소별 만족도 조사결과 — 항목별 결과</p>', unsafe_allow_html=True)
@@ -2635,6 +2643,7 @@ with tab3:
             _f1_html += '</div>'
             st.markdown(_f1_html, unsafe_allow_html=True)
             _f1_xl = df_to_excel_bytes(_item_df)
+            _dl_sheets["항목별"] = _item_df
             st.download_button("📥 항목별 결과 Excel 다운로드", _f1_xl,
                                file_name="항목별_결과.xlsx",
                                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
@@ -2643,16 +2652,33 @@ with tab3:
         # ── ② 계약종별 분석 ──
         if M["contract"]:
             st.markdown('<p class="sec-head">📋 계약종별 만족도 분석</p>', unsafe_allow_html=True)
-            _render_category_section(df_f, M["contract"], "계약종별",
+            _ct_dl_df = _render_category_section(df_f, M["contract"], "계약종별",
                                      M["office"], "_점수100", avg_score_100)
+            if _ct_dl_df is not None:
+                _dl_sheets["계약종별"] = _ct_dl_df
             st.markdown("---")
 
         # ── ③ 업무유형별 분석 ──
         if M["business"]:
             st.markdown('<p class="sec-head">🏢 업무유형별 만족도 분석</p>', unsafe_allow_html=True)
-            _render_category_section(df_f, M["business"], "업무유형",
+            _bz_dl_df = _render_category_section(df_f, M["business"], "업무유형",
                                      M["office"], "_점수100", avg_score_100)
+            if _bz_dl_df is not None:
+                _dl_sheets["업무유형"] = _bz_dl_df
             st.markdown("---")
+
+        # ── 통합 다운로드 버튼 채우기 ──
+        if _dl_sheets:
+            _all_buf = io.BytesIO()
+            with pd.ExcelWriter(_all_buf, engine="openpyxl") as _aw:
+                for _sname, _sdf in _dl_sheets.items():
+                    _sdf.to_excel(_aw, index=False, sheet_name=_sname)
+            _dl_all_placeholder.download_button(
+                label="📥 항목별 · 계약종별 · 업무유형별 통합 다운로드",
+                data=_all_buf.getvalue(),
+                file_name="분석_통합.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                key="dl_all_combined", use_container_width=True)
 
         # ── ⑤ 업무유형별 사분면 버블 차트 ──
         if M["business"] and M["score"]:
