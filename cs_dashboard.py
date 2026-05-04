@@ -4381,8 +4381,9 @@ with tab_sol:
                 # ══════════════════════════════════════════
                 if M.get("voc") and M.get("score") and "_점수100" in _df_sel.columns:
                     _vi_voc_col = M["voc"]
-                    _vi_voc_raw = _df_sel[_vi_voc_col].dropna().astype(str).tolist()
-                    _vi_scores = _df_sel["_점수100"].tolist()
+                    _vi_paired = _df_sel[[_vi_voc_col, "_점수100"]].dropna(subset=[_vi_voc_col, "_점수100"])
+                    _vi_voc_raw = _vi_paired[_vi_voc_col].astype(str).tolist()
+                    _vi_scores = _vi_paired["_점수100"].tolist()
                     _vi_voc_valid = [(t, s) for t, s in zip(_vi_voc_raw, _vi_scores)
                                      if str(t).strip() not in ('', 'nan', '응답없음', '없음', '의견없음')
                                      and len(str(t).strip()) > 2
