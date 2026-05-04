@@ -304,6 +304,163 @@ OFFICE_SUDDEN_CHANGES = {
     "고성지사": "9→10월 96.3→88.9점(-7.4점 급락) → 10→11월 88.9→97.0점(+8.1점 회복). 단월 대량 불만 집중.",
 }
 
+# ══════════════════════════════════════════════════════════════
+#  2025 VOC 기반 조건부 인사이트 (AI 프롬프트에 조건부 주입)
+#  ※ 현재 선택된 지사·월·업무유형과 매칭될 때만 AI가 참조
+# ══════════════════════════════════════════════════════════════
+
+# A. 월×계약분류×업무유형 이상 조합 (VOC 검증 완료)
+VOC_ANOMALY_COMBOS = [
+    {"months": [8], "contract": "일반용", "task": "청구서재발행", "score": 80.5, "n": 32,
+     "offices": ["창녕지사", "통영지사"],
+     "voc_cause": "창녕·통영 직원 응대 불친절 집중 (퉁명스러운 말투, 설명 부족)"},
+    {"months": [11], "contract": "농사용", "task": "신규증설", "score": 85.1, "n": 25,
+     "offices": ["함안의령지사", "고성지사"],
+     "voc_cause": "설치비 과다(80만원 요구) + 처리기간 지연 + 부서 간 일정 불일치"},
+    {"months": [4], "contract": "농사용", "task": "계기업무", "score": 86.7, "n": 33,
+     "offices": ["함양지사", "하동지사"],
+     "voc_cause": "현장 담당자 태도 불친절 + 전주이설 관련 갈등"},
+    {"months": [6], "contract": "주택용", "task": "세금계산서", "score": 87.2, "n": 54,
+     "offices": ["고성지사", "경남본부"],
+     "voc_cause": "전화 연결 어려움 + 홈페이지 정보 부족(TV수신료 메뉴 등 접근 불편)"},
+    {"months": [6], "contract": "주택용", "task": "신규증설", "score": 87.7, "n": 31,
+     "offices": ["통영지사", "사천지사", "거제지사"],
+     "voc_cause": "전화 연결난 + 태양광 설치 현장직원 무례한 태도"},
+    {"months": [8], "contract": "농사용", "task": "신규증설", "score": 87.9, "n": 34,
+     "offices": ["밀양지사", "거제지사"],
+     "voc_cause": "사전 안내 없이 전기차단 → 시설하우스 환기장치 피해 발생"},
+    {"months": [11], "contract": "주택용", "task": "계기업무", "score": 88.3, "n": 38,
+     "offices": ["마산지사", "경남본부", "합천지사"],
+     "voc_cause": "고객 책임 전가 + 작업 미완료 철수 + 누진요금 불만"},
+    {"months": [7], "contract": "주택용", "task": "기타", "score": 88.4, "n": 91,
+     "offices": ["남해지사", "함안의령지사", "진해지사", "통영지사"],
+     "voc_cause": "하절기 요금 급증 불만 + 전화 연결 어려움 + 정전"},
+]
+
+# B. 지사별 2025 VOC 프로파일 (취약점 + 저점월 원인)
+OFFICE_VOC_PROFILE = {
+    "산청지사": {
+        "annual_avg": 95.29, "delta": "+1.7", "rank": 1,
+        "weak_task": "세금계산서(92.7)", "strong_task": "청구서재발행(98.0)",
+        "worst_month": None, "worst_month_score": None,
+        "voc_insight": "전 항목 최고, 안정적. 불만 VOC 자체가 희소."},
+    "함양지사": {
+        "annual_avg": 94.52, "delta": "+1.7", "rank": 2,
+        "weak_task": "세금계산서(91.8)", "strong_task": "요금수납(96.9)",
+        "worst_month": 4, "worst_month_score": 91.4,
+        "voc_insight": "4월 저점: 전화 연결 불가 + 하청업체 직원 불친절 + 전주이설 담당자 태도 민원."},
+    "사천지사": {
+        "annual_avg": 94.35, "delta": "+1.5", "rank": 3,
+        "weak_task": "청구서재발행(85.8)", "strong_task": "요금수납(96.0)",
+        "worst_month": 6, "worst_month_score": 90.5,
+        "voc_insight": "청구서재발행 극심 — 8월 일반용 50점대(직원 불친절)."},
+    "함안의령지사": {
+        "annual_avg": 94.34, "delta": "-0.1", "rank": 4,
+        "weak_task": "세금계산서(91.3)", "strong_task": "요금수납(97.1)",
+        "worst_month": 11, "worst_month_score": 91.2,
+        "voc_insight": "유일한 하락 지사. 산업용 비중 최고(7.4%). 11월 농사용 신규증설 비용·설치 지연 불만."},
+    "진주지사": {
+        "annual_avg": 94.23, "delta": "+1.2", "rank": 5,
+        "weak_task": "요금수납(88.7)", "strong_task": "복지할인(95.7)",
+        "worst_month": 11, "worst_month_score": 92.0,
+        "voc_insight": "요금수납 불만: 전화연결 불가(123 대기 20분+), 환불 시스템 낙후(우편 안내), 창구 직원 무표정·고자세."},
+    "거창지사": {
+        "annual_avg": 94.19, "delta": "+1.6", "rank": 6,
+        "weak_task": "청구서재발행(90.0)", "strong_task": "계기업무(97.9)",
+        "worst_month": 7, "worst_month_score": 91.7,
+        "voc_insight": "7월 저점: 123 전화 대기 과다 + 부서 간 전화 돌림 + 계량기 교체 사전고지 없음 + 태양광 증설 비용 부담."},
+    "마산지사": {
+        "annual_avg": 94.15, "delta": "+0.9", "rank": 7,
+        "weak_task": "자동이체(92.4)", "strong_task": "세금계산서(97.9)",
+        "worst_month": 8, "worst_month_score": 92.6,
+        "voc_insight": "대형 지사. 자동이체 건수 多(434건)로 불만 분산 발생."},
+    "밀양지사": {
+        "annual_avg": 93.70, "delta": "+1.0", "rank": 8,
+        "weak_task": "계기업무(89.0)", "strong_task": "요금수납(97.2)",
+        "worst_month": 1, "worst_month_score": 91.4,
+        "voc_insight": "1월 저점: 신규증설 개통 지연 + 팩스번호 오안내 + 부서 돌림. 계기업무: 교체 사전고지 없이 정전 발생, 담당자 직통 미안내."},
+    "남해지사": {
+        "annual_avg": 93.56, "delta": "+0.1", "rank": 9,
+        "weak_task": "청구서재발행(91.4)", "strong_task": "계약종별변경(96.8)",
+        "worst_month": 6, "worst_month_score": 89.8,
+        "voc_insight": "6월 저점: 세금계산서(81.5) 급락. 지역 문의 불편(통합 콜센터만 가능), 고령자 출장 서비스 요구."},
+    "거제지사": {
+        "annual_avg": 93.37, "delta": "+1.0", "rank": 10,
+        "weak_task": "세금계산서(88.0)", "strong_task": "기본사항변경(95.9)",
+        "worst_month": 6, "worst_month_score": 89.8,
+        "voc_insight": "6월 급락: 신규증설(77.2)·세금계산서(78.0) 동반 하락. 전화 연결 불가(소상공인 바우처 작업 집중기), 고지서 도착 지연, 고객응대 교육 필요."},
+    "하동지사": {
+        "annual_avg": 93.32, "delta": "+2.9", "rank": 11,
+        "weak_task": "세금계산서(88.8)", "strong_task": "신규증설(96.5)",
+        "worst_month": 2, "worst_month_score": 89.7,
+        "voc_insight": "최대 개선폭(+2.9). 하반기 대폭 상승."},
+    "합천지사": {
+        "annual_avg": 93.21, "delta": "+1.5", "rank": 12,
+        "weak_task": "휴지/부활(88.2)", "strong_task": "요금수납(95.9)",
+        "worst_month": 6, "worst_month_score": 80.0,
+        "voc_insight": "6월 -11.8점 극심 급락(단월 사건성) → 7월 +15.5 회복."},
+    "진해지사": {
+        "annual_avg": 93.18, "delta": "+1.3", "rank": 13,
+        "weak_task": "청구서재발행(89.6)", "strong_task": "요금수납(95.8)",
+        "worst_month": 6, "worst_month_score": 90.2,
+        "voc_insight": "도시주거 순수형(주택72%). 6월 전화 연결 어려움."},
+    "고성지사": {
+        "annual_avg": 92.93, "delta": "+1.7", "rank": 14,
+        "weak_task": "기타(87.2)", "strong_task": "청구서재발행(96.2)",
+        "worst_month": 10, "worst_month_score": 87.2,
+        "voc_insight": "10월 단발 급락 후 11월 즉시 회복(97.0). 단월 사건성."},
+    "통영지사": {
+        "annual_avg": 92.76, "delta": "+1.5", "rank": 15,
+        "weak_task": "청구서재발행(88.4)", "strong_task": "기본사항변경(95.7)",
+        "worst_month": 1, "worst_month_score": 90.1,
+        "voc_insight": "불만족률 높음(11.7%). 전화연결 불만 + 상담원 업무이해도 부족."},
+    "경남본부": {
+        "annual_avg": 92.52, "delta": "+1.9", "rank": 16,
+        "weak_task": "세금계산서(88.2)", "strong_task": "기본사항변경(94.8)",
+        "worst_month": 6, "worst_month_score": 90.6,
+        "voc_insight": "산업용 6%. 세금계산서 불만: 전화 연결 불가 + 지역 지사 직접 처리 불가 구조."},
+    "창녕지사": {
+        "annual_avg": 92.40, "delta": "+1.0", "rank": 17,
+        "weak_task": "청구서재발행(83.8)", "strong_task": "세금계산서(97.2)",
+        "worst_month": 8, "worst_month_score": 89.3,
+        "voc_insight": "연간 최하위. 청구서재발행 핵심 VOC: 직원 불친절(퉁명스럽게, 말투 습관), 8월 집중."},
+}
+
+
+def _get_conditional_voc_insights(office_name: str, data_months: list = None, risk_tasks: list = None) -> str:
+    """현재 선택된 지사·월·업무유형과 매칭되는 VOC 인사이트만 반환."""
+    parts = []
+
+    # 1) 지사 프로파일 매칭
+    for key, profile in OFFICE_VOC_PROFILE.items():
+        if office_name and (office_name in key or key in office_name):
+            parts.append(
+                f"[2025 연간 VOC 진단] 순위 {profile['rank']}위, 연간 {profile['annual_avg']}점({profile['delta']}). "
+                f"취약업무: {profile['weak_task']}. "
+                f"VOC 원인: {profile['voc_insight']}"
+            )
+            break
+
+    # 2) 월×계약×업무 이상 조합 매칭 (지사 + 월 기준)
+    matched_combos = []
+    for combo in VOC_ANOMALY_COMBOS:
+        office_match = office_name and any(
+            office_name in o or o in office_name for o in combo["offices"]
+        )
+        month_match = data_months and any(m in combo["months"] for m in data_months)
+        task_match = risk_tasks and combo["task"] in risk_tasks
+
+        if office_match and (month_match or task_match):
+            matched_combos.append(
+                f"{combo['months'][0]}월 {combo['contract']}×{combo['task']}({combo['score']}점/{combo['n']}건): "
+                f"{combo['voc_cause']}"
+            )
+
+    if matched_combos:
+        parts.append("[관련 VOC 이상조합] " + " | ".join(matched_combos[:3]))
+
+    return "\n".join(parts)
+
 def _get_office_annual(office_name: str) -> str:
     """지사명으로 연간 분석 데이터를 조회하여 텍스트로 반환."""
     if not office_name:
@@ -3479,18 +3636,18 @@ with tab_sol:
         # LEVEL 2 — 지사별 정밀 진단 (Diagnosis)
         # ══════════════════════════════════════════════════════
 
-        # ── 피어 그룹 (고정 분류) ─────────────────────────────
-        _PEER_LARGE = {"직할", "진주지사", "마산지사", "거제지사", "밀양지사", "사천지사", "통영지사", "함안의령지사", "거창지사", "창녕지사"}
-        _PEER_SMALL = {"합천지사", "진해지사", "하동지사", "고성지사", "산청지사", "남해지사", "함양지사"}
+        # ── 평가군 (고정 분류: 1군/2군) ─────────────────────────
+        _PEER_1 = {"진주지사", "마산지사", "거제지사", "밀양지사", "사천지사", "통영지사", "함안의령지사", "거창지사", "창녕지사"}
+        _PEER_2 = {"합천지사", "진해지사", "하동지사", "고성지사", "산청지사", "남해지사", "함양지사"}
         _off_counts = df_f.groupby(M["office"])["_점수100"].count().sort_values()
-        if _sel_off in _PEER_LARGE:
-            _peer_label, _peer_tier = "대규모", 2
-        elif _sel_off in _PEER_SMALL:
-            _peer_label, _peer_tier = "소규모", 0
+        if _sel_off in _PEER_1:
+            _peer_label, _peer_tier = "1군", 1
+        elif _sel_off in _PEER_2:
+            _peer_label, _peer_tier = "2군", 2
         else:
-            _peer_label, _peer_tier = "대규모" if _sel_off in {"경남본부"} else "소규모", 2 if _sel_off in {"경남본부"} else 0
+            _peer_label, _peer_tier = "1군", 1
         _peer_offs = [o for o in _off_counts.index
-                      if (o in _PEER_LARGE if _peer_tier == 2 else o in _PEER_SMALL)]
+                      if (o in _PEER_1 if _peer_tier == 1 else o in _PEER_2)]
         _peer_avg = df_f[df_f[M["office"]].isin(_peer_offs)]["_점수100"].mean()
 
         # ── 기본 지표 ─────────────────────────────────────────
@@ -3539,9 +3696,9 @@ with tab_sol:
             f'<div style="font-size:0.78em;opacity:0.75;">/ {_total_offs}개 지사</div>'
             '</div>'
             '<div style="background:rgba(255,255,255,0.13);border-radius:8px;padding:12px;text-align:center;">'
-            f'<div style="font-size:0.72em;opacity:0.8;margin-bottom:4px;">{_peer_label} 그룹 랭킹</div>'
+            f'<div style="font-size:0.72em;opacity:0.8;margin-bottom:4px;">평가군 랭킹 ({_peer_label})</div>'
             f'<div style="font-size:1.9em;font-weight:900;">{_peer_rank}<span style="font-size:0.45em;">위</span></div>'
-            f'<div style="font-size:0.78em;opacity:0.75;">/ {len(_peer_offs)}개 · 피어평균 {_peer_avg:.1f}점</div>'
+            f'<div style="font-size:0.78em;opacity:0.75;">/ {len(_peer_offs)}개 · 평가군평균 {_peer_avg:.1f}점</div>'
             '</div>'
             '<div style="background:rgba(255,255,255,0.13);border-radius:8px;padding:12px;text-align:center;">'
             '<div style="font-size:0.72em;opacity:0.8;margin-bottom:4px;">데이터 신뢰도</div>'
@@ -4072,6 +4229,18 @@ with tab_sol:
                         if _all_voc_list:
                             _all_neg_vocs = "\n".join(f"- {v}" for v in _all_voc_list[:30])
 
+                    # ── 조건부 VOC 인사이트 매칭 ──
+                    _data_months = []
+                    if M.get("receipt_no") and M["receipt_no"] in _df_sel.columns:
+                        import re as _re_mod
+                        for _rn_val in _df_sel[M["receipt_no"]].dropna().head(200):
+                            _m_match = _re_mod.search(r'\d{4}(\d{2})\d{2}', str(_rn_val))
+                            if _m_match:
+                                _data_months.append(int(_m_match.group(1)))
+                        _data_months = list(set(_data_months))
+                    _risk_tasks = [r["업무"] for r in (_real_top3 or [])] + [r["업무"] for r in (_drop_top3 or [])]
+                    _voc_conditional = _get_conditional_voc_insights(_sel_off, _data_months, _risk_tasks)
+
                     _sol_ai_key = f"_ai_sol_{_sel_off}"
                     if st.button("🤖 AI 종합 처방전 생성", key="sol_ai_total_btn",
                                  type="primary", use_container_width=True):
@@ -4084,7 +4253,8 @@ with tab_sol:
                                 f"# 분석 대상\n"
                                 f"- 지사: {_sel_off}\n"
                                 f"- 지역 특성: {_kb_ctx}\n"
-                                f"- 종합 평균: {_sel_avg:.1f}점 (본부 평균 {avg_score_100:.1f}점)\n\n"
+                                f"- 종합 평균: {_sel_avg:.1f}점 (본부 평균 {avg_score_100:.1f}점)\n"
+                                f"{('- 2025 VOC 배경: ' + _voc_conditional + chr(10)) if _voc_conditional else ''}\n"
                                 f"# 리스크 요약 (참고용 — 제목에 그대로 쓰지 말 것)\n{_rx_lines}\n"
                                 f"# 고객 불만 VOC 원문 (핵심 데이터 — 반드시 패턴 분석할 것)\n"
                                 f"{_all_neg_vocs or '없음'}\n\n"
