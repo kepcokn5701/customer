@@ -1055,11 +1055,11 @@ def _extract_voc_phrases(voc_texts, scores):
     return neg_results, pos_results, notable[:10]
 
 
-# ── VOC 키워드 워드클라우드 함수 ────────────────────────────────
+# ── VOC 키워드 워드클라우드 함수 ────────────────────────────
 _VOC_CLOUD_STOP = _STOP | {
     "친절","감사","만족","좋겠","좋았","좋을","수고","고맙","칭찬","훌륭","편안",
     "깔끔","성실","정확","꼼꼼","배려","추천","완벽","노력","발전",
-    "따뜻","경청","상냥","반갑","적극","열심","신속","쾌적",
+    "따뜻","경청","상냥","반갑","적극","열심","신속","켈적",
     "불쾌","짜증","실망","황당","어이없","답답","불만",
     "한전","전기","전력","고객","서비스","이용","사용",
     "회사","지사","지점","센터","상담","상담원","전화","통화","연결",
@@ -1069,9 +1069,34 @@ _VOC_CLOUD_STOP = _STOP | {
     "없음","있음","필요","바람","희망","생각","의견","마음","정도",
     "그냥","일단","보통","특별","나름","전반","전체","현재",
     "감사합니다","수고하셨습니다","고맙습니다","없습니다","있습니다",
-    "합니다","됩니다","입니다","바랍���다","주세요","부탁","드립니다",
+    "합니다","됩니다","입니다","바랍니다","주세요","부탁","드립니다",
     "빈항목","빈문서","응답없음","의견없음",
+    # ── 사람/직급 (중립 → 워드클라우드에 불필요) ──
+    "여직원","남직원","여자","남자","아가씨","아저씨","아주머니","언니","오빠",
+    "사원","대리","과장","차장","부장","팀장","소장","본부장","사장",
+    # ── 지사/지역명 패턴 ──
+    "사업소","본부","영업소","고객센터","콜센터",
+    # ── CS 범용 (변별력 없는 단어) ──
+    "전화기","수화기","번호","안내문","안내장","우편","우편물",
+    "사람","분","때","말","곳","쪽","중","후","전","용","건","차","개","며",
+    "가지","방법","얘기","이야기","말씀","대답","약속","계속","다시",
+    "오늘","어제","내일","지금","아까","먼저","나중","이번","저번","다음",
+    "정도","상태","모습","느낌","기분","마음","수준","관계",
+    "멘트","보수","공사","작업",
 }
+# 부분매칭 불용어: 이 문자열을 *포함*하는 단어도 제거 (지사명 등)
+_VOC_CLOUD_STOP_PARTIAL = [
+    "지사","사업소","본부","한전","영업소","센터","지점",
+    "합니다","습니다","입니다","됩니다","겠습니다",
+    "주셔서","해주셔","드립니다","바랍니다",
+]
+
+
+def _is_cloud_stop(word):
+    """워드클라우드 불용어 체크 (정확매칭 + 부분매칭)"""
+    if word in _VOC_CLOUD_STOP:
+        return True
+    return any(pat in word for pat in _VOC_CLOUD_STOP_PARTIAL)
 
 
 def _extract_voc_nouns(texts):
@@ -1088,18 +1113,18 @@ def _extract_voc_nouns(texts):
             for tok in tokens:
                 # NNG: 일반명사, NNP: 고유명사
                 if tok.tag in ('NNG', 'NNP') and len(tok.form) >= 2:
-                    if tok.form not in _VOC_CLOUD_STOP:
+                    if not _is_cloud_stop(tok.form):
                         nouns.append(tok.form)
     elif KONLPY_AVAILABLE:
         okt = Okt()
         for t in valid:
             ns = okt.nouns(t)
-            nouns.extend([n for n in ns if n not in _VOC_CLOUD_STOP and len(n) >= 2])
+            nouns.extend([n for n in ns if not _is_cloud_stop(n) and len(n) >= 2])
     else:
         # fallback: regex 2글자 이상 한글
         for t in valid:
             found = re.findall(r"[가-힣]{2,}", t)
-            nouns.extend([w for w in found if w not in _VOC_CLOUD_STOP])
+            nouns.extend([w for w in found if not _is_cloud_stop(w)])
     return nouns
 
 
@@ -1108,28 +1133,31 @@ def _generate_voc_wordcloud(word_freq, sentiment="neg"):
     if not word_freq or not WORDCLOUD_AVAILABLE:
         return None
 
-    colormap = "Reds" if sentiment == "neg" else "Greens"
-    bg_color = "#fff5f5" if sentiment == "neg" else "#f0fff0"
+    if sentiment == "neg":
+        colormap = "YlOrRd"
+    else:
+        colormap = "YlGn"
 
     wc = _WordCloud(
         font_path=FONT_PATH,
-        width=500, height=280,
-        background_color=bg_color,
+        width=520, height=260,
+        background_color="white",
         colormap=colormap,
-        max_words=40,
-        min_font_size=12,
-        max_font_size=60,
+        max_words=35,
+        min_font_size=11,
+        max_font_size=55,
         prefer_horizontal=0.85,
         relative_scaling=0.5,
+        contour_width=1,
+        contour_color="#e0e0e0",
     )
     wc.generate_from_frequencies(word_freq)
 
-    fig, ax = plt.subplots(figsize=(5, 2.8))
+    fig, ax = plt.subplots(figsize=(5, 2.6))
     ax.imshow(wc, interpolation="bilinear")
     ax.axis("off")
-    plt.tight_layout(pad=0.3)
+    plt.tight_layout(pad=0.2)
     return fig
-
 
 # ══════════════════════════════════════════════════════════════
 #  3. 유틸리티 함수
