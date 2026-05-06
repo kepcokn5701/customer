@@ -4545,7 +4545,7 @@ with tab_sol:
                 _drop_top3 = sorted(_drop_risk, key=lambda x: x["점수"])[:3]
 
                 # ══════════════════════════════════════════
-                # VOC 인사이트 (구절 기반 양면 분석)
+                # 💬 고객 요청사항 (건의/요청 액션 아이템)
                 # ══════════════════════════════════════════
                 if M.get("voc") and M.get("score") and "_점수100" in _df_sel.columns:
                     _vi_voc_col = M["voc"]
@@ -4559,83 +4559,32 @@ with tab_sol:
                     if _vi_voc_valid:
                         _vi_texts = [t for t, _ in _vi_voc_valid]
                         _vi_sc = [s for _, s in _vi_voc_valid]
-                        _neg_res, _pos_res, _notable = _extract_voc_phrases(_vi_texts, _vi_sc)
+                        _, _, _notable = _extract_voc_phrases(_vi_texts, _vi_sc)
 
-                        _n_neg = sum(1 for s in _vi_sc if float(s) < 80)
-                        _n_pos = sum(1 for s in _vi_sc if float(s) >= 90)
-
-                        if _neg_res or _pos_res or _notable:
+                        if _notable:
                             st.markdown("---")
                             st.markdown(
-                                '<div style="background:linear-gradient(90deg,#1a237e,#283593);'
-                                'border-radius:10px;padding:14px 20px;color:white;margin:16px 0 12px;">'
-                                '<span style="font-size:1.1em;font-weight:800;">'
-                                f'🔍 VOC 인사이트 — {_sel_off}</span>'
+                                '<div style="background:linear-gradient(135deg,#4a148c,#6a1b9a);'
+                                'border-radius:10px;padding:16px 22px;color:white;margin:16px 0 12px;">'
+                                '<span style="font-size:1.15em;font-weight:800;">'
+                                f'💬 고객 요청사항 — {_sel_off}</span>'
                                 '<span style="font-size:0.82em;opacity:.8;margin-left:10px;">'
-                                f'80점 미만 {_n_neg}건 · 90점 이상 {_n_pos}건 분석'
+                                f'고객이 구체적 개선을 요청한 의견 {len(_notable)}건'
                                 '</span></div>', unsafe_allow_html=True)
 
-                            _vi_col_l, _vi_col_r = st.columns([1, 1])
-
-                            # 좌측: 강점 (긍정)
-                            with _vi_col_l:
-                                st.markdown("**😊 강점**", unsafe_allow_html=True)
-                                if _pos_res:
-                                    for _label, _cnt, _samples in _pos_res:
-                                        st.markdown(
-                                            f'<div style="margin:8px 0 4px;">'
-                                            f'<span style="font-size:0.92em;font-weight:600;">{_label}</span>'
-                                            f'<span style="float:right;font-size:0.85em;color:#2e7d32;">'
-                                            f'{_cnt}건</span></div>',
-                                            unsafe_allow_html=True)
-                                        for _smp in _samples:
-                                            _smp_short = _smp[:60] + ('…' if len(_smp) > 60 else '')
-                                            st.markdown(
-                                                f'<div style="margin-left:12px;font-size:0.8em;color:#555;'
-                                                f'border-left:2px solid #a5d6a7;padding-left:8px;margin-bottom:3px;">'
-                                                f'"{_smp_short}"</div>',
-                                                unsafe_allow_html=True)
-                                else:
-                                    st.caption("긍정 구절이 감지되지 않았습니다.")
-
-                            # 우측: 약점 (부정)
-                            with _vi_col_r:
-                                st.markdown("**😟 약점**", unsafe_allow_html=True)
-                                if _neg_res:
-                                    for _label, _cnt, _samples in _neg_res:
-                                        st.markdown(
-                                            f'<div style="margin:8px 0 4px;">'
-                                            f'<span style="font-size:0.92em;font-weight:600;">{_label}</span>'
-                                            f'<span style="float:right;font-size:0.85em;color:#c62828;">'
-                                            f'{_cnt}건</span></div>',
-                                            unsafe_allow_html=True)
-                                        for _smp in _samples:
-                                            _smp_short = _smp[:60] + ('…' if len(_smp) > 60 else '')
-                                            st.markdown(
-                                                f'<div style="margin-left:12px;font-size:0.8em;color:#555;'
-                                                f'border-left:2px solid #ef9a9a;padding-left:8px;margin-bottom:3px;">'
-                                                f'"{_smp_short}"</div>',
-                                                unsafe_allow_html=True)
-                                else:
-                                    st.caption("부정 구절이 감지되지 않았습니다.")
-
-                            # 주목할 고객 의견 (건의/요청)
-                            if _notable:
+                            for _vi_i, (_voc_txt, _voc_sc) in enumerate(_notable[:7]):
+                                _voc_display = _voc_txt[:120] + ('…' if len(_voc_txt) > 120 else '')
+                                _sc_color = '#c62828' if _voc_sc and _voc_sc < 60 else '#e65100' if _voc_sc and _voc_sc < 80 else '#555'
+                                _sc_tag = (f'<span style="color:{_sc_color};font-size:0.78em;'
+                                           f'font-weight:600;margin-left:8px;">'
+                                           f'{_voc_sc:.0f}점</span>' if _voc_sc else '')
                                 st.markdown(
-                                    '<div style="margin-top:14px;padding:10px 14px;'
-                                    'background:#f3e5f5;border-radius:8px;">'
-                                    '<span style="font-weight:700;font-size:0.92em;">'
-                                    '💬 주목할 고객 의견 (건의/요청)</span></div>',
+                                    f'<div style="margin:8px 0;padding:10px 14px;'
+                                    f'background:#fafafa;border-left:4px solid #7b1fa2;'
+                                    f'border-radius:6px;font-size:0.9em;">'
+                                    f'"{_voc_display}"{_sc_tag}</div>',
                                     unsafe_allow_html=True)
-                                for _voc_txt, _voc_sc in _notable[:5]:
-                                    _voc_short = _voc_txt[:80] + ('…' if len(_voc_txt) > 80 else '')
-                                    _sc_tag = (f'<span style="color:#c62828;font-size:0.75em;">'
-                                               f' ({_voc_sc:.0f}점)</span>' if _voc_sc else '')
-                                    st.markdown(
-                                        f'<div style="margin:5px 0 2px 8px;font-size:0.84em;">'
-                                        f'· "{_voc_short}"{_sc_tag}</div>',
-                                        unsafe_allow_html=True)
-                                st.caption("※ 고객이 구체적 개선을 요청한 의견입니다.")
+                            st.caption("※ '~해주세요', '~하면 좋겠다' 등 고객이 구체적 행동을 요청한 의견입니다. 즉시 조치 가능 여부를 검토하세요.")
 
 
                 # ── 실질적 리스크 카드 (계약종별×업무) ──────────
