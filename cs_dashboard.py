@@ -4420,77 +4420,6 @@ with tab_sol:
                 _real_top3 = sorted(_real_risk, key=lambda x: x["impact"], reverse=True)[:3]
                 _drop_top3 = sorted(_drop_risk, key=lambda x: x["점수"])[:3]
 
-                # ── 실질적 리스크 카드 (계약종별×업무) ──────────
-                if _real_top3:
-                    st.markdown("##### 🚨 실질적 리스크 TOP 3 — 건수 多 & 평균 이하 (우선 개선)")
-                    st.caption("카드를 클릭하면 상세 분석이 열립니다.")
-                    _rt_cols = st.columns(len(_real_top3))
-                    for _ri, _rk in enumerate(_real_top3):
-                        _rk_key = f"sol_real_{_ri}"
-                        _cur_sel = st.session_state.get("sol_cell_sel")
-                        _is_sel = (_cur_sel is not None
-                                   and _cur_sel.get("계약종별") == _rk["계약종별"]
-                                   and _cur_sel.get("업무") == _rk["업무"])
-                        _badge = "①②③"[_ri]
-                        _bg = "#fff3e0" if _is_sel else "#ffebee"
-                        _bd = "#ff8f00" if _is_sel else "#ef9a9a"
-                        with _rt_cols[_ri]:
-                            _voc_line = f'<div style="font-size:0.75em;color:#888;margin-top:4px;">"{_rk["voc"]}…"</div>' if _rk["voc"] else ""
-                            st.markdown(
-                                f'<div style="background:{_bg};border:2px solid {_bd};'
-                                'border-radius:10px;padding:12px;margin-bottom:8px;">'
-                                f'<div style="font-size:0.78em;color:#c62828;font-weight:700;">리스크 {_badge}</div>'
-                                f'<div style="font-size:1em;font-weight:800;margin:4px 0;">{_rk["계약종별"]} × {_rk["업무"]}</div>'
-                                f'<div style="font-size:0.82em;color:#555;">최저: {_rk["최저항목"]} ({_rk["최저점수"]}점)</div>'
-                                f'<div style="font-size:1.4em;font-weight:900;color:#c62828;">{_rk["점수"]:.1f}점</div>'
-                                f'<div style="font-size:0.78em;color:#555;">{_rk["건수"]}건 · 임팩트 {_rk["impact"]:.0f}</div>'
-                                f'{_voc_line}'
-                                '</div>', unsafe_allow_html=True)
-                            if st.button(
-                                    "▲ 닫기" if _is_sel else "🔍 상세 원인 분석",
-                                    key=_rk_key, use_container_width=True,
-                                    type="secondary" if _is_sel else "primary"):
-                                st.session_state["sol_cell_sel"] = (
-                                    None if _is_sel else {"계약종별": _rk["계약종별"], "업무": _rk["업무"]})
-                                st.rerun()
-
-                # ── 급락 리스크 카드 ──────────────────────────────
-                if _drop_top3:
-                    st.markdown("##### ⚡ 급락 리스크 TOP 3 — 건수 少 & 점수 급락 (모니터링)")
-                    st.caption("소수 응답이지만 점수가 급락한 조합입니다. 민원 전조 신호일 수 있으니 **추이를 주시**하세요.")
-                    _dt_cols = st.columns(len(_drop_top3))
-                    for _di, _dk in enumerate(_drop_top3):
-                        _dk_key = f"sol_drop_{_di}"
-                        _cur_sel = st.session_state.get("sol_cell_sel")
-                        _is_sel = (_cur_sel is not None
-                                   and _cur_sel.get("계약종별") == _dk["계약종별"]
-                                   and _cur_sel.get("업무") == _dk["업무"])
-                        _badge = "①②③"[_di]
-                        _bg = "#fff3e0" if _is_sel else "#fff8e1"
-                        _bd = "#ff8f00" if _is_sel else "#ffca28"
-                        with _dt_cols[_di]:
-                            _voc_line = f'<div style="font-size:0.75em;color:#888;margin-top:4px;">"{_dk["voc"]}…"</div>' if _dk["voc"] else ""
-                            st.markdown(
-                                f'<div style="background:{_bg};border:2px solid {_bd};'
-                                'border-radius:10px;padding:12px;margin-bottom:8px;">'
-                                f'<div style="font-size:0.78em;color:#e65100;font-weight:700;">급락 {_badge}</div>'
-                                f'<div style="font-size:1em;font-weight:800;margin:4px 0;">{_dk["계약종별"]} × {_dk["업무"]}</div>'
-                                f'<div style="font-size:0.82em;color:#555;">최저: {_dk["최저항목"]} ({_dk["최저점수"]}점)</div>'
-                                f'<div style="font-size:1.4em;font-weight:900;color:#e65100;">{_dk["점수"]:.1f}점</div>'
-                                f'<div style="font-size:0.78em;color:#555;">{_dk["건수"]}건 (소량)</div>'
-                                f'{_voc_line}'
-                                '</div>', unsafe_allow_html=True)
-                            if st.button(
-                                    "▲ 닫기" if _is_sel else "🔍 상세 원인 분석",
-                                    key=_dk_key, use_container_width=True,
-                                    type="secondary" if _is_sel else "primary"):
-                                st.session_state["sol_cell_sel"] = (
-                                    None if _is_sel else {"계약종별": _dk["계약종별"], "업무": _dk["업무"]})
-                                st.rerun()
-
-                if not _real_top3 and not _drop_top3:
-                    st.success("✅ 모든 업무×계약종별 조합이 본부 평균 이상입니다.")
-
                 # ══════════════════════════════════════════
                 # VOC 인사이트 (키워드 워드클라우드)
                 # ══════════════════════════════════════════
@@ -4596,6 +4525,78 @@ with tab_sol:
                                         f'· "{_voc_short}"{_sc_tag}</div>',
                                         unsafe_allow_html=True)
                                 st.caption("※ 고객이 구체적 개선을 요청한 의견입니다.")
+
+
+                # ── 실질적 리스크 카드 (계약종별×업무) ──────────
+                if _real_top3:
+                    st.markdown("##### 🚨 실질적 리스크 TOP 3 — 건수 多 & 평균 이하 (우선 개선)")
+                    st.caption("카드를 클릭하면 상세 분석이 열립니다.")
+                    _rt_cols = st.columns(len(_real_top3))
+                    for _ri, _rk in enumerate(_real_top3):
+                        _rk_key = f"sol_real_{_ri}"
+                        _cur_sel = st.session_state.get("sol_cell_sel")
+                        _is_sel = (_cur_sel is not None
+                                   and _cur_sel.get("계약종별") == _rk["계약종별"]
+                                   and _cur_sel.get("업무") == _rk["업무"])
+                        _badge = "①②③"[_ri]
+                        _bg = "#fff3e0" if _is_sel else "#ffebee"
+                        _bd = "#ff8f00" if _is_sel else "#ef9a9a"
+                        with _rt_cols[_ri]:
+                            _voc_line = f'<div style="font-size:0.75em;color:#888;margin-top:4px;">"{_rk["voc"]}…"</div>' if _rk["voc"] else ""
+                            st.markdown(
+                                f'<div style="background:{_bg};border:2px solid {_bd};'
+                                'border-radius:10px;padding:12px;margin-bottom:8px;">'
+                                f'<div style="font-size:0.78em;color:#c62828;font-weight:700;">리스크 {_badge}</div>'
+                                f'<div style="font-size:1em;font-weight:800;margin:4px 0;">{_rk["계약종별"]} × {_rk["업무"]}</div>'
+                                f'<div style="font-size:0.82em;color:#555;">최저: {_rk["최저항목"]} ({_rk["최저점수"]}점)</div>'
+                                f'<div style="font-size:1.4em;font-weight:900;color:#c62828;">{_rk["점수"]:.1f}점</div>'
+                                f'<div style="font-size:0.78em;color:#555;">{_rk["건수"]}건 · 임팩트 {_rk["impact"]:.0f}</div>'
+                                f'{_voc_line}'
+                                '</div>', unsafe_allow_html=True)
+                            if st.button(
+                                    "▲ 닫기" if _is_sel else "🔍 상세 원인 분석",
+                                    key=_rk_key, use_container_width=True,
+                                    type="secondary" if _is_sel else "primary"):
+                                st.session_state["sol_cell_sel"] = (
+                                    None if _is_sel else {"계약종별": _rk["계약종별"], "업무": _rk["업무"]})
+                                st.rerun()
+
+                # ── 급락 리스크 카드 ──────────────────────────────
+                if _drop_top3:
+                    st.markdown("##### ⚡ 급락 리스크 TOP 3 — 건수 少 & 점수 급락 (모니터링)")
+                    st.caption("소수 응답이지만 점수가 급락한 조합입니다. 민원 전조 신호일 수 있으니 **추이를 주시**하세요.")
+                    _dt_cols = st.columns(len(_drop_top3))
+                    for _di, _dk in enumerate(_drop_top3):
+                        _dk_key = f"sol_drop_{_di}"
+                        _cur_sel = st.session_state.get("sol_cell_sel")
+                        _is_sel = (_cur_sel is not None
+                                   and _cur_sel.get("계약종별") == _dk["계약종별"]
+                                   and _cur_sel.get("업무") == _dk["업무"])
+                        _badge = "①②③"[_di]
+                        _bg = "#fff3e0" if _is_sel else "#fff8e1"
+                        _bd = "#ff8f00" if _is_sel else "#ffca28"
+                        with _dt_cols[_di]:
+                            _voc_line = f'<div style="font-size:0.75em;color:#888;margin-top:4px;">"{_dk["voc"]}…"</div>' if _dk["voc"] else ""
+                            st.markdown(
+                                f'<div style="background:{_bg};border:2px solid {_bd};'
+                                'border-radius:10px;padding:12px;margin-bottom:8px;">'
+                                f'<div style="font-size:0.78em;color:#e65100;font-weight:700;">급락 {_badge}</div>'
+                                f'<div style="font-size:1em;font-weight:800;margin:4px 0;">{_dk["계약종별"]} × {_dk["업무"]}</div>'
+                                f'<div style="font-size:0.82em;color:#555;">최저: {_dk["최저항목"]} ({_dk["최저점수"]}점)</div>'
+                                f'<div style="font-size:1.4em;font-weight:900;color:#e65100;">{_dk["점수"]:.1f}점</div>'
+                                f'<div style="font-size:0.78em;color:#555;">{_dk["건수"]}건 (소량)</div>'
+                                f'{_voc_line}'
+                                '</div>', unsafe_allow_html=True)
+                            if st.button(
+                                    "▲ 닫기" if _is_sel else "🔍 상세 원인 분석",
+                                    key=_dk_key, use_container_width=True,
+                                    type="secondary" if _is_sel else "primary"):
+                                st.session_state["sol_cell_sel"] = (
+                                    None if _is_sel else {"계약종별": _dk["계약종별"], "업무": _dk["업무"]})
+                                st.rerun()
+
+                if not _real_top3 and not _drop_top3:
+                    st.success("✅ 모든 업무×계약종별 조합이 본부 평균 이상입니다.")
 
                 # ══════════════════════════════════════════
                 # 상세 분석 — 선택된 카드의 범인 특정 + VOC
