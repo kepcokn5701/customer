@@ -4632,29 +4632,6 @@ with tab_sol:
                                 else:
                                     st.caption("긍정 VOC가 없습니다.")
 
-                            # ── 속성별 분류 요약 (부정 키프레이즈) ──
-                            if _neg_freq:
-                                _neg_cats = _classify_keyphrases(_neg_freq)
-                                if _neg_cats:
-                                    st.markdown(
-                                        '<div style="margin-top:10px;padding:10px 14px;'
-                                        'background:#fff3e0;border-radius:8px;">'
-                                        '<span style="font-weight:700;font-size:0.92em;">'
-                                        '📊 부정 VOC 속성별 분류</span></div>',
-                                        unsafe_allow_html=True)
-                                    _cat_cols = st.columns(min(len(_neg_cats), 4))
-                                    for _ci, (_cat_name, _cat_items) in enumerate(_neg_cats.items()):
-                                        if _ci >= 4:
-                                            break
-                                        with _cat_cols[_ci]:
-                                            _cat_total = sum(c for _, c in _cat_items)
-                                            st.markdown(f"**{_cat_name}** ({_cat_total}건)")
-                                            for _kp, _kc in _cat_items[:3]:
-                                                st.markdown(
-                                                    f'<span style="font-size:0.82em;color:#e65100;">'
-                                                    f'· {_kp} ({_kc})</span>',
-                                                    unsafe_allow_html=True)
-
                             # 주목할 고객 의견 (건의/요청)
                             if _notable:
                                 st.markdown(
