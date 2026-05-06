@@ -1099,33 +1099,125 @@ def _is_cloud_stop(word):
     return any(pat in word for pat in _VOC_CLOUD_STOP_PARTIAL)
 
 
-def _extract_voc_nouns(texts):
-    """VOC 텍스트 → 명사 추출 (kiwipiepy 우선, fallback: regex)"""
-    nouns = []
+# ── 의미 없는 범용 동사/형용사 (페어에서 제외) ──
+_GENERIC_VERBS = {
+    '하', '되', '있', '없', '이', '아니', '보', '같', '주', '받',
+    '나', '오', '가', '알', '넣', '두', '시키', '내', '들', '쓰',
+    '놓', '만들', '걸', '그렇', '이렇', '저렇', '어떻', '않',
+    '말', '살', '지', '싶', '모르', '따르', '서', '달',
+}
+# ── 페어 구성 시에도 무의미한 명사 (복합명사 빌드 스킵) ──
+_TRIVIAL_NOUNS = {
+    '것', '수', '등', '때', '곳', '쪽', '중', '뒤', '앞',
+    '분', '건', '개', '점', '바', '데', '줄', '뿐', '나',
+}
+
+# ── 동의어 클러스터링: 같은 의미의 수식어를 표준형으로 통합 ──
+_SYNONYM_MODIFIER = {
+    '느리다': '지연', '늦다': '지연', '오래다': '지연', '걸리다': '지연',
+    '빠르다': '신속', '즉시': '신속',
+    '비싸다': '비싸다', '과다': '비싸다',
+    '어렵다': '어렵다', '복잡하다': '복잡',
+    '불편': '불편', '불친절': '불친절', '불합리': '불합리',
+}
+_SYNONYM_PHRASE = {
+    '대기시간 길다': '대기시간 지연', '대기시간 오래다': '대기시간 지연',
+    '대기시간 걸리다': '대기시간 지연',
+    '전화 안 걸리다': '전화연결 지연', '전화 안 되다': '전화연결 지연',
+    '연결 안 되다': '전화연결 지연',
+    '통화 안 되다': '전화연결 지연',
+}
+
+
+def _normalize_keyphrase(phrase):
+    """동의어 정규화: 같은 의미 → 표준 키프레이즈로 통합"""
+    if phrase in _SYNONYM_PHRASE:
+        return _SYNONYM_PHRASE[phrase]
+    parts = phrase.rsplit(' ', 1)
+    if len(parts) == 2:
+        noun, mod = parts
+        if mod in _SYNONYM_MODIFIER:
+            return f"{noun} {_SYNONYM_MODIFIER[mod]}"
+    return phrase
+
+
+def _extract_voc_keyphrases(texts):
+    """VOC 텍스트 → [속성+상태] 의미 단위 키프레이즈 추출
+    예: '대기시간 길다', '전화연결 안되다', '설명 자세하다'
+    kiwipiepy 우선, fallback: 기존 명사 추출
+    """
+    phrases = []
     valid = [str(t).strip() for t in texts
              if str(t).strip() not in _VOC_EMPTY and len(str(t).strip()) > 2]
     if not valid:
-        return nouns
+        return phrases
 
     if KIWI_AVAILABLE:
         for t in valid:
             tokens = _KIWI.tokenize(t)
-            for tok in tokens:
-                # NNG: 일반명사, NNP: 고유명사
-                if tok.tag in ('NNG', 'NNP') and len(tok.form) >= 2:
-                    if not _is_cloud_stop(tok.form):
-                        nouns.append(tok.form)
+            n = len(tokens)
+            i = 0
+            while i < n:
+                tok = tokens[i]
+                # ── 명사(NNG/NNP) 발견 → 복합명사 빌드 + 수식어 탐색 ──
+                if tok.tag in ('NNG', 'NNP') and len(tok.form) >= 2 and tok.form not in _TRIVIAL_NOUNS:
+                    # 1) 연속 명사 결합 → 복합명사
+                    noun_parts = [tok.form]
+                    j = i + 1
+                    while j < n and tokens[j].tag in ('NNG', 'NNP') and tokens[j].form not in _TRIVIAL_NOUNS:
+                        noun_parts.append(tokens[j].form)
+                        j += 1
+                    compound = ''.join(noun_parts)
+
+                    # 2) 후방 4토큰 내 형용사(VA)/동사(VV)/어근(XR) 탐색
+                    modifier = None
+                    neg_prefix = ""
+                    for k in range(j, min(j + 5, n)):
+                        tk = tokens[k]
+                        # 부정 표현: 안/못
+                        if tk.form in ('안', '못') and tk.tag in ('MAG', 'VCN'):
+                            neg_prefix = tk.form + " "
+                        # 형용사/동사 → 수식어 확정
+                        elif tk.tag in ('VA', 'VV'):
+                            if tk.form not in _GENERIC_VERBS and len(tk.form) >= 1:
+                                modifier = neg_prefix + tk.form + "다"
+                            break
+                        # 형용사 어근 (불친절, 불편 등) → 수식어
+                        elif tk.tag == 'XR' and len(tk.form) >= 2:
+                            modifier = tk.form
+                            break
+                        # 조사·부사는 건너뛰기
+                        elif tk.tag.startswith('J') or tk.tag in ('MAG', 'MAJ', 'EC', 'EP'):
+                            continue
+                        else:
+                            break
+
+                    # 3) 키프레이즈 생성 + 동의어 정규화
+                    if modifier:
+                        keyphrase = _normalize_keyphrase(f"{compound} {modifier}")
+                        phrases.append(keyphrase)
+                    elif not _is_cloud_stop(compound):
+                        phrases.append(compound)
+
+                    i = j
+                # ── 독립 형용사 어근 (XR: 불친절, 불편, 불합리 등) ──
+                elif tok.tag == 'XR' and len(tok.form) >= 2 and not _is_cloud_stop(tok.form):
+                    phrases.append(tok.form)
+                    i += 1
+                else:
+                    i += 1
+
     elif KONLPY_AVAILABLE:
         okt = Okt()
         for t in valid:
             ns = okt.nouns(t)
-            nouns.extend([n for n in ns if not _is_cloud_stop(n) and len(n) >= 2])
+            phrases.extend([n for n in ns if not _is_cloud_stop(n) and len(n) >= 2])
     else:
-        # fallback: regex 2글자 이상 한글
         for t in valid:
             found = re.findall(r"[가-힣]{2,}", t)
-            nouns.extend([w for w in found if not _is_cloud_stop(w)])
-    return nouns
+            phrases.extend([w for w in found if not _is_cloud_stop(w)])
+
+    return phrases
 
 
 def _generate_voc_wordcloud(word_freq, sentiment="neg"):
@@ -1158,6 +1250,38 @@ def _generate_voc_wordcloud(word_freq, sentiment="neg"):
     ax.axis("off")
     plt.tight_layout(pad=0.2)
     return fig
+
+
+# ── 속성 기반 키프레이즈 분류 ──────────────────────────────────
+_KEYPHRASE_CATEGORIES = {
+    "📞 상담·응대": ["상담", "응대", "안내", "설명", "답변", "연락", "통화", "전화", "콜백", "말투", "태도", "인사"],
+    "⏱️ 처리속도": ["지연", "느리", "오래", "늦", "빠르", "신속", "대기", "소요", "기다"],
+    "📋 절차·접수": ["접수", "신청", "서류", "절차", "복잡", "번거", "어렵", "등록", "변경", "해지"],
+    "🔧 현장·시공": ["방문", "현장", "공사", "시공", "설치", "교체", "수리", "점검", "정전", "단전", "복구"],
+    "💰 요금·과금": ["요금", "납부", "청구", "누진", "할인", "감면", "비싸", "과다", "부과", "체납"],
+    "🏗️ 시설·환경": ["소음", "진동", "전주", "전선", "변압기", "계량기", "위험", "안전", "미관"],
+    "💻 디지털": ["홈페이지", "앱", "모바일", "시스템", "로그인", "오류", "접속"],
+}
+
+
+def _classify_keyphrases(freq_dict):
+    """키프레이즈를 서비스 속성 카테고리별로 그룹핑
+    Returns: {카테고리명: [(키프레이즈, 건수), ...], ...}
+    """
+    result = {}
+    classified = set()
+    for phrase, cnt in freq_dict.most_common(50):
+        for cat, keywords in _KEYPHRASE_CATEGORIES.items():
+            if any(kw in phrase for kw in keywords):
+                result.setdefault(cat, []).append((phrase, cnt))
+                classified.add(phrase)
+                break
+    # 미분류 항목
+    unclassified = [(p, c) for p, c in freq_dict.most_common(50) if p not in classified]
+    if unclassified:
+        result["🔍 기타"] = unclassified
+    return result
+
 
 # ══════════════════════════════════════════════════════════════
 #  3. 유틸리티 함수
@@ -4439,16 +4563,16 @@ with tab_sol:
                         # 건의/요청 추출 (기존 구절 패턴 활용)
                         _, _, _notable = _extract_voc_phrases(_vi_texts, _vi_sc)
 
-                        # 긍정/부정 텍스트 분리 → 명사 추출
+                        # 긍정/부정 텍스트 분리 → 키프레이즈 추출
                         _neg_texts = [t for t, s in _vi_voc_valid if float(s) < 80]
                         _pos_texts = [t for t, s in _vi_voc_valid if float(s) >= 90]
                         _n_neg = len(_neg_texts)
                         _n_pos = len(_pos_texts)
 
-                        _neg_nouns = _extract_voc_nouns(_neg_texts)
-                        _pos_nouns = _extract_voc_nouns(_pos_texts)
-                        _neg_freq = Counter(_neg_nouns)
-                        _pos_freq = Counter(_pos_nouns)
+                        _neg_kp = _extract_voc_keyphrases(_neg_texts)
+                        _pos_kp = _extract_voc_keyphrases(_pos_texts)
+                        _neg_freq = Counter(_neg_kp)
+                        _pos_freq = Counter(_pos_kp)
 
                         if _neg_freq or _pos_freq or _notable:
                             st.markdown("---")
@@ -4507,6 +4631,29 @@ with tab_sol:
                                                 unsafe_allow_html=True)
                                 else:
                                     st.caption("긍정 VOC가 없습니다.")
+
+                            # ── 속성별 분류 요약 (부정 키프레이즈) ──
+                            if _neg_freq:
+                                _neg_cats = _classify_keyphrases(_neg_freq)
+                                if _neg_cats:
+                                    st.markdown(
+                                        '<div style="margin-top:10px;padding:10px 14px;'
+                                        'background:#fff3e0;border-radius:8px;">'
+                                        '<span style="font-weight:700;font-size:0.92em;">'
+                                        '📊 부정 VOC 속성별 분류</span></div>',
+                                        unsafe_allow_html=True)
+                                    _cat_cols = st.columns(min(len(_neg_cats), 4))
+                                    for _ci, (_cat_name, _cat_items) in enumerate(_neg_cats.items()):
+                                        if _ci >= 4:
+                                            break
+                                        with _cat_cols[_ci]:
+                                            _cat_total = sum(c for _, c in _cat_items)
+                                            st.markdown(f"**{_cat_name}** ({_cat_total}건)")
+                                            for _kp, _kc in _cat_items[:3]:
+                                                st.markdown(
+                                                    f'<span style="font-size:0.82em;color:#e65100;">'
+                                                    f'· {_kp} ({_kc})</span>',
+                                                    unsafe_allow_html=True)
 
                             # 주목할 고객 의견 (건의/요청)
                             if _notable:
