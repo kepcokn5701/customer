@@ -4507,8 +4507,6 @@ with tab_sol:
                 else:
                     st.success("✅ 해당 지사에 50점 이하 건이 없습니다.")
 
-                st.markdown("---")
-
                 # ── 리스크 분류: 계약종별 × 업무 기준 ──────────
                 _sol_score_cols = [c for c in individual_scores if c in _df_sel.columns]
                 _sol_combos = _df_sel.groupby([M["contract"], M["business"]]).agg(
