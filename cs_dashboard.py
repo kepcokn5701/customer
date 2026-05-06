@@ -4545,7 +4545,7 @@ with tab_sol:
                 _drop_top3 = sorted(_drop_risk, key=lambda x: x["점수"])[:3]
 
                 # ══════════════════════════════════════════
-                # VOC 인사이트 (키워드 워드클라우드)
+                # VOC 인사이트 (구절 기반 양면 분석)
                 # ══════════════════════════════════════════
                 if M.get("voc") and M.get("score") and "_점수100" in _df_sel.columns:
                     _vi_voc_col = M["voc"]
@@ -4559,22 +4559,12 @@ with tab_sol:
                     if _vi_voc_valid:
                         _vi_texts = [t for t, _ in _vi_voc_valid]
                         _vi_sc = [s for _, s in _vi_voc_valid]
+                        _neg_res, _pos_res, _notable = _extract_voc_phrases(_vi_texts, _vi_sc)
 
-                        # 건의/요청 추출 (기존 구절 패턴 활용)
-                        _, _, _notable = _extract_voc_phrases(_vi_texts, _vi_sc)
+                        _n_neg = sum(1 for s in _vi_sc if float(s) < 80)
+                        _n_pos = sum(1 for s in _vi_sc if float(s) >= 90)
 
-                        # 긍정/부정 텍스트 분리 → 키프레이즈 추출
-                        _neg_texts = [t for t, s in _vi_voc_valid if float(s) < 80]
-                        _pos_texts = [t for t, s in _vi_voc_valid if float(s) >= 90]
-                        _n_neg = len(_neg_texts)
-                        _n_pos = len(_pos_texts)
-
-                        _neg_kp = _extract_voc_keyphrases(_neg_texts)
-                        _pos_kp = _extract_voc_keyphrases(_pos_texts)
-                        _neg_freq = Counter(_neg_kp)
-                        _pos_freq = Counter(_pos_kp)
-
-                        if _neg_freq or _pos_freq or _notable:
+                        if _neg_res or _pos_res or _notable:
                             st.markdown("---")
                             st.markdown(
                                 '<div style="background:linear-gradient(90deg,#1a237e,#283593);'
@@ -4587,50 +4577,47 @@ with tab_sol:
 
                             _vi_col_l, _vi_col_r = st.columns([1, 1])
 
-                            # 좌측: 부정 키워드 (더 중요)
+                            # 좌측: 강점 (긍정)
                             with _vi_col_l:
-                                st.markdown("**😟 부정 키워드** <span style='font-size:0.8em;color:#888;'>(80점 미만)</span>",
+                                st.markdown("**😊 강점**", unsafe_allow_html=True)
+                                if _pos_res:
+                                    for _label, _cnt, _samples in _pos_res:
+                                        st.markdown(
+                                            f'<div style="margin:8px 0 4px;">'
+                                            f'<span style="font-size:0.92em;font-weight:600;">{_label}</span>'
+                                            f'<span style="float:right;font-size:0.85em;color:#2e7d32;">'
+                                            f'{_cnt}건</span></div>',
                                             unsafe_allow_html=True)
-                                if _neg_freq and WORDCLOUD_AVAILABLE and FONT_PATH:
-                                    _fig_neg = _generate_voc_wordcloud(
-                                        dict(_neg_freq.most_common(40)), "neg")
-                                    if _fig_neg:
-                                        st.pyplot(_fig_neg)
-                                        plt.close(_fig_neg)
-                                elif _neg_freq:
-                                    # wordcloud 미설치 시 텍스트 fallback
-                                    _top_neg = _neg_freq.most_common(15)
-                                    _tags = " ".join(
-                                        f'<span style="font-size:{max(0.75, min(1.4, 0.7+c*0.08))}em;'
-                                        f'margin:3px 5px;display:inline-block;background:#ffebee;'
-                                        f'padding:2px 8px;border-radius:12px;color:#c62828;">'
-                                        f'{w} ({c})</span>' for w, c in _top_neg)
-                                    st.markdown(f'<div style="line-height:2.2;">{_tags}</div>',
+                                        for _smp in _samples:
+                                            _smp_short = _smp[:60] + ('…' if len(_smp) > 60 else '')
+                                            st.markdown(
+                                                f'<div style="margin-left:12px;font-size:0.8em;color:#555;'
+                                                f'border-left:2px solid #a5d6a7;padding-left:8px;margin-bottom:3px;">'
+                                                f'"{_smp_short}"</div>',
                                                 unsafe_allow_html=True)
                                 else:
-                                    st.caption("부정 VOC가 없습니다.")
+                                    st.caption("긍정 구절이 감지되지 않았습니다.")
 
-                            # 우측: 긍정 키워드
+                            # 우측: 약점 (부정)
                             with _vi_col_r:
-                                st.markdown("**😊 긍정 키워드** <span style='font-size:0.8em;color:#888;'>(90점 이상)</span>",
+                                st.markdown("**😟 약점**", unsafe_allow_html=True)
+                                if _neg_res:
+                                    for _label, _cnt, _samples in _neg_res:
+                                        st.markdown(
+                                            f'<div style="margin:8px 0 4px;">'
+                                            f'<span style="font-size:0.92em;font-weight:600;">{_label}</span>'
+                                            f'<span style="float:right;font-size:0.85em;color:#c62828;">'
+                                            f'{_cnt}건</span></div>',
                                             unsafe_allow_html=True)
-                                if _pos_freq and WORDCLOUD_AVAILABLE and FONT_PATH:
-                                    _fig_pos = _generate_voc_wordcloud(
-                                        dict(_pos_freq.most_common(40)), "pos")
-                                    if _fig_pos:
-                                        st.pyplot(_fig_pos)
-                                        plt.close(_fig_pos)
-                                elif _pos_freq:
-                                    _top_pos = _pos_freq.most_common(15)
-                                    _tags = " ".join(
-                                        f'<span style="font-size:{max(0.75, min(1.4, 0.7+c*0.08))}em;'
-                                        f'margin:3px 5px;display:inline-block;background:#e8f5e9;'
-                                        f'padding:2px 8px;border-radius:12px;color:#2e7d32;">'
-                                        f'{w} ({c})</span>' for w, c in _top_pos)
-                                    st.markdown(f'<div style="line-height:2.2;">{_tags}</div>',
+                                        for _smp in _samples:
+                                            _smp_short = _smp[:60] + ('…' if len(_smp) > 60 else '')
+                                            st.markdown(
+                                                f'<div style="margin-left:12px;font-size:0.8em;color:#555;'
+                                                f'border-left:2px solid #ef9a9a;padding-left:8px;margin-bottom:3px;">'
+                                                f'"{_smp_short}"</div>',
                                                 unsafe_allow_html=True)
                                 else:
-                                    st.caption("긍정 VOC가 없습니다.")
+                                    st.caption("부정 구절이 감지되지 않았습니다.")
 
                             # 주목할 고객 의견 (건의/요청)
                             if _notable:
