@@ -4586,10 +4586,20 @@ with tab_sol:
 
 
                 # ── 실질적 리스크 카드 (계약종별×업무) ──────────
+                if _real_top3 or _drop_top3:
+                    st.markdown("---")
+                    st.markdown(
+                        '<div style="background:linear-gradient(135deg,#b71c1c,#c62828);'
+                        'border-radius:10px;padding:14px 20px;color:white;margin:8px 0 12px;">'
+                        f'<span style="font-size:1.1em;font-weight:800;">'
+                        f'🚨 리스크 진단 — {_sel_off}</span>'
+                        '<span style="font-size:0.82em;opacity:.8;margin-left:10px;">'
+                        '업무×계약종별 조합별 우선 개선 대상'
+                        '</span></div>', unsafe_allow_html=True)
                 if _real_top3:
                     st.markdown("##### 🚨 실질적 리스크 TOP 3 — 건수 多 & 평균 이하 (우선 개선)")
                     st.caption("카드를 클릭하면 상세 분석이 열립니다.")
-                    _rt_cols = st.columns(len(_real_top3))
+                    _rt_cols = st.columns(3)
                     for _ri, _rk in enumerate(_real_top3):
                         _rk_key = f"sol_real_{_ri}"
                         _cur_sel = st.session_state.get("sol_cell_sel")
@@ -4623,7 +4633,7 @@ with tab_sol:
                 if _drop_top3:
                     st.markdown("##### ⚡ 급락 리스크 TOP 3 — 건수 少 & 점수 급락 (모니터링)")
                     st.caption("소수 응답이지만 점수가 급락한 조합입니다. 민원 전조 신호일 수 있으니 **추이를 주시**하세요.")
-                    _dt_cols = st.columns(len(_drop_top3))
+                    _dt_cols = st.columns(3)
                     for _di, _dk in enumerate(_drop_top3):
                         _dk_key = f"sol_drop_{_di}"
                         _cur_sel = st.session_state.get("sol_cell_sel")
@@ -4659,14 +4669,7 @@ with tab_sol:
                 # ══════════════════════════════════════════
                 # 상세 분석 — 선택된 카드의 범인 특정 + VOC
                 # ══════════════════════════════════════════
-                # 기본값: 화면에 보이는 리스크 카드 1위 자동 선택
-                # session_state에 이전 값이 있어도, 현재 지사에 데이터 없으면 리셋
-                _first_card = None
-                if _real_top3:
-                    _first_card = {"계약종별": _real_top3[0]["계약종별"], "업무": _real_top3[0]["업무"]}
-                elif _drop_top3:
-                    _first_card = {"계약종별": _drop_top3[0]["계약종별"], "업무": _drop_top3[0]["업무"]}
-
+                # 카드 클릭 전까지 숨김 — 명시적 선택 시에만 표시
                 _cell = st.session_state.get("sol_cell_sel")
                 if _cell is not None and _cell.get("계약종별"):
                     # 이전 선택값이 현재 지사에 데이터가 있는지 확인
@@ -4675,9 +4678,7 @@ with tab_sol:
                         (_df_sel[M["business"]] == _cell["업무"])
                     ]
                     if len(_chk) == 0:
-                        _cell = _first_card  # 데이터 없으면 카드 1위로 리셋
-                if _cell is None:
-                    _cell = _first_card
+                        _cell = None  # 데이터 없으면 숨김
                 if _cell and _cell.get("계약종별"):
                     _sel_ct = _cell["계약종별"]
                     _sel_biz = _cell["업무"]
