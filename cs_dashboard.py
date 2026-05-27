@@ -4852,6 +4852,7 @@ with tab_sol:
                     _office_kb = _get_office_kb(_sel_off)
                     _kb_ctx = _office_kb["context"] if _office_kb else "지역 특성 정보 없음"
                     _kb_act = _office_kb["action"] if _office_kb else ""
+                    _office_annual = _get_office_annual(_sel_off)
 
                     # 리스크 요약 텍스트 생성
                     _rx_lines = ""
@@ -4910,6 +4911,7 @@ with tab_sol:
                                 f"- 지사: {_sel_off}\n"
                                 f"- 지역 특성: {_kb_ctx}\n"
                                 f"- 종합 평균: {_sel_avg:.1f}점 (본부 평균 {avg_score_100:.1f}점)\n"
+                                f"{('- 참고 배경(추세 판단용, 반드시 언급할 필요 없음): ' + _office_annual + chr(10)) if _office_annual else ''}"
                                 f"{('- 2025 VOC 배경: ' + _voc_conditional + chr(10)) if _voc_conditional else ''}\n"
                                 f"# 리스크 요약 (참고용 — 제목에 그대로 쓰지 말 것)\n{_rx_lines}\n"
                                 f"# 고객 불만 VOC 원문 (핵심 데이터 — 반드시 패턴 분석할 것)\n"
