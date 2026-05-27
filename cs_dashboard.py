@@ -2931,12 +2931,12 @@ with tab1:
                                color_discrete_map={"⬆ 본부평균 이상": C["teal"], "⬇ 본부평균 미달": C["red"]},
                                orientation="h", text="_표시", template=PLOTLY_TPL,
                                title=f"사업소별 평균 만족도 — 본부 평균: {_bar_avg:.1f}점")
-            fig_bench.update_traces(texttemplate="%{text}", textposition="outside",
+            fig_bench.update_traces(texttemplate="%{text}", textposition="outside", cliponaxis=False,
                                     hovertemplate="%{y}<br>평균: %{x:.1f}점<br>본부 대비: %{customdata[0]:+.1f}점<extra></extra>",
                                     customdata=_ofc_grp_bar[["_차이"]].values)
-            fig_bench.add_vline(x=_bar_avg, line_color=C["navy"], line_dash="dash", line_width=2.5,
+            fig_bench.add_vline(x=_bar_avg, line_color="#aaa", line_dash="dash", line_width=1.2,
                                 annotation_text=f"▼ 본부 평균 {_bar_avg:.1f}",
-                                annotation_font_size=12, annotation_font_color=C["navy"],
+                                annotation_font_size=11, annotation_font_color="#888",
                                 annotation_position="top", annotation_yshift=10)
             fig_bench.update_layout(height=max(350, len(_ofc_grp_bar) * 35 + 80),
                                      margin=dict(t=80, b=20, l=10, r=200), legend_title_text="",
@@ -3009,15 +3009,15 @@ def _render_category_section(df, cat_col, cat_label, office_col, score_col, over
                  color_discrete_map={"하위 3": C["red"], "일반": C["sky"]},
                  orientation="h", text="평균만족도", template=PLOTLY_TPL,
                  title=f"{cat_label}별 평균 만족도 (빨간색 = 하위 3개)")
-    fig.update_traces(texttemplate="%{text:.1f}", textposition="outside",
+    fig.update_traces(texttemplate="%{text:.1f}", textposition="outside", cliponaxis=False,
                       hovertemplate="%{y}<br>평균: %{x:.1f}점<br>응답: %{customdata[0]:,}건<extra></extra>",
                       customdata=grp[["응답수"]].values)
-    fig.add_vline(x=overall_avg, line_color=C["navy"], line_dash="dash", line_width=2,
+    fig.add_vline(x=overall_avg, line_color="#aaa", line_dash="dash", line_width=1.2,
                   annotation_text=f"▼ 전체 평균 {overall_avg:.1f}",
-                  annotation_font_size=11, annotation_font_color=C["navy"],
+                  annotation_font_size=11, annotation_font_color="#888",
                   annotation_position="top", annotation_yshift=10)
     fig.update_layout(height=max(300, len(grp) * 30 + 80),
-                       margin=dict(t=80, b=20, l=10, r=100), legend_title_text="",
+                       margin=dict(t=80, b=20, l=10, r=160), legend_title_text="",
                        title_font=dict(size=14, color=C["navy"]))
     st.plotly_chart(fig, use_container_width=True, config={'staticPlot': True})
 
@@ -3687,12 +3687,12 @@ with tab3:
                 ))
 
             # 사분면 기준선
-            fig_bbl.add_hline(y=_q_y_avg, line_color=C["navy"], line_dash="dot", line_width=1,
+            fig_bbl.add_hline(y=_q_y_avg, line_color="#aaa", line_dash="dot", line_width=1,
                               annotation_text=f"만족도 평균 {_q_y_avg:.1f}", annotation_font_size=10,
-                              annotation_position="top left")
-            fig_bbl.add_vline(x=_q_x_avg, line_color=C["navy"], line_dash="dot", line_width=1,
+                              annotation_font_color="#888", annotation_position="top left")
+            fig_bbl.add_vline(x=_q_x_avg, line_color="#aaa", line_dash="dot", line_width=1,
                               annotation_text=f"건수 평균 {_q_x_avg:.0f}", annotation_font_size=10,
-                              annotation_position="top right")
+                              annotation_font_color="#888", annotation_position="top right")
 
             # 사분면 영역 라벨
             _x_min, _x_max = _bbl_grp["처리건수"].min(), _bbl_grp["처리건수"].max()
@@ -4675,7 +4675,7 @@ with tab_sol:
                             if st.button(
                                     "▲ 닫기" if _is_sel else "🔍 상세 원인 분석",
                                     key=_rk_key, use_container_width=True,
-                                    type="secondary" if _is_sel else "primary"):
+                                    type="secondary"):
                                 st.session_state["sol_cell_sel"] = (
                                     None if _is_sel else {"계약종별": _rk["계약종별"], "업무": _rk["업무"]})
                                 st.rerun()
@@ -4709,7 +4709,7 @@ with tab_sol:
                             if st.button(
                                     "▲ 닫기" if _is_sel else "🔍 상세 원인 분석",
                                     key=_dk_key, use_container_width=True,
-                                    type="secondary" if _is_sel else "primary"):
+                                    type="secondary"):
                                 st.session_state["sol_cell_sel"] = (
                                     None if _is_sel else {"계약종별": _dk["계약종별"], "업무": _dk["업무"]})
                                 st.rerun()
@@ -4845,6 +4845,67 @@ with tab_sol:
 
                         else:
                             st.info("세부항목 점수 데이터가 없습니다.")
+
+                # ── VOC 키워드 분석 (지사별, 자동 실행) ──────────────
+                if M.get("voc") and GEMINI_AVAILABLE:
+                    _voc_kw_key = f"_voc_kw_{_sel_off}"
+                    if not st.session_state.get(_voc_kw_key):
+                        _voc_df = _df_sel[M["voc"]].dropna().astype(str)
+                        _voc_list = [v.strip() for v in _voc_df.tolist()
+                                     if v.strip() not in ("", "nan", "응답없음", "없음", "의견없음", "빈문서", "빈항목") and len(v.strip()) > 2]
+                        if _voc_list:
+                            _voc_sample = _voc_list[:40]
+                            try:
+                                import urllib.request
+                                _kw_prompt = (
+                                    f"아래는 {_sel_off}의 고객 VOC {len(_voc_sample)}건입니다.\n\n"
+                                    "아래 형식으로만 출력하세요. 다른 말 금지.\n\n"
+                                    "부정: (불만 키워드 3개, 쉼표 구분)\n"
+                                    "특이: (이 지사 고유 이슈 1개. 없으면 '없음')\n\n"
+                                    "규칙:\n"
+                                    "- 키워드는 구체적 명사형 2~5자 (예: 처리지연, 전화불통, 하청태도)\n"
+                                    "- '불만', '불편', '개선필요' 같은 포괄적 단어 금지\n"
+                                    "- 설명·인사·미사여구 금지. 형식만 출력.\n\n"
+                                    "VOC:\n"
+                                )
+                                for _v in _voc_sample:
+                                    _kw_prompt += f"- {_v}\n"
+
+                                _models = ["gemini-2.5-flash", "gemini-2.5-flash-lite"]
+                                _ctx = ssl._create_unverified_context()
+                                for _model in _models:
+                                    _api_url = f"https://generativelanguage.googleapis.com/v1beta/models/{_model}:generateContent?key={_GEMINI_KEY}"
+                                    _payload = {"contents": [{"parts": [{"text": _kw_prompt}]}],
+                                                 "generationConfig": {"temperature": 0.2, "maxOutputTokens": 512}}
+                                    _req = urllib.request.Request(_api_url, data=json.dumps(_payload).encode("utf-8"),
+                                                                   headers={"Content-Type": "application/json"}, method="POST")
+                                    try:
+                                        with urllib.request.urlopen(_req, context=_ctx, timeout=15) as _resp:
+                                            _rbody = json.loads(_resp.read().decode("utf-8"))
+                                            _kw_text = _rbody["candidates"][0]["content"]["parts"][0]["text"].strip()
+                                            import re as _re_kw2
+                                            _neg_m = _re_kw2.search(r'부정[:：]\s*(.+)', _kw_text)
+                                            _spec_m = _re_kw2.search(r'특이[:：]\s*(.+)', _kw_text)
+                                            st.session_state[_voc_kw_key] = {
+                                                "부정": _neg_m.group(1).strip() if _neg_m else "",
+                                                "특이": _spec_m.group(1).strip() if _spec_m else "없음"
+                                            }
+                                            break
+                                    except Exception:
+                                        continue
+                            except Exception:
+                                pass
+
+                    _kw_data = st.session_state.get(_voc_kw_key)
+                    if _kw_data and isinstance(_kw_data, dict) and _kw_data.get("부정"):
+                        st.markdown("---")
+                        st.markdown(
+                            f'<div style="background:#f5f5f5;border-left:4px solid #1976d2;'
+                            f'border-radius:6px;padding:12px 16px;margin:8px 0;">'
+                            f'<span style="font-weight:700;color:#1976d2;">🔬 VOC 키워드</span>'
+                            f'<span style="margin-left:16px;">부정: <b>{_kw_data["부정"]}</b></span>'
+                            f'<span style="margin-left:16px;color:#666;">특이: {_kw_data["특이"]}</span>'
+                            f'</div>', unsafe_allow_html=True)
 
                 # ── AI 종합 처방전 (실질+급락 전체) ──────────────
                 if _real_top3 or _drop_top3:
