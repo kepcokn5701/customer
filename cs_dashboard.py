@@ -2939,7 +2939,7 @@ with tab1:
                                 annotation_font_size=12, annotation_font_color=C["navy"],
                                 annotation_position="top", annotation_yshift=10)
             fig_bench.update_layout(height=max(350, len(_ofc_grp_bar) * 35 + 80),
-                                     margin=dict(t=80, b=20, l=10, r=160), legend_title_text="",
+                                     margin=dict(t=80, b=20, l=10, r=200), legend_title_text="",
                                      title_font=dict(size=14, color=C["navy"]))
             st.plotly_chart(fig_bench, use_container_width=True, config={'staticPlot': True})
 
@@ -3548,12 +3548,14 @@ with tab3:
 
                 _stats = _biz_ofc_stats.get(biz)
                 if _stats and _stats["bottom3"]:
-                    _bot_str = " / ".join([f"{n}({v}점, N={c})" for n, v, c in _stats["bottom3"]])
+                    _bot3 = _stats["bottom3"][:3]
                     _h += f"<b>[관리 포인트]</b><br>"
-                    _h += f"하위 지사: {_bot_str}<br>"
+                    for _bn, _bv, _bc in _bot3:
+                        _h += f"  · {_bn} ({_bv}점, N={_bc})<br>"
                     if _stats.get("unreliable"):
-                        _ur_str = ", ".join([f"{n}({v}점, N={c}) ⚠신뢰도 낮음" for n, v, c in _stats["unreliable"]])
-                        _h += f"모수 부족: {_ur_str}<br>"
+                        _ur3 = _stats["unreliable"][:2]
+                        for _un, _uv, _uc in _ur3:
+                            _h += f"  · {_un} ({_uv}점, N={_uc}) ⚠모수부족<br>"
                     _h += "<br>"
 
                 if _stats and _stats.get("top1"):
@@ -3703,7 +3705,7 @@ with tab3:
             ]
             for _qx, _qy, _qt, _qc in _qlabels:
                 fig_bbl.add_annotation(x=_qx, y=_qy, text=_qt, showarrow=False,
-                                       font=dict(color=_qc, size=12, weight="bold"), xanchor="center")
+                                       font=dict(color=_qc, size=17, weight="bold"), xanchor="center")
 
             # 라벨 annotations 추가
             for _ann in _bbl_annotations:
@@ -3714,8 +3716,11 @@ with tab3:
             fig_bbl.update_layout(
                 height=640, margin=dict(t=60, b=60, l=60, r=60),
                 xaxis_title="처리 건수", yaxis_title="평균 만족도 (100점 환산)",
+                xaxis=dict(fixedrange=True),
                 yaxis=dict(range=[_bbl_grp["평균만족도"].min() - _y_pad - 2,
-                                  _bbl_grp["평균만족도"].max() + _y_pad + 2]),
+                                  _bbl_grp["평균만족도"].max() + _y_pad + 2],
+                           fixedrange=True),
+                dragmode=False,
                 legend=dict(orientation="h", yanchor="bottom", y=-0.15, xanchor="center", x=0.5, font=dict(size=14)),
                 template=PLOTLY_TPL)
             st.plotly_chart(fig_bbl, use_container_width=True)
@@ -3744,7 +3749,7 @@ with tab3:
 
             # ── AI 사분면 분석 버튼 ──
             _q_ss_key = "_ai_quadrant_result"
-            if st.button("🤖 AI 업무유형 처방전", key="ai_quadrant_btn", type="primary", use_container_width=True):
+            if st.button("🤖 AI 업무유형 분석", key="ai_quadrant_btn", type="primary", use_container_width=True):
                 if not GEMINI_AVAILABLE:
                     st.error("Gemini API 키가 설정되지 않았습니다. `.env` 파일에 `GEMINI_API_KEY`를 설정해주세요.")
                 else:
@@ -3772,64 +3777,68 @@ with tab3:
                                 for v in _vocs:
                                     _ai_q_voc.append(f"  - {v}")
 
-                    _ai_q_prompt = f"""당신은 한국전력 경남본부 현장 업무 프로세스 최적화 전문가입니다.
-직원의 화법이 아닌, '업무 처리 방식'을 살짝 바꿔 고객이 변화를 체감할 수 있는 실무 솔루션을 제시합니다.
+                    # 지사별 비교 데이터 수집 (지사명 제외, 격차만)
+                    _ai_q_ofc = []
+                    for _, qr in _bbl_grp[_bbl_grp["사분면"].str.contains("최우선|개별")].iterrows():
+                        _biz = qr["업무유형"]
+                        _st = _biz_ofc_stats.get(_biz)
+                        if _st and _st.get("top1") and _st["bottom3"]:
+                            _tv = _st["top1"][1]
+                            _bv = _st["bottom3"][0][1]
+                            _gap = round(_tv - _bv, 1)
+                            _ai_q_ofc.append(f"[{_biz}] 최고 {_tv}점 vs 최저 {_bv}점 (격차 {_gap}점, 지사 수 {len(_st['bottom3'])+1}개)")
+
+                    _ai_q_prompt = f"""당신은 한국전력 경남본부 고객 만족도 데이터 분석가입니다.
+사분면 데이터와 VOC 원문, 지사별 점수를 종합하여 현장 진단과 비교 분석을 제공합니다.
 
 [사분면 해석 기준: 건수(x축) × 만족도(y축)]
-- 4사분면 (건수↑ 점수↓): **병목 구간**. 처리량이 많은데 점수가 낮음 → 업무 방식 효율화 + 고객 안심 필수.
-- 3사분면 (건수↓ 점수↓): **사각지대**. 빈도가 낮아 대응이 미숙 → 기본 절차 방어에 집중.
-
-[사업소에서 쓸 수 있는 6가지 솔루션 도구]
-아래 도구 안에서 조합하여 액션을 만드세요.
-1. **기대치 선제 안내** — 접수 시점에 "소요 기간, 필요 서류, 다음 단계"를 먼저 알려 사후 민원 차단
-2. **눈으로 보여주기** — 구두 설명 대신 고지서·계량기·도면의 해당 부분을 짚어 가며 확인시키기
-3. **진행 상황 중간 알림** — 장기 업무 시 "현재 단계 → 남은 단계"를 중간에 한 번 더 전달
-4. **비교 자료 비치** — 자주 묻는 항목(요금 계산, 요금제 비교 등)을 표·그래프로 만들어 창구에 상시 비치
-5. **완료 후 한 줄 마무리** — 처리 끝난 뒤 결과·원인·후속 조치를 고객에게 1줄로 전달 (전화·문자·대면)
-6. **접수 시 체크리스트 공유** — 필수 확인 항목을 고객 눈앞에서 함께 체크하여 누락·오해 방지
+- 4사분면 (건수↑ 점수↓): **병목 구간**. 처리량이 많은데 점수가 낮음.
+- 3사분면 (건수↓ 점수↓): **사각지대**. 빈도가 낮아 대응이 미숙.
 
 [이번 달 사분면 데이터]
 {_ai_q_data}
 [3·4사분면 업무의 불만족 VOC 원문]
 {chr(10).join(_ai_q_voc) if _ai_q_voc else '- 해당 없음'}
+[3·4사분면 업무의 지사별 점수 비교]
+{chr(10).join(_ai_q_ofc) if _ai_q_ofc else '- 해당 없음'}
 
 # 출력 형식 (반드시 아래 3개 블록만 순서대로 출력)
 
 #### 📋 현장 진단
 - 3·4사분면 업무를 한 업무당 반드시 별도 bullet(-)로 나열
-- 형식: - **업무명** [사분면] — VOC에서 드러난 프로세스 공백 또는 행동 오류 (점수, 건수)
+- 형식: - **업무명** [사분면] — VOC에서 드러난 핵심 문제 키워드 (점수, 건수)
 - 예시:
-- **신규증설** [4사분면] — 접수 후 진행 안내 없이 방치, 고객이 재문의 반복 (91.3점, 79건)
-- **휴지부활** [3사분면] — 복구 절차 미숙지로 안내 누락 (79.3점, 3건)
+- **신규증설** [4사분면] — 접수 후 진행 안내 부재, 고객 재문의 반복 (91.3점, 79건)
+- **휴지부활** [3사분면] — 복구 절차 안내 누락 (79.3점, 3건)
 
-#### 🎯 업무 처방 (4사분면 우선, 최대 3개 업무)
-- 업무당 1개 액션, 위 6가지 도구 중 해당하는 것을 활용
-- 형식: - **[업무명]** (기존 문제) → (변경 액션) + 사용 도구명
-- 예시:
-- **[신규증설]** 접수 후 무응답 방치 → 접수 시 "설치까지 약 X일, 중간에 1회 진행 알림" 선제 안내 [기대치 선제 안내 + 진행 상황 중간 알림]
-- **[기타]** 요금 산출 근거 구두 설명만 → 고지서 항목별 비교표를 짚어 가며 확인 [눈으로 보여주기 + 비교 자료 비치]
+#### 🔍 비교 분석 (3·4사분면 업무 대상)
+- 업무당 sub-bullet 구성. 한 분석 포인트는 반드시 별도 줄로 분리.
+- 지사명은 절대 언급 금지. 격차 수치와 원인만 분석.
+- 아래 2가지 관점으로 작성:
+  1. **지사 간 격차**: 같은 업무 내 최고-최저 점수 차이 + VOC에서 추정되는 격차 원인
+  2. **업무 간 공통 패턴**: 서로 다른 업무에서 반복되는 동일한 불만 유형 (1가지만)
+- 형식 (업무별로 나누고, 분석 포인트마다 줄바꿈):
+- **[신규증설]**
+  - 격차: 최고 96점 vs 최저 73점 (23점 차이)
+  - 원인: VOC에서 "진행 안내 부재" 불만이 저점수 지사에 집중
+- **[공통 패턴]**
+  - 신규증설·검침 모두 "완료 후 결과 미안내"가 불만 키워드로 반복
 
 #### ✅ 유지 (1사분면이 있을 경우만)
-- 높은 만족도가 유지되는 핵심 루틴을 한 줄로 정의
+- 높은 만족도가 유지되는 핵심 포인트를 한 줄로 정리
 - 형식: - **업무명** — 유지 포인트 한 줄
-
-[사업소 권한 밖 — 제안 제외]
-- 123 고객센터 전화 연결 지연 (본사 관할)
-- 전기요금 단가·정책·제도 변경 (본사 권한)
-- TF 구성, 전담 창구, 핫라인 신설 (비현실적)
-- 새 시스템·프로세스 도입 (사업소 권한 밖)
-- 문자 발송·해피콜·만족도 조사 (이미 자동화 시행 중)
 
 [필수 규칙]
 - 개조식 bullet만. 줄글·산문체 금지.
 - 업무당 별도 줄. 한 줄에 여러 업무 합치지 말 것.
-- "친절하게", "자세히", "명확히" 같은 추상적 형용사/부사 금지. 동작 중심 동사 사용.
+- 수치(점수, 건수, 격차)를 반드시 근거로 포함할 것.
+- "친절하게", "자세히", "명확히" 같은 추상적 형용사/부사 금지.
 - 백틱(`)·코드 블록 금지. 강조는 **굵은 글씨**만.
 - '전기세' → '전기요금'.
 - 미사여구·AI 추임새·인사말 금지. 바로 본론.
 - 데이터에 없는 사실 창작 금지."""
 
-                    with st.spinner("AI가 업무유형별 처방전 생성 중…"):
+                    with st.spinner("AI가 업무유형별 분석 생성 중…"):
                         try:
                             import urllib.request
                             _models = ["gemini-2.5-flash", "gemini-2.5-pro", "gemini-2.5-flash-lite", "gemma-3-12b-it"]
