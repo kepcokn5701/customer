@@ -786,14 +786,18 @@ function renderTab1(){
   if(G.M.office){
     html+=`<div class="sec"><div class="sec-title">🏢 지사별 만족도 비교</div>
       <div style="margin-bottom:10px"><button id="btnDlOfc" class="btn btn-primary btn-sm">📥 지사별 만족도 엑셀 다운로드</button></div>
-      <div class="cbox cbox-full"><div style="position:relative;height:240px;"><canvas id="cOffice"></canvas></div></div>
+      <div class="cbox cbox-full"><div style="position:relative;height:280px;"><canvas id="cOffice"></canvas></div></div>
     </div>`;
   }
 
   // Contract + Biz row
   html+=`<div class="row2">`;
-  if(G.M.contract) html+=`<div class="cbox"><h3>계약종별 분포</h3><div style="position:relative;height:280px;"><canvas id="cContract"></canvas></div></div>`;
-  if(G.M.business) html+=`<div class="cbox"><h3>업무유형별 분포</h3><div style="position:relative;height:280px;"><canvas id="cBiz"></canvas></div></div>`;
+  if(G.M.contract) html+=`<div class="cbox"><h3>계약종별 분포</h3><div style="position:relative;height:280px;margin-top:60px;"><canvas id="cContract"></canvas></div></div>`;
+  if(G.M.business){
+    const bizCnt=new Set(G.data.filter(d=>d._score!=null&&d._business).map(d=>d._business)).size;
+    const bizH=Math.max(280, bizCnt*36+60);
+    html+=`<div class="cbox"><h3>업무유형별 분포</h3><div style="position:relative;height:${bizH}px;"><canvas id="cBiz"></canvas></div></div>`;
+  }
   html+=`</div>`;
 
   el.innerHTML=html;
@@ -878,7 +882,7 @@ function drawDistChart(scored){
     type:'doughnut',
     data:{labels,datasets:[{data:Object.values(bk),backgroundColor:['#1a3a6c','#00897B','#f59e0b','#e65100'],borderWidth:3,borderColor:'#fff',hoverOffset:6}]},
     options:{responsive:true,maintainAspectRatio:false,cutout:'55%',plugins:{
-      legend:{position:'right',labels:{font:{size:13},padding:8}},
+      legend:{position:'right',labels:{font:{size:14},padding:10}},
       tooltip:{callbacks:{title:()=>'',label:function(ctx){
         const k=Object.keys(bk)[ctx.dataIndex];
         const cnt=Object.values(bk)[ctx.dataIndex];
@@ -896,9 +900,9 @@ function drawDistChart(scored){
         const centerY=(chart.chartArea.top+chart.chartArea.bottom)/2;
         ctx.save();
         ctx.textAlign='center'; ctx.textBaseline='middle';
-        ctx.font='bold 24px sans-serif'; ctx.fillStyle='#1a237e';
+        ctx.font='bold 24px "Malgun Gothic",sans-serif'; ctx.fillStyle='#1a237e';
         ctx.fillText(totalSc.toLocaleString()+'건', centerX, centerY-8);
-        ctx.font='15px sans-serif'; ctx.fillStyle='#555';
+        ctx.font='15px "Malgun Gothic",sans-serif'; ctx.fillStyle='#555';
         ctx.fillText('응답자', centerX, centerY+12);
         ctx.restore();
       }
@@ -942,9 +946,24 @@ function drawOfficeSection(scored,allData){
       {label:'본부 평균',data:ofcs.map(()=>ta),type:'line',borderColor:'#00897B',borderWidth:2,borderDash:[6,3],pointRadius:0,fill:false}
     ]},
     options:{responsive:true,maintainAspectRatio:false,
-      scales:{x:{ticks:{font:{size:12}}},y:{min:Math.max(0,Math.min(...avgs)-10),max:100,ticks:{font:{size:12}}}},
-      plugins:{legend:{position:'top',labels:{font:{size:13}}},tooltip:{callbacks:{label:c=>c.dataset.label+': '+c.parsed.y.toFixed(1)+'점'}}}
-    }
+      layout:{padding:{top:20}},
+      scales:{x:{ticks:{font:{size:14},maxRotation:45,minRotation:0}},y:{min:Math.max(0,Math.min(...avgs)-10),max:100,ticks:{font:{size:13}}}},
+      plugins:{legend:{position:'top',labels:{font:{size:14}}},tooltip:{callbacks:{label:c=>c.dataset.label+': '+c.parsed.y.toFixed(1)+'점'}}}
+    },
+    plugins:[{
+      id:'ofcBarLabels',
+      afterDatasetsDraw(chart){
+        const meta=chart.getDatasetMeta(0);
+        const ctx=chart.ctx;
+        ctx.font='bold 12px "Malgun Gothic",sans-serif';
+        ctx.fillStyle='#333';
+        ctx.textAlign='center';
+        ctx.textBaseline='bottom';
+        meta.data.forEach((bar,i)=>{
+          ctx.fillText(avgs[i].toFixed(1), bar.x, bar.y-4);
+        });
+      }
+    }]
   });
 }
 
@@ -962,7 +981,7 @@ function drawContractDonut(){
     type:'doughnut',
     data:{labels:lblWithPct,datasets:[{data:lbSorted.map(l=>gr[l]),backgroundColor:ctColors.slice(0,lbSorted.length),borderWidth:2,borderColor:'#fff'}]},
     options:{responsive:true,maintainAspectRatio:false,cutout:'55%',
-      plugins:{legend:{position:'right',labels:{font:{size:13},padding:8}},
+      plugins:{legend:{position:'right',labels:{font:{size:14},padding:10}},
         tooltip:{callbacks:{title:()=>'',label:function(ctx){
           const name=lbSorted[ctx.dataIndex];
           const cnt=gr[name];
@@ -983,22 +1002,22 @@ function drawBizBar(){
   destroyChart('cBiz');
   G.chartInstances['cBiz']=new Chart(document.getElementById('cBiz'),{
     type:'bar',
-    data:{labels:lb,datasets:[{data:pcts,backgroundColor:'#00897B',borderRadius:3,barPercentage:0.7,categoryPercentage:0.85}]},
+    data:{labels:lb,datasets:[{data:pcts,backgroundColor:'#00897B',borderRadius:4,barPercentage:0.75,categoryPercentage:0.8}]},
     options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,
-      layout:{padding:{right:80}},
+      layout:{padding:{right:100}},
       plugins:{legend:{display:false},tooltip:{callbacks:{title:()=>'',label:function(ctx){
         const name=lb[ctx.dataIndex];
         const cnt=counts[ctx.dataIndex];
         const pct=pcts[ctx.dataIndex].toFixed(1);
         return `${name}  ${cnt.toLocaleString()}건  ${pct}%`;
       }}}},
-      scales:{x:{beginAtZero:true,title:{display:true,text:'비율(%)',font:{size:12}},ticks:{callback:v=>v+'%',font:{size:11}}},y:{ticks:{font:{size:13},autoSkip:false}}}
+      scales:{x:{beginAtZero:true,title:{display:true,text:'비율(%)',font:{size:13}},ticks:{callback:v=>v+'%',font:{size:12}}},y:{ticks:{font:{size:14},autoSkip:false}}}
     },
     plugins:[{
       id:'barLabels',
       afterDatasetsDraw(chart){
         const ctx=chart.ctx;
-        ctx.font='12px "Malgun Gothic",sans-serif';
+        ctx.font='13px "Malgun Gothic",sans-serif';
         ctx.fillStyle='#333';
         ctx.textAlign='left';
         ctx.textBaseline='middle';
@@ -1456,7 +1475,7 @@ function renderSolOffice(){
 
   // VOC Insight
   if(G.M.voc){
-    html+=`<div id="solVocInsight"></div>`;
+    html+=`<div id="solVocInsight" style="margin-top:32px;"></div>`;
   }
 
   el.innerHTML=html;
@@ -2018,7 +2037,7 @@ function renderWeeklyContent(){
     html+=`<tr style="background:${hdr};font-weight:bold;"><th>구분</th>${bizTypes.map(b=>`<th>${b}</th>`).join('')}</tr>`;
 
     // Row: responded count
-    html+=`<tr><td style="background:#fff;font-weight:bold;">응답건수(금주)</td>`;
+    html+=`<tr><td style="background:#fff;font-weight:bold;">응답건수</td>`;
     bizTypes.forEach(bt=>{
       const cnt=twResponded.filter(d=>d._business===bt).length;
       html+=`<td>${cnt.toLocaleString()}</td>`;
@@ -2026,7 +2045,7 @@ function renderWeeklyContent(){
     html+=`</tr>`;
 
     // Row: score
-    html+=`<tr><td style="background:#fff;font-weight:bold;">금주</td>`;
+    html+=`<tr><td style="background:#fff;font-weight:bold;">점수</td>`;
     bizTypes.forEach(bt=>{
       const scored=twResponded.filter(d=>d._business===bt);
       const avg=scored.length>0?scored.reduce((s,d)=>s+d._score,0)/scored.length:null;
@@ -2036,6 +2055,38 @@ function renderWeeklyContent(){
 
     html+=`</table><div style="text-align:right;font-size:.8em;margin-top:4px;color:#555;">(단위 : 건, 점)</div></div>`;
     html+=`<button class="btn btn-dl btn-sm" onclick="downloadExcel(document.querySelector('#weeklyTbl2 table').outerHTML,'업무유형별_조사결과.xls')">Excel 다운로드</button>`;
+
+    // 함안의령지사 분리 테이블
+    if(G.M.office&&G.M.business&&G.M.score){
+      const haUiData=twResponded.filter(d=>d._office&&d._office.includes('함안의령'));
+      if(haUiData.length>0){
+        let haCol=null;
+        for(const col of G.headers){
+          if(col===G.M.office||col===G.M.business||col===G.M.score) continue;
+          const vals=new Set(haUiData.map(d=>String(d[col]||'').trim()).filter(Boolean));
+          if(vals.has('함안')&&vals.has('의령')){haCol=col;break;}
+        }
+        if(haCol){
+          html+=`<p style="font-weight:700;margin:16px 0 6px;">📍 함안의령지사 상세</p>`;
+          html+=`<div class="tbl-wrap"><table class="tbl">`;
+          html+=`<tr style="background:#1a3a6c;font-weight:bold;"><th>구분</th>`;
+          bizTypes.forEach(bt=>{html+=`<th>${bt}</th>`;});
+          html+=`<th>평균</th></tr>`;
+          ['함안','의령'].forEach(region=>{
+            const rgData=haUiData.filter(d=>String(d[haCol]||'').trim()===region);
+            const rgAvg=rgData.length>0?rgData.reduce((s,d)=>s+d._score,0)/rgData.length:null;
+            html+=`<tr><td style="background:#fff;font-weight:bold;">${region}<br><span style="font-size:.8em;color:#888;">${rgAvg!=null?'('+rgAvg.toFixed(1)+')':''}</span></td>`;
+            bizTypes.forEach(bt=>{
+              const btData=rgData.filter(d=>d._business===bt);
+              const btAvg=btData.length>0?btData.reduce((s,d)=>s+d._score,0)/btData.length:null;
+              html+=`<td>${btAvg!=null?btAvg.toFixed(1):'-'}</td>`;
+            });
+            html+=`<td style="font-weight:bold;">${rgAvg!=null?rgAvg.toFixed(1):'-'}</td></tr>`;
+          });
+          html+=`</table></div>`;
+        }
+      }
+    }
   }
 
   html+=`<hr class="divider">`;
