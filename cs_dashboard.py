@@ -2918,20 +2918,27 @@ with tab1:
         with b_col:
             st.markdown('<p class="sec-head">📊 만족도 점수 구간별 비중</p>', unsafe_allow_html=True)
             bucket_cnt = df_f["_점수구간"].value_counts()
+            _SHORT_BUCKET = {"90점 이상": "≥90점", "70~90점": "70~89점",
+                             "50~70점": "50~69점", "50점 미만": "<50점"}
             bucket_data = pd.DataFrame({
                 "구간": BUCKET_ORDER,
                 "건수": [bucket_cnt.get(b, 0) for b in BUCKET_ORDER],
             })
             bucket_data["비율(%)"] = (bucket_data["건수"] / max(bucket_data["건수"].sum(), 1) * 100).round(1)
-            bucket_data["라벨"] = bucket_data.apply(lambda r: f"{r['구간']} ({int(r['건수']):,}건)", axis=1)
-            _bk_color_map = {f"{k} ({int(bucket_data.loc[bucket_data['구간']==k, '건수'].values[0]):,}건)": v
-                             for k, v in BUCKET_COLORS.items() if k in bucket_data["구간"].values}
+            bucket_data["라벨"] = bucket_data["구간"].map(_SHORT_BUCKET)
+            _bk_color_map = {_SHORT_BUCKET[k]: v for k, v in BUCKET_COLORS.items()
+                             if k in bucket_data["구간"].values}
             fig_bp = px.pie(bucket_data, names="라벨", values="건수", color="라벨",
                             color_discrete_map=_bk_color_map, hole=0.45, template=PLOTLY_TPL)
             fig_bp.update_traces(textposition="inside", textinfo="percent", textfont_size=12,
                                   marker=dict(line=dict(color="#ffffff", width=2)),
                                   hovertemplate="%{label}<br>%{percent}<extra></extra>")
-            fig_bp.update_layout(height=300, margin=dict(t=20, b=10, l=10, r=10), showlegend=False)
+            fig_bp.update_layout(
+                height=300, margin=dict(t=20, b=10, l=10, r=10),
+                showlegend=True,
+                legend=dict(orientation="h", yanchor="top", y=-0.05,
+                            xanchor="center", x=0.5, font=dict(size=11),
+                            title_text=""))
             st.plotly_chart(fig_bp, use_container_width=True, config={'staticPlot': True})
 
         with t_col:
