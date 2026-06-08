@@ -1839,8 +1839,8 @@ st.markdown(f"""
 
   .dash-header {{
     background: linear-gradient(120deg, {C['navy']} 0%, {C['blue']} 55%, {C['sky']} 100%);
-    padding: 2rem 2.5rem; border-radius: 16px; color: white;
-    margin-bottom: 1.5rem; box-shadow: 0 4px 20px rgba(0,0,0,0.18);
+    padding: 1.8rem 2.4rem; border-radius: 14px; color: white;
+    margin-bottom: 1.5rem; box-shadow: 0 2px 12px rgba(15,23,42,0.10);
   }}
   .dash-header h1 {{ font-size:1.9rem; font-weight:800; margin:0; letter-spacing:-0.5px; }}
   .dash-header p  {{ font-size:0.95rem; margin:0.4rem 0 0 0; opacity:0.85; }}
@@ -1851,10 +1851,10 @@ st.markdown(f"""
   }}
 
   [data-testid="stMetric"] {{
-    background: {C['white']}; border-radius: 14px;
-    padding: 1.1rem 1.2rem 0.9rem 1.2rem;
-    box-shadow: 0 2px 12px rgba(0,85,165,0.10);
-    border-top: 4px solid {C['blue']}; transition: transform 0.15s;
+    background: {C['white']}; border-radius: 12px;
+    padding: 1.1rem 1.3rem 0.95rem 1.3rem;
+    box-shadow: 0 1px 3px rgba(15,23,42,0.04), 0 4px 12px rgba(15,23,42,0.05);
+    border-top: 3px solid {C['blue']}; transition: transform 0.15s;
   }}
   [data-testid="stMetric"]:hover {{ transform: translateY(-2px); }}
   [data-testid="stMetricLabel"]  {{ font-size:0.82rem !important; color:{C['gray']} !important; font-weight:600; }}
@@ -1865,7 +1865,7 @@ st.markdown(f"""
   .stTabs [data-baseweb="tab"] {{ font-size:0.95rem; font-weight:700; padding:0.6rem 1.4rem; border-radius:8px 8px 0 0; color:{C['gray']}; background:transparent; }}
   .stTabs [aria-selected="true"] {{ color:{C['navy']} !important; background:{C['white']} !important; border-bottom:3px solid {C['blue']} !important; box-shadow:0 -2px 8px rgba(0,85,165,0.08); }}
 
-  .sec-head {{ font-size:1.1rem; font-weight:800; color:{C['navy']}; border-left:5px solid {C['blue']}; padding:0.2rem 0 0.2rem 0.8rem; margin:1.4rem 0 1rem 0; }}
+  .sec-head {{ font-size:1.15rem; font-weight:700; color:{C['navy']}; border-left:4px solid {C['blue']}; padding:0.1rem 0 0.1rem 0.85rem; margin:1.6rem 0 1.1rem 0; letter-spacing:-0.2px; }}
 
   .card     {{ background:{C['white']}; border-radius:14px; padding:1.3rem 1.5rem; box-shadow:0 2px 12px rgba(0,85,165,0.09); margin-bottom:1rem; color:#333; }}
   .card-red {{ background:#fff5f5; border-radius:14px; padding:1.3rem 1.5rem; box-shadow:0 2px 12px rgba(198,40,40,0.10); border-left:5px solid {C['red']}; margin-bottom:1rem; color:#333; }}
@@ -2944,10 +2944,16 @@ with tab_weekly:
 # ─────────────────────────────────────────────────────────────
 with tab1:
     if M["score"] and avg_score_100 is not None and not np.isnan(avg_score_100):
-        # ── CS리포트 표 공통 스타일 ──
-        _RP_HDR_BG = "#d6e4f0"
-        _RP_BDR = "#b0b0b0"
-        _RP_SUB_BG = "#f9f9f9"
+        # ── CS리포트 표 공통 스타일 (라이트 톤) ──
+        _RP_HDR_BG = "#f1f5f9"        # 헤더 배경 (slate-100)
+        _RP_BDR = "#e5e7eb"           # 테두리 (gray-200)
+        _RP_SUB_BG = "#fafbfc"        # 행 라벨 배경 (거의 흰색)
+        _RP_CARD = (
+            'background:#ffffff;border-radius:12px;padding:20px 24px;'
+            'box-shadow:0 1px 3px rgba(15,23,42,0.04),0 4px 12px rgba(15,23,42,0.06);'
+            'margin-bottom:20px;'
+        )
+        _RP_HDR_STYLE = f'background:{_RP_HDR_BG};font-weight:700;color:{C["navy"]};'
 
         # ════════════════════════════════════════════════════════
         # CS리포트 2번 — 경남본부 조사결과
@@ -2967,30 +2973,30 @@ with tab1:
         if prev_avg_score_100 is not None and not pd.isna(prev_avg_score_100) and _cur_score_val is not None:
             _prev_diff_overall = round(_cur_score_val - round(prev_avg_score_100, 1), 1)
 
-        _hq2_html = '<table style="width:100%;border-collapse:collapse;font-size:0.92em;text-align:center;">'
-        _hq2_html += f'<tr style="background:{_RP_HDR_BG};font-weight:bold;">'
-        _hq2_html += f'<th rowspan="2" style="border:1px solid {_RP_BDR};padding:8px;">구분</th>'
-        _hq2_html += f'<th rowspan="2" style="border:1px solid {_RP_BDR};padding:8px;">경험고객</th>'
-        _hq2_html += f'<th rowspan="2" style="border:1px solid {_RP_BDR};padding:8px;">발송건수</th>'
-        _hq2_html += f'<th colspan="5" style="border:1px solid {_RP_BDR};padding:8px;">설문 결과</th>'
+        _hq2_html = '<table style="width:100%;border-collapse:collapse;font-size:0.95em;text-align:center;">'
+        _hq2_html += f'<tr style="{_RP_HDR_STYLE}">'
+        _hq2_html += f'<th rowspan="2" style="border:1px solid {_RP_BDR};padding:12px 8px;">구분</th>'
+        _hq2_html += f'<th rowspan="2" style="border:1px solid {_RP_BDR};padding:12px 8px;">경험고객</th>'
+        _hq2_html += f'<th rowspan="2" style="border:1px solid {_RP_BDR};padding:12px 8px;">발송건수</th>'
+        _hq2_html += f'<th colspan="5" style="border:1px solid {_RP_BDR};padding:12px 8px;">설문 결과</th>'
         _hq2_html += '</tr>'
-        _hq2_html += f'<tr style="background:{_RP_HDR_BG};font-weight:bold;">'
-        _hq2_html += f'<th style="border:1px solid {_RP_BDR};padding:6px;">응답건수</th>'
-        _hq2_html += f'<th style="border:1px solid {_RP_BDR};padding:6px;">응답률(%)</th>'
-        _hq2_html += f'<th style="border:1px solid {_RP_BDR};padding:6px;">종합만족도</th>'
-        _hq2_html += f'<th style="border:1px solid {_RP_BDR};padding:6px;">{compare_label}대비</th>'
-        _hq2_html += f'<th style="border:1px solid {_RP_BDR};padding:6px;">전년동월대비</th>'
+        _hq2_html += f'<tr style="{_RP_HDR_STYLE}">'
+        _hq2_html += f'<th style="border:1px solid {_RP_BDR};padding:10px 6px;">응답건수</th>'
+        _hq2_html += f'<th style="border:1px solid {_RP_BDR};padding:10px 6px;">응답률(%)</th>'
+        _hq2_html += f'<th style="border:1px solid {_RP_BDR};padding:10px 6px;">종합만족도</th>'
+        _hq2_html += f'<th style="border:1px solid {_RP_BDR};padding:10px 6px;">{compare_label}대비</th>'
+        _hq2_html += f'<th style="border:1px solid {_RP_BDR};padding:10px 6px;">전년동월대비</th>'
         _hq2_html += '</tr>'
-        _hq2_html += f'<tr><td style="border:1px solid {_RP_BDR};padding:8px;font-weight:bold;background:{_RP_SUB_BG};">본부</td>'
-        _hq2_html += f'<td style="border:1px solid {_RP_BDR};padding:8px;">{_exp_cust:,}</td>'
-        _hq2_html += f'<td style="border:1px solid {_RP_BDR};padding:8px;">{_send_n:,}</td>' if _send_n else f'<td style="border:1px solid {_RP_BDR};padding:8px;">-</td>'
-        _hq2_html += f'<td style="border:1px solid {_RP_BDR};padding:8px;">{_resp_n_actual:,}</td>'
-        _hq2_html += f'<td style="border:1px solid {_RP_BDR};padding:8px;">{_resp_rate}</td>' if _resp_rate is not None else f'<td style="border:1px solid {_RP_BDR};padding:8px;">-</td>'
-        _hq2_html += f'<td style="border:1px solid {_RP_BDR};padding:8px;font-weight:bold;">{_cur_score_val}</td>' if _cur_score_val is not None else f'<td style="border:1px solid {_RP_BDR};padding:8px;">-</td>'
-        _hq2_html += f'<td style="border:1px solid {_RP_BDR};padding:8px;">{_fmt_diff(_prev_diff_overall)}</td>'
-        _hq2_html += f'<td style="border:1px solid {_RP_BDR};padding:8px;">-</td></tr>'
+        _hq2_html += f'<tr><td style="border:1px solid {_RP_BDR};padding:12px 8px;font-weight:700;background:{_RP_SUB_BG};color:{C["navy"]};">본부</td>'
+        _hq2_html += f'<td style="border:1px solid {_RP_BDR};padding:12px 8px;">{_exp_cust:,}</td>'
+        _hq2_html += f'<td style="border:1px solid {_RP_BDR};padding:12px 8px;">{_send_n:,}</td>' if _send_n else f'<td style="border:1px solid {_RP_BDR};padding:12px 8px;">-</td>'
+        _hq2_html += f'<td style="border:1px solid {_RP_BDR};padding:12px 8px;">{_resp_n_actual:,}</td>'
+        _hq2_html += f'<td style="border:1px solid {_RP_BDR};padding:12px 8px;">{_resp_rate}</td>' if _resp_rate is not None else f'<td style="border:1px solid {_RP_BDR};padding:12px 8px;">-</td>'
+        _hq2_html += f'<td style="border:1px solid {_RP_BDR};padding:12px 8px;font-weight:700;color:{C["navy"]};">{_cur_score_val}</td>' if _cur_score_val is not None else f'<td style="border:1px solid {_RP_BDR};padding:12px 8px;">-</td>'
+        _hq2_html += f'<td style="border:1px solid {_RP_BDR};padding:12px 8px;">{_fmt_diff(_prev_diff_overall)}</td>'
+        _hq2_html += f'<td style="border:1px solid {_RP_BDR};padding:12px 8px;">-</td></tr>'
         _hq2_html += '</table>'
-        st.markdown(_hq2_html, unsafe_allow_html=True)
+        st.markdown(f'<div style="{_RP_CARD}">{_hq2_html}</div>', unsafe_allow_html=True)
 
         # ════════════════════════════════════════════════════════
         # CS리포트 3번 — 본부 만족도 구간별 비중 (전월대비 포함)
@@ -3054,28 +3060,28 @@ with tab1:
             st.plotly_chart(fig_bp, use_container_width=True, config={'staticPlot': True})
 
         with _bk_tbl_col:
-            _bk3_html = '<table style="width:100%;border-collapse:collapse;font-size:0.92em;text-align:center;margin-top:40px;">'
-            _bk3_html += f'<tr style="background:{_RP_HDR_BG};font-weight:bold;">'
-            _bk3_html += f'<th style="border:1px solid {_RP_BDR};padding:8px;">구분</th>'
+            _bk3_html = '<table style="width:100%;border-collapse:collapse;font-size:0.95em;text-align:center;margin-top:30px;">'
+            _bk3_html += f'<tr style="{_RP_HDR_STYLE}">'
+            _bk3_html += f'<th style="border:1px solid {_RP_BDR};padding:12px 8px;">구분</th>'
             for lbl, col in zip(_bk_lbl_lr, _bk_colors_lr):
-                _bk3_html += f'<th style="border:1px solid {_RP_BDR};padding:8px;color:{col};">{lbl}</th>'
-            _bk3_html += f'<th style="border:1px solid {_RP_BDR};padding:8px;">합계</th></tr>'
-            _bk3_html += f'<tr><td style="border:1px solid {_RP_BDR};padding:8px;font-weight:bold;background:{_RP_SUB_BG};">응답수(건)</td>'
+                _bk3_html += f'<th style="border:1px solid {_RP_BDR};padding:12px 8px;color:{col};">{lbl}</th>'
+            _bk3_html += f'<th style="border:1px solid {_RP_BDR};padding:12px 8px;">합계</th></tr>'
+            _bk3_html += f'<tr><td style="border:1px solid {_RP_BDR};padding:12px 8px;font-weight:700;background:{_RP_SUB_BG};color:{C["navy"]};">응답수(건)</td>'
             for c in _bk_cnts_lr:
-                _bk3_html += f'<td style="border:1px solid {_RP_BDR};padding:8px;">{c:,}</td>'
-            _bk3_html += f'<td style="border:1px solid {_RP_BDR};padding:8px;font-weight:bold;">{_bk_total_lr:,}</td></tr>'
-            _bk3_html += f'<tr><td style="border:1px solid {_RP_BDR};padding:8px;font-weight:bold;background:{_RP_SUB_BG};">비중(%)</td>'
+                _bk3_html += f'<td style="border:1px solid {_RP_BDR};padding:12px 8px;">{c:,}</td>'
+            _bk3_html += f'<td style="border:1px solid {_RP_BDR};padding:12px 8px;font-weight:700;color:{C["navy"]};">{_bk_total_lr:,}</td></tr>'
+            _bk3_html += f'<tr><td style="border:1px solid {_RP_BDR};padding:12px 8px;font-weight:700;background:{_RP_SUB_BG};color:{C["navy"]};">비중(%)</td>'
             for p in _bk_pcts_lr:
-                _bk3_html += f'<td style="border:1px solid {_RP_BDR};padding:8px;">{p:.1f}</td>'
-            _bk3_html += f'<td style="border:1px solid {_RP_BDR};padding:8px;font-weight:bold;">100.0</td></tr>'
-            _bk3_html += f'<tr><td style="border:1px solid {_RP_BDR};padding:8px;font-weight:bold;background:{_RP_SUB_BG};">{compare_label}대비(%p)</td>'
+                _bk3_html += f'<td style="border:1px solid {_RP_BDR};padding:12px 8px;">{p:.1f}</td>'
+            _bk3_html += f'<td style="border:1px solid {_RP_BDR};padding:12px 8px;font-weight:700;color:{C["navy"]};">100.0</td></tr>'
+            _bk3_html += f'<tr><td style="border:1px solid {_RP_BDR};padding:12px 8px;font-weight:700;background:{_RP_SUB_BG};color:{C["navy"]};">{compare_label}대비(%p)</td>'
             if _diff_pcts is not None:
                 for d in _diff_pcts:
-                    _bk3_html += f'<td style="border:1px solid {_RP_BDR};padding:8px;">{_fmt_diff(d)}</td>'
-                _bk3_html += f'<td style="border:1px solid {_RP_BDR};padding:8px;">-</td></tr>'
+                    _bk3_html += f'<td style="border:1px solid {_RP_BDR};padding:12px 8px;">{_fmt_diff(d)}</td>'
+                _bk3_html += f'<td style="border:1px solid {_RP_BDR};padding:12px 8px;">-</td></tr>'
             else:
                 for _ in range(5):
-                    _bk3_html += f'<td style="border:1px solid {_RP_BDR};padding:8px;">-</td>'
+                    _bk3_html += f'<td style="border:1px solid {_RP_BDR};padding:12px 8px;">-</td>'
                 _bk3_html += '</tr>'
             _bk3_html += '</table>'
             st.markdown(_bk3_html, unsafe_allow_html=True)
@@ -3105,13 +3111,13 @@ with tab1:
             st.markdown(f'<p class="sec-head">사업소별 만족도 <span style="font-size:0.85em;color:#666;font-weight:normal;">(군별 상위권: {_g1_name}, {_g2_name})</span></p>', unsafe_allow_html=True)
 
             _max_len = max(len(OFFICE_GROUP_1), len(OFFICE_GROUP_2))
-            _ofc4_html = '<table style="width:100%;border-collapse:collapse;font-size:0.9em;text-align:center;">'
-            _ofc4_html += f'<tr style="background:{_RP_HDR_BG};font-weight:bold;">'
+            _ofc4_html = '<table style="width:100%;border-collapse:collapse;font-size:0.93em;text-align:center;">'
+            _ofc4_html += f'<tr style="{_RP_HDR_STYLE}">'
             for _ in range(2):
-                _ofc4_html += f'<th style="border:1px solid {_RP_BDR};padding:6px;">구분</th>'
-                _ofc4_html += f'<th style="border:1px solid {_RP_BDR};padding:6px;">종합점수</th>'
-                _ofc4_html += f'<th style="border:1px solid {_RP_BDR};padding:6px;">본부대비</th>'
-                _ofc4_html += f'<th style="border:1px solid {_RP_BDR};padding:6px;">{compare_label}대비</th>'
+                _ofc4_html += f'<th style="border:1px solid {_RP_BDR};padding:10px 6px;">구분</th>'
+                _ofc4_html += f'<th style="border:1px solid {_RP_BDR};padding:10px 6px;">종합점수</th>'
+                _ofc4_html += f'<th style="border:1px solid {_RP_BDR};padding:10px 6px;">본부대비</th>'
+                _ofc4_html += f'<th style="border:1px solid {_RP_BDR};padding:10px 6px;">{compare_label}대비</th>'
             _ofc4_html += '</tr>'
 
             for i in range(_max_len):
@@ -3133,15 +3139,15 @@ with tab1:
                             _score_str = "-"
                             _diff_hq_str = "-"
                             _diff_prev_str = "-"
-                        _ofc4_html += f'<td style="border:1px solid {_RP_BDR};padding:6px;font-weight:bold;background:{_RP_SUB_BG};">{_disp_name}</td>'
-                        _ofc4_html += f'<td style="border:1px solid {_RP_BDR};padding:6px;">{_score_str}</td>'
-                        _ofc4_html += f'<td style="border:1px solid {_RP_BDR};padding:6px;">{_diff_hq_str}</td>'
-                        _ofc4_html += f'<td style="border:1px solid {_RP_BDR};padding:6px;">{_diff_prev_str}</td>'
+                        _ofc4_html += f'<td style="border:1px solid {_RP_BDR};padding:10px 6px;font-weight:700;background:{_RP_SUB_BG};color:{C["navy"]};">{_disp_name}</td>'
+                        _ofc4_html += f'<td style="border:1px solid {_RP_BDR};padding:10px 6px;">{_score_str}</td>'
+                        _ofc4_html += f'<td style="border:1px solid {_RP_BDR};padding:10px 6px;">{_diff_hq_str}</td>'
+                        _ofc4_html += f'<td style="border:1px solid {_RP_BDR};padding:10px 6px;">{_diff_prev_str}</td>'
                     else:
-                        _ofc4_html += f'<td colspan="4" style="border:1px solid {_RP_BDR};padding:6px;color:#999;">-</td>'
+                        _ofc4_html += f'<td colspan="4" style="border:1px solid {_RP_BDR};padding:10px 6px;color:#bbb;">-</td>'
                 _ofc4_html += '</tr>'
             _ofc4_html += '</table>'
-            st.markdown(_ofc4_html, unsafe_allow_html=True)
+            st.markdown(f'<div style="{_RP_CARD}">{_ofc4_html}</div>', unsafe_allow_html=True)
 
 
     # ── 분포 차트 ──
