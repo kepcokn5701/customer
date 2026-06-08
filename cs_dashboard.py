@@ -543,8 +543,9 @@ C = dict(
     ch_etc      = "#9e9e9e",   # 기타 — gray
 )
 
-PIE_COLORS   = ["#1a3a6c","#0055a5","#2196f3","#42a5f5","#90caf9",
-                "#64b5f6","#1565c0","#0288d1","#0097a7","#00897b"]
+# 카테고리 팔레트 (navy 패밀리 그라데이션) — 청록/녹색 제거
+PIE_COLORS   = ["#1a3a6c","#1565c0","#0055a5","#0288d1","#2196f3",
+                "#42a5f5","#64b5f6","#90caf9"]
 MIXED_COLORS = ["#1a3a6c","#f0a500","#2196f3","#00897b","#c62828",
                 "#7b1fa2","#e65100","#558b2f","#0288d1","#ad1457"]
 # 점수 구간 색상 (마스터 신호 팔레트 재사용)
@@ -2923,10 +2924,8 @@ with tab1:
                         "value": _gauge_val,
                     },
                 },
-                title={"text": "종합 만족도 (100점 환산)",
-                       "font": {"size": 14, "color": C["navy"]}},
             ))
-            fig_gauge.update_layout(height=300, margin=dict(t=70, b=20, l=30, r=30), paper_bgcolor="white")
+            fig_gauge.update_layout(height=300, margin=dict(t=30, b=20, l=30, r=30), paper_bgcolor="white")
             st.plotly_chart(fig_gauge, use_container_width=True, config={'staticPlot': True})
         with b_col:
             st.markdown('<p class="sec-head">📊 만족도 점수 구간별 비중</p>', unsafe_allow_html=True)
@@ -3028,14 +3027,16 @@ with tab1:
             with pc_list[idx]:
                 _title = titles_map.get(col_nm, col_nm)
                 if col_nm == M["business"]:
-                    # 업무유형: 가로 막대그래프, 퍼센트 높은 순 정렬
+                    # 업무유형: 가로 막대그래프, 퍼센트 높은 순 정렬 (상위 3 navy 강조, 나머지 sky)
                     _biz_df = pd.DataFrame({"유형": counts.index, "건수": counts.values})
                     _biz_df["비율(%)"] = (_biz_df["건수"] / max(_total, 1) * 100).round(1)
                     _biz_df = _biz_df.sort_values("비율(%)", ascending=True)
-                    fig_biz = px.bar(_biz_df, x="비율(%)", y="유형", orientation="h",
+                    _biz_top3 = set(_biz_df.sort_values("비율(%)", ascending=False).head(3)["유형"].tolist())
+                    _biz_df["구분"] = _biz_df["유형"].apply(lambda x: "상위 3" if x in _biz_top3 else "일반")
+                    fig_biz = px.bar(_biz_df, x="비율(%)", y="유형", orientation="h", color="구분",
                                      text=[f"{r:.1f}% ({int(c):,}건)" for r, c in zip(_biz_df["비율(%)"], _biz_df["건수"])],
-                                     color_discrete_sequence=[C["sky"]], template=PLOTLY_TPL,
-                                     title=f"{_title} 분포")
+                                     color_discrete_map={"상위 3": C["navy"], "일반": C["sky"]},
+                                     template=PLOTLY_TPL, title=f"{_title} 분포")
                     fig_biz.update_traces(textposition="outside", textfont_size=11,
                                           hovertemplate="%{y}: %{x:.1f}% (%{customdata[0]:,}건)<extra></extra>",
                                           customdata=_biz_df[["건수"]].values)
