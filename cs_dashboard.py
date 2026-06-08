@@ -3313,60 +3313,63 @@ def _render_category_section(df, cat_col, cat_label, office_col, score_col, over
                     return ""
                 return "background:rgba(237,233,254,0.55);"
 
-            _hdr = "#d6e4f0"
-            _bdr = "#b0b0b0"
+            _hdr = "#f1f5f9"
+            _bdr = "#e5e7eb"
             _ylw = "#fef9e7"
             _cols = list(pivot.columns)
+            _hdr_style = f'background:{_hdr};font-weight:700;color:{C["navy"]};'
 
-            html = '<div style="overflow-x:auto;"><table style="border-collapse:collapse;width:100%;font-size:0.85em;text-align:center;">'
+            html = ('<div style="overflow-x:auto;background:#ffffff;border-radius:12px;'
+                    'padding:18px 20px;box-shadow:0 1px 3px rgba(15,23,42,0.04),0 4px 12px rgba(15,23,42,0.06);'
+                    'margin-bottom:18px;"><table style="border-collapse:collapse;width:100%;font-size:0.88em;text-align:center;">')
 
             if _is_contract:
                 # ── 양식2: 2단 헤더 (계약종 > 종합점수/응답호수) ──
-                html += f'<tr style="background:{_hdr};font-weight:bold;">'
-                html += f'<th rowspan="2" style="border:1px solid {_bdr};padding:6px 10px;min-width:70px;">지사</th>'
+                html += f'<tr style="{_hdr_style}">'
+                html += f'<th rowspan="2" style="border:1px solid {_bdr};padding:8px 10px;min-width:70px;">지사</th>'
                 for c in _cols:
-                    html += f'<th colspan="2" style="border:1px solid {_bdr};padding:6px 4px;">{c}</th>'
-                html += f'<th colspan="2" style="border:1px solid {_bdr};padding:6px 4px;">합계</th>'
+                    html += f'<th colspan="2" style="border:1px solid {_bdr};padding:8px 4px;">{c}</th>'
+                html += f'<th colspan="2" style="border:1px solid {_bdr};padding:8px 4px;">합계</th>'
                 html += '</tr>'
-                html += f'<tr style="background:{_hdr};font-weight:bold;font-size:0.9em;">'
+                html += f'<tr style="{_hdr_style}font-size:0.9em;">'
                 for _ in _cols:
-                    html += f'<th style="border:1px solid {_bdr};padding:4px;">종합<br>점수</th>'
-                    html += f'<th style="border:1px solid {_bdr};padding:4px;">응답<br>호수</th>'
-                html += f'<th style="border:1px solid {_bdr};padding:4px;">종합<br>점수</th>'
-                html += f'<th style="border:1px solid {_bdr};padding:4px;">응답<br>호수</th>'
+                    html += f'<th style="border:1px solid {_bdr};padding:5px 4px;">종합<br>점수</th>'
+                    html += f'<th style="border:1px solid {_bdr};padding:5px 4px;">응답<br>호수</th>'
+                html += f'<th style="border:1px solid {_bdr};padding:5px 4px;">종합<br>점수</th>'
+                html += f'<th style="border:1px solid {_bdr};padding:5px 4px;">응답<br>호수</th>'
                 html += '</tr>'
             else:
                 # ── 양식3: 1단 헤더 (업무유형/접수채널) ──
-                html += f'<tr style="background:{_hdr};font-weight:bold;">'
-                html += f'<th style="border:1px solid {_bdr};padding:6px 10px;min-width:70px;">구분</th>'
+                html += f'<tr style="{_hdr_style}">'
+                html += f'<th style="border:1px solid {_bdr};padding:8px 10px;min-width:70px;">구분</th>'
                 for c in _cols:
-                    html += f'<th style="border:1px solid {_bdr};padding:6px 4px;">{c}</th>'
-                html += f'<th style="border:1px solid {_bdr};padding:6px 4px;">합계</th>'
+                    html += f'<th style="border:1px solid {_bdr};padding:8px 4px;">{c}</th>'
+                html += f'<th style="border:1px solid {_bdr};padding:8px 4px;">합계</th>'
                 html += '</tr>'
 
             # 본부 합계 행
-            _dbl = f"border-bottom:3px double {_bdr};"
-            html += f'<tr style="background:#e8eef5;font-weight:bold;">'
-            html += f'<td style="border:1px solid {_bdr};{_dbl}padding:5px 8px;font-weight:bold;background:#dce6f0;">본부</td>'
+            _dbl = f"border-bottom:2px solid {C['navy']};"
+            html += f'<tr style="background:#f8fafc;font-weight:700;color:{C["navy"]};">'
+            html += f'<td style="border:1px solid {_bdr};{_dbl}padding:6px 10px;font-weight:700;background:#f1f5f9;color:{C["navy"]};">본부</td>'
             for c in _cols:
                 _hq_v = df[cat_col].eq(c).astype(int)
                 _hq_score = df.loc[_hq_v == 1, score_col].mean()
                 _hq_str = f"{_hq_score:.1f}" if pd.notna(_hq_score) else ""
                 if _is_contract:
                     _hq_cnt = int(df.loc[_hq_v == 1, score_col].count())
-                    html += f'<td style="border:1px solid {_bdr};{_dbl}padding:4px;">{_hq_str}</td>'
-                    html += f'<td style="border:1px solid {_bdr};{_dbl}padding:4px;">{_hq_cnt}</td>'
+                    html += f'<td style="border:1px solid {_bdr};{_dbl}padding:5px 4px;">{_hq_str}</td>'
+                    html += f'<td style="border:1px solid {_bdr};{_dbl}padding:5px 4px;">{_hq_cnt}</td>'
                 else:
-                    html += f'<td style="border:1px solid {_bdr};{_dbl}padding:4px;">{_hq_str}</td>'
+                    html += f'<td style="border:1px solid {_bdr};{_dbl}padding:5px 4px;">{_hq_str}</td>'
             # 본부 합계 총합
             _hq_total = df[score_col].mean()
             _hq_total_str = f"{_hq_total:.1f}" if pd.notna(_hq_total) else ""
             if _is_contract:
                 _hq_total_cnt = int(df[score_col].count())
-                html += f'<td style="border:1px solid {_bdr};{_dbl}padding:4px;font-weight:bold;">{_hq_total_str}</td>'
-                html += f'<td style="border:1px solid {_bdr};{_dbl}padding:4px;">{_hq_total_cnt}</td>'
+                html += f'<td style="border:1px solid {_bdr};{_dbl}padding:5px 4px;font-weight:700;">{_hq_total_str}</td>'
+                html += f'<td style="border:1px solid {_bdr};{_dbl}padding:5px 4px;">{_hq_total_cnt}</td>'
             else:
-                html += f'<td style="border:1px solid {_bdr};{_dbl}padding:4px;font-weight:bold;">{_hq_total_str}</td>'
+                html += f'<td style="border:1px solid {_bdr};{_dbl}padding:5px 4px;font-weight:700;">{_hq_total_str}</td>'
             html += '</tr>'
 
             # 지사별 하위 3개 사전 계산 (연라벤더 셀 = 본부 평균 미만 셀 중 최하 3개) — 업무유형/접수채널 표만
@@ -3385,30 +3388,30 @@ def _render_category_section(df, cat_col, cat_label, office_col, score_col, over
             # 데이터 행
             for ofc in pivot.index:
                 html += '<tr>'
-                html += f'<td style="border:1px solid {_bdr};padding:5px 8px;font-weight:bold;background:#f9f9f9;">{ofc}</td>'
+                html += f'<td style="border:1px solid {_bdr};padding:6px 10px;font-weight:700;background:#fafbfc;color:{C["navy"]};">{ofc}</td>'
                 _bot3_set = _ofc_bottom3.get(ofc, set())
                 for c in _cols:
                     v = pivot.loc[ofc, c]
                     v_str = f"{v:.1f}" if pd.notna(v) else ""
-                    _bg = _below_avg_color(v, _hq_avgs.get(c))
+                    # 라벤더 배경: 계약종별 표는 제거, 업무유형/접수채널은 유지
+                    _bg = "" if _is_contract else _below_avg_color(v, _hq_avgs.get(c))
                     if _is_contract:
                         cnt = int(pivot_cnt.loc[ofc, c])
                         cnt_str = str(cnt) if cnt > 0 else ""
-                        html += f'<td style="border:1px solid {_bdr};padding:4px;{_bg}">{v_str}</td>'
-                        html += f'<td style="border:1px solid {_bdr};padding:4px;">{cnt_str}</td>'
+                        html += f'<td style="border:1px solid {_bdr};padding:5px 4px;">{v_str}</td>'
+                        html += f'<td style="border:1px solid {_bdr};padding:5px 4px;">{cnt_str}</td>'
                     else:
                         _red = "color:#d32f2f;" if c in _bot3_set else ""
-                        html += f'<td style="border:1px solid {_bdr};padding:4px;{_bg}{_red}">{v_str}</td>'
+                        html += f'<td style="border:1px solid {_bdr};padding:5px 4px;{_bg}{_red}">{v_str}</td>'
                 # 합계 열
                 _t_score = df[df[office_col] == ofc][score_col].mean()
                 _t_str = f"{_t_score:.1f}" if pd.notna(_t_score) else ""
-                _t_bg = _below_avg_color(_t_score, _hq_total_avg)
                 if _is_contract:
                     _t_cnt = int(df[df[office_col] == ofc][score_col].count())
-                    html += f'<td style="border:1px solid {_bdr};padding:4px;font-weight:bold;">{_t_str}</td>'
-                    html += f'<td style="border:1px solid {_bdr};padding:4px;">{_t_cnt}</td>'
+                    html += f'<td style="border:1px solid {_bdr};padding:5px 4px;font-weight:700;">{_t_str}</td>'
+                    html += f'<td style="border:1px solid {_bdr};padding:5px 4px;">{_t_cnt}</td>'
                 else:
-                    html += f'<td style="border:1px solid {_bdr};padding:4px;font-weight:bold;">{_t_str}</td>'
+                    html += f'<td style="border:1px solid {_bdr};padding:5px 4px;font-weight:700;">{_t_str}</td>'
                 html += '</tr>'
 
             html += '</table>'
