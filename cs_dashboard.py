@@ -3038,7 +3038,7 @@ with tab1:
         # CS리포트 2번 — 경남본부 조사결과
         # ════════════════════════════════════════════════════════
         st.markdown("---")
-        st.markdown('<p class="sec-head">□ 경남본부 조사결과 <span style="font-size:0.75em;color:#888;font-weight:normal;">(단위: 호·점)</span></p>', unsafe_allow_html=True)
+        st.markdown('<p class="sec-head">경남본부 조사결과 <span style="font-size:0.75em;color:#888;font-weight:normal;">(단위: 호·점)</span></p>', unsafe_allow_html=True)
 
         _exp_cust = len(df_raw)
         _send_n = None
@@ -3103,9 +3103,9 @@ with tab1:
 
         if _diff_p90 is not None:
             _delta_word = "증가" if _diff_p90 > 0 else ("감소" if _diff_p90 < 0 else "유지")
-            _title3 = f'□ 본부 만족도 90점 이상 비중 {_p90:.1f}%로 {compare_label} 대비 {_fmt_diff(_diff_p90)}%p {_delta_word}'
+            _title3 = f'본부 만족도 90점 이상 비중 {_p90:.1f}%로 {compare_label} 대비 {_fmt_diff(_diff_p90)}%p {_delta_word}'
         else:
-            _title3 = f'□ 본부 만족도 90점 이상 비중 {_p90:.1f}%'
+            _title3 = f'본부 만족도 90점 이상 비중 {_p90:.1f}%로 {compare_label} 대비 (   )%p 감소'
         st.markdown(f'<p class="sec-head">{_title3}</p>', unsafe_allow_html=True)
 
         _bk_colors_lr = [BUCKET_COLORS[b] for b in _bk_order_lr]
@@ -3157,7 +3157,7 @@ with tab1:
             _g2_top = _top_in_group(OFFICE_GROUP_2)
             _g1_name = _g1_top[0].replace("지사", "") if _g1_top else "-"
             _g2_name = _g2_top[0].replace("지사", "") if _g2_top else "-"
-            st.markdown(f'<p class="sec-head">□ 사업소별 만족도 <span style="font-size:0.85em;color:#666;font-weight:normal;">(군별 상위권: {_g1_name}, {_g2_name})</span></p>', unsafe_allow_html=True)
+            st.markdown(f'<p class="sec-head">사업소별 만족도 <span style="font-size:0.85em;color:#666;font-weight:normal;">(군별 상위권: {_g1_name}, {_g2_name})</span></p>', unsafe_allow_html=True)
 
             _max_len = max(len(OFFICE_GROUP_1), len(OFFICE_GROUP_2))
             _ofc4_html = '<table style="width:100%;border-collapse:collapse;font-size:0.9em;text-align:center;">'
