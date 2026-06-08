@@ -2952,7 +2952,6 @@ with tab1:
         # ════════════════════════════════════════════════════════
         # CS리포트 2번 — 경남본부 조사결과
         # ════════════════════════════════════════════════════════
-        st.markdown("---")
         st.markdown('<p class="sec-head">경남본부 조사결과 <span style="font-size:0.75em;color:#888;font-weight:normal;">(단위: 호·점)</span></p>', unsafe_allow_html=True)
 
         _exp_cust = len(df_raw)
