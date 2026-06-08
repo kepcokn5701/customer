@@ -555,6 +555,9 @@ BUCKET_ORDER  = ["90점 이상", "70~90점", "50~70점", "50점 미만"]
 OFFICE_ORDER  = ["경남본부", "직할", "진주지사", "마산지사", "거제지사", "밀양지사", "사천지사",
                  "통영지사", "거창지사", "함안의령지사", "창녕지사", "합천지사", "진해지사",
                  "하동지사", "고성지사", "산청지사", "남해지사", "함양지사"]
+# CS리포트 사업소별 표 군별 구분
+OFFICE_GROUP_1 = ["직할", "진주지사", "마산지사", "거제지사", "밀양지사", "사천지사", "통영지사", "거창지사", "함안의령지사"]
+OFFICE_GROUP_2 = ["창녕지사", "합천지사", "진해지사", "하동지사", "고성지사", "산청지사", "남해지사", "함양지사"]
 PLOTLY_TPL    = "plotly_white"
 
 def _sort_offices(values):
@@ -1923,6 +1926,13 @@ with st.sidebar:
     st.markdown("#### 📂 데이터 업로드")
     uploaded_file = st.file_uploader("파일을 여기에 드래그하세요", type=["xlsx","xls","csv"], label_visibility="collapsed")
     st.markdown("<hr>", unsafe_allow_html=True)
+    st.markdown("#### 📁 비교 데이터 (선택)")
+    st.caption("전월/전년 동월 데이터로 비교 분석")
+    compare_file = st.file_uploader("비교 파일", type=["xlsx","xls","csv"],
+                                     key="compare_uploader", label_visibility="collapsed")
+    compare_label = st.text_input("비교 기간 라벨", value="전월",
+                                   help="예: 전월, 전년동월, 2026년 1월 등")
+    st.markdown("<hr>", unsafe_allow_html=True)
     st.caption("© CS 분석 시스템")
 
 # ══════════════════════════════════════════════════════════════
@@ -2306,6 +2316,40 @@ if M["score"]:
     avg_score_100 = score_100.mean()
     df_f["_점수구간"] = score_100.apply(score_bucket)
 
+# ── 비교 파일 처리 (전월/전년 동월 비교용) ──
+prev_df_raw = None
+prev_df_f = None
+prev_avg_score_100 = None
+if compare_file is not None:
+    try:
+        _prev_raw_bytes = compare_file.read()
+        prev_df_raw, _prev_orig_len = load_data(_prev_raw_bytes, compare_file.name)
+        # 메인 파일과 동일한 컬럼 매핑(M) 사용 (양식 동일 가정)
+        prev_df_f = prev_df_raw.copy()
+        # 순번 컬럼 정리
+        if "순번" in prev_df_f.columns:
+            prev_df_f.drop(columns=["순번"], inplace=True)
+        if M["score"] and M["score"] in prev_df_f.columns:
+            _prev_score = normalize_score_100(prev_df_f[M["score"]])
+            prev_df_f["_점수100"] = _prev_score
+            prev_df_f["_점수구간"] = _prev_score.apply(score_bucket)
+            prev_avg_score_100 = _prev_score.mean()
+    except Exception as _prev_err:
+        st.warning(f"비교 파일 로드 실패: {_prev_err}")
+        prev_df_raw = prev_df_f = None
+        prev_avg_score_100 = None
+
+# ── CS리포트 표 비교 표기 헬퍼 ──
+def _fmt_diff(val, decimals=1):
+    """차이값 → CS리포트 표기. 양수=숫자만, 음수=△숫자, 0=0.0, NaN/None=-"""
+    if val is None or pd.isna(val):
+        return "-"
+    if val == 0:
+        return f"{0:.{decimals}f}"
+    if val > 0:
+        return f"{val:.{decimals}f}"
+    return f"△{abs(val):.{decimals}f}"
+
 # VOC 감성 분석
 voc_texts_all = []
 voc_sentiments = []
@@ -2363,7 +2407,11 @@ st.markdown('<p class="sec-head">📌 핵심 요약 지표 (100점 환산)</p>',
 m1, m2, m3, m4, m5 = st.columns(5)
 with m1:
     if avg_score_100 is not None and not np.isnan(avg_score_100):
-        st.metric("⭐ 종합만족도", f"{avg_score_100:.1f}점")
+        _m1_delta = None
+        if prev_avg_score_100 is not None and not pd.isna(prev_avg_score_100):
+            _d = round(avg_score_100 - prev_avg_score_100, 1)
+            _m1_delta = f"{compare_label} 대비 {_d:+.1f}점"
+        st.metric("⭐ 종합만족도", f"{avg_score_100:.1f}점", delta=_m1_delta)
     else:
         st.metric("⭐ 종합만족도", "컬럼 미선택")
 with m2:
@@ -2981,34 +3029,174 @@ with tab1:
             _bk_html += '</table>'
             st.markdown(_bk_html, unsafe_allow_html=True)
 
-        # ── 사업소별 평균 만족도 ──
+        # ── CS리포트 표 공통 스타일 ──
+        _RP_HDR_BG = "#d6e4f0"
+        _RP_BDR = "#b0b0b0"
+        _RP_SUB_BG = "#f9f9f9"
+
+        # ════════════════════════════════════════════════════════
+        # CS리포트 2번 — 경남본부 조사결과
+        # ════════════════════════════════════════════════════════
+        st.markdown("---")
+        st.markdown('<p class="sec-head">□ 경남본부 조사결과 <span style="font-size:0.75em;color:#888;font-weight:normal;">(단위: 호·점)</span></p>', unsafe_allow_html=True)
+
+        _exp_cust = len(df_raw)
+        _send_n = None
+        _resp_n_actual = len(df_f)
+        if M.get("response") and M["response"] in df_raw.columns:
+            _rv = df_raw[M["response"]].astype(str).str.strip()
+            _send_n = int(_rv.isin(["응답", "미응답"]).sum())
+            _resp_n_actual = int((_rv == "응답").sum())
+        _resp_rate = round(_resp_n_actual / _send_n * 100, 1) if (_send_n and _send_n > 0) else None
+        _cur_score_val = round(avg_score_100, 1) if (avg_score_100 is not None and not pd.isna(avg_score_100)) else None
+        _prev_diff_overall = None
+        if prev_avg_score_100 is not None and not pd.isna(prev_avg_score_100) and _cur_score_val is not None:
+            _prev_diff_overall = round(_cur_score_val - round(prev_avg_score_100, 1), 1)
+
+        _hq2_html = '<table style="width:100%;border-collapse:collapse;font-size:0.92em;text-align:center;">'
+        _hq2_html += f'<tr style="background:{_RP_HDR_BG};font-weight:bold;">'
+        _hq2_html += f'<th rowspan="2" style="border:1px solid {_RP_BDR};padding:8px;">구분</th>'
+        _hq2_html += f'<th rowspan="2" style="border:1px solid {_RP_BDR};padding:8px;">경험고객</th>'
+        _hq2_html += f'<th rowspan="2" style="border:1px solid {_RP_BDR};padding:8px;">발송건수</th>'
+        _hq2_html += f'<th colspan="5" style="border:1px solid {_RP_BDR};padding:8px;">설문 결과</th>'
+        _hq2_html += '</tr>'
+        _hq2_html += f'<tr style="background:{_RP_HDR_BG};font-weight:bold;">'
+        _hq2_html += f'<th style="border:1px solid {_RP_BDR};padding:6px;">응답건수</th>'
+        _hq2_html += f'<th style="border:1px solid {_RP_BDR};padding:6px;">응답률(%)</th>'
+        _hq2_html += f'<th style="border:1px solid {_RP_BDR};padding:6px;">종합만족도</th>'
+        _hq2_html += f'<th style="border:1px solid {_RP_BDR};padding:6px;">{compare_label}대비</th>'
+        _hq2_html += f'<th style="border:1px solid {_RP_BDR};padding:6px;">전년동월대비</th>'
+        _hq2_html += '</tr>'
+        _hq2_html += f'<tr><td style="border:1px solid {_RP_BDR};padding:8px;font-weight:bold;background:{_RP_SUB_BG};">본부</td>'
+        _hq2_html += f'<td style="border:1px solid {_RP_BDR};padding:8px;">{_exp_cust:,}</td>'
+        _hq2_html += f'<td style="border:1px solid {_RP_BDR};padding:8px;">{_send_n:,}</td>' if _send_n else f'<td style="border:1px solid {_RP_BDR};padding:8px;">-</td>'
+        _hq2_html += f'<td style="border:1px solid {_RP_BDR};padding:8px;">{_resp_n_actual:,}</td>'
+        _hq2_html += f'<td style="border:1px solid {_RP_BDR};padding:8px;">{_resp_rate}</td>' if _resp_rate is not None else f'<td style="border:1px solid {_RP_BDR};padding:8px;">-</td>'
+        _hq2_html += f'<td style="border:1px solid {_RP_BDR};padding:8px;font-weight:bold;">{_cur_score_val}</td>' if _cur_score_val is not None else f'<td style="border:1px solid {_RP_BDR};padding:8px;">-</td>'
+        _hq2_html += f'<td style="border:1px solid {_RP_BDR};padding:8px;">{_fmt_diff(_prev_diff_overall)}</td>'
+        _hq2_html += f'<td style="border:1px solid {_RP_BDR};padding:8px;">-</td></tr>'
+        _hq2_html += '</table>'
+        st.markdown(_hq2_html, unsafe_allow_html=True)
+
+        # ════════════════════════════════════════════════════════
+        # CS리포트 3번 — 본부 만족도 구간별 비중 (전월대비 포함)
+        # ════════════════════════════════════════════════════════
+        st.markdown("<br>", unsafe_allow_html=True)
+        _bk_cnt_full = df_f["_점수구간"].value_counts()
+        _bk_order_lr = ["50점 미만", "50~70점", "70~90점", "90점 이상"]
+        _bk_lbl_lr = ["50점 미만", "50~70점 미만", "70~90점 미만", "90점 이상"]
+        _bk_cnts_lr = [int(_bk_cnt_full.get(b, 0)) for b in _bk_order_lr]
+        _bk_total_lr = sum(_bk_cnts_lr)
+        _bk_pcts_lr = [round(c / max(_bk_total_lr, 1) * 100, 1) for c in _bk_cnts_lr]
+        _p90 = _bk_pcts_lr[3]
+
+        _prev_bk_pcts = None
+        _diff_pcts = None
+        _diff_p90 = None
+        if prev_df_f is not None and "_점수구간" in prev_df_f.columns:
+            _prev_bk_cnt = prev_df_f["_점수구간"].value_counts()
+            _prev_cnts = [int(_prev_bk_cnt.get(b, 0)) for b in _bk_order_lr]
+            _prev_total = sum(_prev_cnts)
+            _prev_bk_pcts = [round(c / max(_prev_total, 1) * 100, 1) for c in _prev_cnts]
+            _diff_pcts = [round(_bk_pcts_lr[i] - _prev_bk_pcts[i], 1) for i in range(4)]
+            _diff_p90 = _diff_pcts[3]
+
+        if _diff_p90 is not None:
+            _delta_word = "증가" if _diff_p90 > 0 else ("감소" if _diff_p90 < 0 else "유지")
+            _title3 = f'□ 본부 만족도 90점 이상 비중 {_p90:.1f}%로 {compare_label} 대비 {_fmt_diff(_diff_p90)}%p {_delta_word}'
+        else:
+            _title3 = f'□ 본부 만족도 90점 이상 비중 {_p90:.1f}%'
+        st.markdown(f'<p class="sec-head">{_title3}</p>', unsafe_allow_html=True)
+
+        _bk_colors_lr = [BUCKET_COLORS[b] for b in _bk_order_lr]
+        _bk3_html = '<table style="width:100%;border-collapse:collapse;font-size:0.92em;text-align:center;">'
+        _bk3_html += f'<tr style="background:{_RP_HDR_BG};font-weight:bold;">'
+        _bk3_html += f'<th style="border:1px solid {_RP_BDR};padding:8px;">구분</th>'
+        for lbl, col in zip(_bk_lbl_lr, _bk_colors_lr):
+            _bk3_html += f'<th style="border:1px solid {_RP_BDR};padding:8px;color:{col};">{lbl}</th>'
+        _bk3_html += f'<th style="border:1px solid {_RP_BDR};padding:8px;">합계</th></tr>'
+        _bk3_html += f'<tr><td style="border:1px solid {_RP_BDR};padding:8px;font-weight:bold;background:{_RP_SUB_BG};">응답수(건)</td>'
+        for c in _bk_cnts_lr:
+            _bk3_html += f'<td style="border:1px solid {_RP_BDR};padding:8px;">{c:,}</td>'
+        _bk3_html += f'<td style="border:1px solid {_RP_BDR};padding:8px;font-weight:bold;">{_bk_total_lr:,}</td></tr>'
+        _bk3_html += f'<tr><td style="border:1px solid {_RP_BDR};padding:8px;font-weight:bold;background:{_RP_SUB_BG};">비중(%)</td>'
+        for p in _bk_pcts_lr:
+            _bk3_html += f'<td style="border:1px solid {_RP_BDR};padding:8px;">{p:.1f}</td>'
+        _bk3_html += f'<td style="border:1px solid {_RP_BDR};padding:8px;font-weight:bold;">100.0</td></tr>'
+        _bk3_html += f'<tr><td style="border:1px solid {_RP_BDR};padding:8px;font-weight:bold;background:{_RP_SUB_BG};">{compare_label}대비(%p)</td>'
+        if _diff_pcts is not None:
+            for d in _diff_pcts:
+                _bk3_html += f'<td style="border:1px solid {_RP_BDR};padding:8px;">{_fmt_diff(d)}</td>'
+            _bk3_html += f'<td style="border:1px solid {_RP_BDR};padding:8px;">-</td></tr>'
+        else:
+            for _ in range(5):
+                _bk3_html += f'<td style="border:1px solid {_RP_BDR};padding:8px;">-</td>'
+            _bk3_html += '</tr>'
+        _bk3_html += '</table>'
+        st.markdown(_bk3_html, unsafe_allow_html=True)
+
+        # ════════════════════════════════════════════════════════
+        # CS리포트 4번 — 사업소별 만족도 (군별 2단 표)
+        # ════════════════════════════════════════════════════════
         if M["office"]:
-            st.markdown("---")
-            st.markdown('<p class="sec-head">🏢 사업소별 평균 만족도</p>', unsafe_allow_html=True)
-            _ofc_grp_bar = df_f.groupby(M["office"])["_점수100"].agg(["mean", "count"]).reset_index()
-            _ofc_grp_bar.columns = ["사업소", "평균만족도", "응답수"]
-            _ofc_grp_bar = _ofc_grp_bar.sort_values("평균만족도", ascending=True)
-            _bar_avg = df_f["_점수100"].mean()
-            _ofc_grp_bar["그룹"] = _ofc_grp_bar["평균만족도"].apply(
-                lambda v: "⬆ 본부평균 이상" if v >= _bar_avg else "⬇ 본부평균 미달")
-            _ofc_grp_bar["_차이"] = _ofc_grp_bar["평균만족도"] - _bar_avg
-            _ofc_grp_bar["_표시"] = _ofc_grp_bar.apply(
-                lambda r: f"{r['평균만족도']:.1f} ({'+' if r['_차이']>=0 else ''}{r['_차이']:.1f}점)", axis=1)
-            fig_bench = px.bar(_ofc_grp_bar, x="평균만족도", y="사업소", color="그룹",
-                               color_discrete_map={"⬆ 본부평균 이상": C["green"], "⬇ 본부평균 미달": C["red"]},
-                               orientation="h", text="_표시", template=PLOTLY_TPL,
-                               title=f"사업소별 평균 만족도 — 본부 평균: {_bar_avg:.1f}점")
-            fig_bench.update_traces(texttemplate="%{text}", textposition="outside", cliponaxis=False,
-                                    hovertemplate="%{y}<br>평균: %{x:.1f}점<br>본부 대비: %{customdata[0]:+.1f}점<extra></extra>",
-                                    customdata=_ofc_grp_bar[["_차이"]].values)
-            fig_bench.add_vline(x=_bar_avg, line_color="#aaa", line_dash="dash", line_width=1.2,
-                                annotation_text=f"▼ 본부 평균 {_bar_avg:.1f}",
-                                annotation_font_size=11, annotation_font_color="#888",
-                                annotation_position="top", annotation_yshift=10)
-            fig_bench.update_layout(height=max(350, len(_ofc_grp_bar) * 35 + 80),
-                                     margin=dict(t=80, b=20, l=10, r=200), legend_title_text="",
-                                     title_font=dict(size=14, color=C["navy"]))
-            st.plotly_chart(fig_bench, use_container_width=True, config={'staticPlot': True})
+            st.markdown("<br>", unsafe_allow_html=True)
+            _ofc_stats = df_f.groupby(M["office"])["_점수100"].mean().round(1)
+            _hq_avg = round(df_f["_점수100"].mean(), 1)
+            _prev_ofc_stats = None
+            if prev_df_f is not None and "_점수100" in prev_df_f.columns and M["office"] in prev_df_f.columns:
+                _prev_ofc_stats = prev_df_f.groupby(M["office"])["_점수100"].mean().round(1)
+
+            # 군별 최고 점수 지사 찾기
+            def _top_in_group(group_list):
+                _candidates = [(o, _ofc_stats.get(o)) for o in group_list if o in _ofc_stats.index]
+                _candidates = [(o, s) for o, s in _candidates if s is not None and not pd.isna(s)]
+                if not _candidates:
+                    return None
+                return max(_candidates, key=lambda x: x[1])
+            _g1_top = _top_in_group(OFFICE_GROUP_1)
+            _g2_top = _top_in_group(OFFICE_GROUP_2)
+            _g1_name = _g1_top[0].replace("지사", "") if _g1_top else "-"
+            _g2_name = _g2_top[0].replace("지사", "") if _g2_top else "-"
+            st.markdown(f'<p class="sec-head">□ 사업소별 만족도 <span style="font-size:0.85em;color:#666;font-weight:normal;">(군별 상위권: {_g1_name}, {_g2_name})</span></p>', unsafe_allow_html=True)
+
+            _max_len = max(len(OFFICE_GROUP_1), len(OFFICE_GROUP_2))
+            _ofc4_html = '<table style="width:100%;border-collapse:collapse;font-size:0.9em;text-align:center;">'
+            _ofc4_html += f'<tr style="background:{_RP_HDR_BG};font-weight:bold;">'
+            for _ in range(2):
+                _ofc4_html += f'<th style="border:1px solid {_RP_BDR};padding:6px;">구분</th>'
+                _ofc4_html += f'<th style="border:1px solid {_RP_BDR};padding:6px;">종합점수</th>'
+                _ofc4_html += f'<th style="border:1px solid {_RP_BDR};padding:6px;">본부대비</th>'
+                _ofc4_html += f'<th style="border:1px solid {_RP_BDR};padding:6px;">{compare_label}대비</th>'
+            _ofc4_html += '</tr>'
+
+            for i in range(_max_len):
+                _ofc4_html += '<tr>'
+                for grp in [OFFICE_GROUP_1, OFFICE_GROUP_2]:
+                    if i < len(grp):
+                        _ofc = grp[i]
+                        _disp_name = _ofc.replace("지사", "")
+                        _score = _ofc_stats.get(_ofc) if _ofc in _ofc_stats.index else None
+                        if _score is not None and not pd.isna(_score):
+                            _score_str = f"{_score:.1f}"
+                            _diff_hq_str = _fmt_diff(round(_score - _hq_avg, 1))
+                            _diff_prev_str = "-"
+                            if _prev_ofc_stats is not None and _ofc in _prev_ofc_stats.index:
+                                _prev_s = _prev_ofc_stats.get(_ofc)
+                                if _prev_s is not None and not pd.isna(_prev_s):
+                                    _diff_prev_str = _fmt_diff(round(_score - _prev_s, 1))
+                        else:
+                            _score_str = "-"
+                            _diff_hq_str = "-"
+                            _diff_prev_str = "-"
+                        _ofc4_html += f'<td style="border:1px solid {_RP_BDR};padding:6px;font-weight:bold;background:{_RP_SUB_BG};">{_disp_name}</td>'
+                        _ofc4_html += f'<td style="border:1px solid {_RP_BDR};padding:6px;">{_score_str}</td>'
+                        _ofc4_html += f'<td style="border:1px solid {_RP_BDR};padding:6px;">{_diff_hq_str}</td>'
+                        _ofc4_html += f'<td style="border:1px solid {_RP_BDR};padding:6px;">{_diff_prev_str}</td>'
+                    else:
+                        _ofc4_html += f'<td colspan="4" style="border:1px solid {_RP_BDR};padding:6px;color:#999;">-</td>'
+                _ofc4_html += '</tr>'
+            _ofc4_html += '</table>'
+            st.markdown(_ofc4_html, unsafe_allow_html=True)
 
 
     # ── 분포 차트 ──
