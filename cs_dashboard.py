@@ -3180,10 +3180,24 @@ def _render_category_section(df, cat_col, cat_label, office_col, score_col, over
                 html += f'<td style="border:1px solid {_bdr};{_dbl}padding:4px;font-weight:bold;">{_hq_total_str}</td>'
             html += '</tr>'
 
+            # 지사별 하위 3개 사전 계산 (연라벤더 셀 = 본부 평균 미만 셀 중 최하 3개) — 업무유형/접수채널 표만
+            _ofc_bottom3 = {}
+            if not _is_contract:
+                for ofc in pivot.index:
+                    _below = {}
+                    for c in pivot.columns:
+                        v = pivot.loc[ofc, c]
+                        _ha = _hq_avgs.get(c)
+                        if pd.notna(v) and _ha is not None and v < _ha:
+                            _below[c] = v
+                    if _below:
+                        _ofc_bottom3[ofc] = {cat for cat, _ in sorted(_below.items(), key=lambda x: x[1])[:3]}
+
             # 데이터 행
             for ofc in pivot.index:
                 html += '<tr>'
                 html += f'<td style="border:1px solid {_bdr};padding:5px 8px;font-weight:bold;background:#f9f9f9;">{ofc}</td>'
+                _bot3_set = _ofc_bottom3.get(ofc, set())
                 for c in _cols:
                     v = pivot.loc[ofc, c]
                     v_str = f"{v:.1f}" if pd.notna(v) else ""
@@ -3194,7 +3208,8 @@ def _render_category_section(df, cat_col, cat_label, office_col, score_col, over
                         html += f'<td style="border:1px solid {_bdr};padding:4px;{_bg}">{v_str}</td>'
                         html += f'<td style="border:1px solid {_bdr};padding:4px;">{cnt_str}</td>'
                     else:
-                        html += f'<td style="border:1px solid {_bdr};padding:4px;{_bg}">{v_str}</td>'
+                        _red = "color:#d32f2f;" if c in _bot3_set else ""
+                        html += f'<td style="border:1px solid {_bdr};padding:4px;{_bg}{_red}">{v_str}</td>'
                 # 합계 열
                 _t_score = df[df[office_col] == ofc][score_col].mean()
                 _t_str = f"{_t_score:.1f}" if pd.notna(_t_score) else ""
