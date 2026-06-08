@@ -3117,18 +3117,12 @@ def _render_category_section(df, cat_col, cat_label, office_col, score_col, over
             _hq_total_avg = float(df[score_col].mean()) if pd.notna(df[score_col].mean()) else None
 
             def _below_avg_color(v, hq_avg):
-                """본부 평균 미만 → 연라벤더~진보라 그라데이션, 이상 → 투명"""
+                """본부 평균 미만 → 연라벤더 단일색, 이상 → 투명"""
                 if pd.isna(v) or hq_avg is None:
                     return ""
-                gap = hq_avg - v
-                if gap <= 0:
+                if hq_avg - v <= 0:
                     return ""
-                # gap 0→10+ : 연라벤더(237,233,254) → 진보라(167,139,250)
-                t = min(gap / 10.0, 1.0)
-                r = int(237 - (237 - 167) * t)
-                g = int(233 - (233 - 139) * t)
-                b = int(254 - (254 - 250) * t)
-                return f"background:rgba({r},{g},{b},0.55);"
+                return "background:rgba(237,233,254,0.55);"
 
             _hdr = "#d6e4f0"
             _bdr = "#b0b0b0"
@@ -3186,14 +3180,6 @@ def _render_category_section(df, cat_col, cat_label, office_col, score_col, over
                 html += f'<td style="border:1px solid {_bdr};{_dbl}padding:4px;font-weight:bold;">{_hq_total_str}</td>'
             html += '</tr>'
 
-            # 지사별 하위 3개 업무유형 사전 계산 (업무유형 테이블만)
-            _is_biz = (cat_label == "업무유형")
-            _ofc_bottom3 = {}
-            if _is_biz:
-                for ofc in pivot.index:
-                    _row = pivot.loc[ofc].dropna().sort_values()
-                    _ofc_bottom3[ofc] = {cat: rank + 1 for rank, (cat, _) in enumerate(_row.head(3).items())}
-
             # 데이터 행
             for ofc in pivot.index:
                 html += '<tr>'
@@ -3208,12 +3194,7 @@ def _render_category_section(df, cat_col, cat_label, office_col, score_col, over
                         html += f'<td style="border:1px solid {_bdr};padding:4px;{_bg}">{v_str}</td>'
                         html += f'<td style="border:1px solid {_bdr};padding:4px;">{cnt_str}</td>'
                     else:
-                        _rank = _ofc_bottom3.get(ofc, {}).get(c)
-                        if _rank:
-                            _mk = f' <span style="font-size:0.8em;">(▼{_rank})</span>'
-                            html += f'<td style="border:1px solid {_bdr};padding:4px;{_bg}color:#d32f2f;font-weight:bold;">{v_str}{_mk}</td>'
-                        else:
-                            html += f'<td style="border:1px solid {_bdr};padding:4px;{_bg}">{v_str}</td>'
+                        html += f'<td style="border:1px solid {_bdr};padding:4px;{_bg}">{v_str}</td>'
                 # 합계 열
                 _t_score = df[df[office_col] == ofc][score_col].mean()
                 _t_str = f"{_t_score:.1f}" if pd.notna(_t_score) else ""
@@ -3258,9 +3239,9 @@ def _render_category_section(df, cat_col, cat_label, office_col, score_col, over
                     _hq_row[_c] = round(_hq_avgs[_c], 1) if _hq_avgs.get(_c) is not None else ""
                 _hq_row["합계"] = round(_hq_total_avg, 1) if _hq_total_avg is not None else ""
                 _dl_df = pd.concat([pd.DataFrame([_hq_row]), _dl_df], ignore_index=True)
-                # openpyxl 스타일링 (보라배경 + 빨간볼드 하위3개)
-                from openpyxl.styles import PatternFill, Font
-                _red_ft = Font(color="D32F2F", bold=True)
+                # openpyxl 스타일링 (보라배경 단일색)
+                from openpyxl.styles import PatternFill
+                _lavender_fill = PatternFill(start_color="EDE9FE", end_color="EDE9FE", fill_type="solid")
                 _buf = io.BytesIO()
                 with pd.ExcelWriter(_buf, engine="openpyxl") as _w:
                     _dl_df.to_excel(_w, index=False, sheet_name="Sheet1")
@@ -3274,18 +3255,9 @@ def _render_category_section(df, cat_col, cat_label, office_col, score_col, over
                             _cv = _cell.value
                             if not isinstance(_cv, (int, float)):
                                 continue
-                            # 본부 평균 미만 → 라벤더 배경
                             _ha = _hq_avgs.get(_cn)
                             if _ha is not None and _cv < _ha:
-                                _g = min((_ha - _cv) / 10.0, 1.0)
-                                _cr = int(237 - (237 - 167) * _g)
-                                _cg = int(233 - (233 - 139) * _g)
-                                _cb = int(254 - (254 - 250) * _g)
-                                _cell.fill = PatternFill(start_color=f"{_cr:02X}{_cg:02X}{_cb:02X}",
-                                                         end_color=f"{_cr:02X}{_cg:02X}{_cb:02X}", fill_type="solid")
-                            # 하위 3개 → 빨간 볼드
-                            if _ofc_bottom3.get(_ofc, {}).get(_cn):
-                                _cell.font = _red_ft
+                                _cell.fill = _lavender_fill
                 _dl_bytes = _buf.getvalue()
             _return_dl_df = _dl_df
             st.download_button(
