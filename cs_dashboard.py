@@ -2975,26 +2975,26 @@ with tab1:
 
         _hq2_html = '<table style="width:100%;border-collapse:collapse;font-size:0.95em;text-align:center;">'
         _hq2_html += f'<tr style="{_RP_HDR_STYLE}">'
-        _hq2_html += f'<th rowspan="2" style="border:1px solid {_RP_BDR};padding:12px 8px;">구분</th>'
-        _hq2_html += f'<th rowspan="2" style="border:1px solid {_RP_BDR};padding:12px 8px;">경험고객</th>'
-        _hq2_html += f'<th rowspan="2" style="border:1px solid {_RP_BDR};padding:12px 8px;">발송건수</th>'
-        _hq2_html += f'<th colspan="5" style="border:1px solid {_RP_BDR};padding:12px 8px;">설문 결과</th>'
+        _hq2_html += f'<th rowspan="2" style="border:1px solid {_RP_BDR};padding:8px 8px;">구분</th>'
+        _hq2_html += f'<th rowspan="2" style="border:1px solid {_RP_BDR};padding:8px 8px;">경험고객</th>'
+        _hq2_html += f'<th rowspan="2" style="border:1px solid {_RP_BDR};padding:8px 8px;">발송건수</th>'
+        _hq2_html += f'<th colspan="5" style="border:1px solid {_RP_BDR};padding:8px 8px;">설문 결과</th>'
         _hq2_html += '</tr>'
         _hq2_html += f'<tr style="{_RP_HDR_STYLE}">'
-        _hq2_html += f'<th style="border:1px solid {_RP_BDR};padding:10px 6px;">응답건수</th>'
-        _hq2_html += f'<th style="border:1px solid {_RP_BDR};padding:10px 6px;">응답률(%)</th>'
-        _hq2_html += f'<th style="border:1px solid {_RP_BDR};padding:10px 6px;">종합만족도</th>'
-        _hq2_html += f'<th style="border:1px solid {_RP_BDR};padding:10px 6px;">{compare_label}대비</th>'
-        _hq2_html += f'<th style="border:1px solid {_RP_BDR};padding:10px 6px;">전년동월대비</th>'
+        _hq2_html += f'<th style="border:1px solid {_RP_BDR};padding:7px 6px;">응답건수</th>'
+        _hq2_html += f'<th style="border:1px solid {_RP_BDR};padding:7px 6px;">응답률(%)</th>'
+        _hq2_html += f'<th style="border:1px solid {_RP_BDR};padding:7px 6px;">종합만족도</th>'
+        _hq2_html += f'<th style="border:1px solid {_RP_BDR};padding:7px 6px;">{compare_label}대비</th>'
+        _hq2_html += f'<th style="border:1px solid {_RP_BDR};padding:7px 6px;">전년동월대비</th>'
         _hq2_html += '</tr>'
-        _hq2_html += f'<tr><td style="border:1px solid {_RP_BDR};padding:12px 8px;font-weight:700;background:{_RP_SUB_BG};color:{C["navy"]};">본부</td>'
-        _hq2_html += f'<td style="border:1px solid {_RP_BDR};padding:12px 8px;">{_exp_cust:,}</td>'
-        _hq2_html += f'<td style="border:1px solid {_RP_BDR};padding:12px 8px;">{_send_n:,}</td>' if _send_n else f'<td style="border:1px solid {_RP_BDR};padding:12px 8px;">-</td>'
-        _hq2_html += f'<td style="border:1px solid {_RP_BDR};padding:12px 8px;">{_resp_n_actual:,}</td>'
-        _hq2_html += f'<td style="border:1px solid {_RP_BDR};padding:12px 8px;">{_resp_rate}</td>' if _resp_rate is not None else f'<td style="border:1px solid {_RP_BDR};padding:12px 8px;">-</td>'
-        _hq2_html += f'<td style="border:1px solid {_RP_BDR};padding:12px 8px;font-weight:700;color:{C["navy"]};">{_cur_score_val}</td>' if _cur_score_val is not None else f'<td style="border:1px solid {_RP_BDR};padding:12px 8px;">-</td>'
-        _hq2_html += f'<td style="border:1px solid {_RP_BDR};padding:12px 8px;">{_fmt_diff(_prev_diff_overall)}</td>'
-        _hq2_html += f'<td style="border:1px solid {_RP_BDR};padding:12px 8px;">-</td></tr>'
+        _hq2_html += f'<tr><td style="border:1px solid {_RP_BDR};padding:8px 8px;font-weight:700;background:{_RP_SUB_BG};color:{C["navy"]};">본부</td>'
+        _hq2_html += f'<td style="border:1px solid {_RP_BDR};padding:8px 8px;">{_exp_cust:,}</td>'
+        _hq2_html += f'<td style="border:1px solid {_RP_BDR};padding:8px 8px;">{_send_n:,}</td>' if _send_n else f'<td style="border:1px solid {_RP_BDR};padding:8px 8px;">-</td>'
+        _hq2_html += f'<td style="border:1px solid {_RP_BDR};padding:8px 8px;">{_resp_n_actual:,}</td>'
+        _hq2_html += f'<td style="border:1px solid {_RP_BDR};padding:8px 8px;">{_resp_rate}</td>' if _resp_rate is not None else f'<td style="border:1px solid {_RP_BDR};padding:8px 8px;">-</td>'
+        _hq2_html += f'<td style="border:1px solid {_RP_BDR};padding:8px 8px;font-weight:700;color:{C["navy"]};">{_cur_score_val}</td>' if _cur_score_val is not None else f'<td style="border:1px solid {_RP_BDR};padding:8px 8px;">-</td>'
+        _hq2_html += f'<td style="border:1px solid {_RP_BDR};padding:8px 8px;">{_fmt_diff(_prev_diff_overall)}</td>'
+        _hq2_html += f'<td style="border:1px solid {_RP_BDR};padding:8px 8px;">-</td></tr>'
         _hq2_html += '</table>'
         st.markdown(f'<div style="{_RP_CARD}">{_hq2_html}</div>', unsafe_allow_html=True)
 
@@ -3062,26 +3062,26 @@ with tab1:
         with _bk_tbl_col:
             _bk3_html = '<table style="width:100%;border-collapse:collapse;font-size:0.95em;text-align:center;margin-top:30px;">'
             _bk3_html += f'<tr style="{_RP_HDR_STYLE}">'
-            _bk3_html += f'<th style="border:1px solid {_RP_BDR};padding:12px 8px;">구분</th>'
+            _bk3_html += f'<th style="border:1px solid {_RP_BDR};padding:8px 8px;">구분</th>'
             for lbl, col in zip(_bk_lbl_lr, _bk_colors_lr):
-                _bk3_html += f'<th style="border:1px solid {_RP_BDR};padding:12px 8px;color:{col};">{lbl}</th>'
-            _bk3_html += f'<th style="border:1px solid {_RP_BDR};padding:12px 8px;">합계</th></tr>'
-            _bk3_html += f'<tr><td style="border:1px solid {_RP_BDR};padding:12px 8px;font-weight:700;background:{_RP_SUB_BG};color:{C["navy"]};">응답수(건)</td>'
+                _bk3_html += f'<th style="border:1px solid {_RP_BDR};padding:8px 8px;color:{col};">{lbl}</th>'
+            _bk3_html += f'<th style="border:1px solid {_RP_BDR};padding:8px 8px;">합계</th></tr>'
+            _bk3_html += f'<tr><td style="border:1px solid {_RP_BDR};padding:8px 8px;font-weight:700;background:{_RP_SUB_BG};color:{C["navy"]};">응답수(건)</td>'
             for c in _bk_cnts_lr:
-                _bk3_html += f'<td style="border:1px solid {_RP_BDR};padding:12px 8px;">{c:,}</td>'
-            _bk3_html += f'<td style="border:1px solid {_RP_BDR};padding:12px 8px;font-weight:700;color:{C["navy"]};">{_bk_total_lr:,}</td></tr>'
-            _bk3_html += f'<tr><td style="border:1px solid {_RP_BDR};padding:12px 8px;font-weight:700;background:{_RP_SUB_BG};color:{C["navy"]};">비중(%)</td>'
+                _bk3_html += f'<td style="border:1px solid {_RP_BDR};padding:8px 8px;">{c:,}</td>'
+            _bk3_html += f'<td style="border:1px solid {_RP_BDR};padding:8px 8px;font-weight:700;color:{C["navy"]};">{_bk_total_lr:,}</td></tr>'
+            _bk3_html += f'<tr><td style="border:1px solid {_RP_BDR};padding:8px 8px;font-weight:700;background:{_RP_SUB_BG};color:{C["navy"]};">비중(%)</td>'
             for p in _bk_pcts_lr:
-                _bk3_html += f'<td style="border:1px solid {_RP_BDR};padding:12px 8px;">{p:.1f}</td>'
-            _bk3_html += f'<td style="border:1px solid {_RP_BDR};padding:12px 8px;font-weight:700;color:{C["navy"]};">100.0</td></tr>'
-            _bk3_html += f'<tr><td style="border:1px solid {_RP_BDR};padding:12px 8px;font-weight:700;background:{_RP_SUB_BG};color:{C["navy"]};">{compare_label}대비(%p)</td>'
+                _bk3_html += f'<td style="border:1px solid {_RP_BDR};padding:8px 8px;">{p:.1f}</td>'
+            _bk3_html += f'<td style="border:1px solid {_RP_BDR};padding:8px 8px;font-weight:700;color:{C["navy"]};">100.0</td></tr>'
+            _bk3_html += f'<tr><td style="border:1px solid {_RP_BDR};padding:8px 8px;font-weight:700;background:{_RP_SUB_BG};color:{C["navy"]};">{compare_label}대비(%p)</td>'
             if _diff_pcts is not None:
                 for d in _diff_pcts:
-                    _bk3_html += f'<td style="border:1px solid {_RP_BDR};padding:12px 8px;">{_fmt_diff(d)}</td>'
-                _bk3_html += f'<td style="border:1px solid {_RP_BDR};padding:12px 8px;">-</td></tr>'
+                    _bk3_html += f'<td style="border:1px solid {_RP_BDR};padding:8px 8px;">{_fmt_diff(d)}</td>'
+                _bk3_html += f'<td style="border:1px solid {_RP_BDR};padding:8px 8px;">-</td></tr>'
             else:
                 for _ in range(5):
-                    _bk3_html += f'<td style="border:1px solid {_RP_BDR};padding:12px 8px;">-</td>'
+                    _bk3_html += f'<td style="border:1px solid {_RP_BDR};padding:8px 8px;">-</td>'
                 _bk3_html += '</tr>'
             _bk3_html += '</table>'
             st.markdown(_bk3_html, unsafe_allow_html=True)
@@ -3114,10 +3114,10 @@ with tab1:
             _ofc4_html = '<table style="width:100%;border-collapse:collapse;font-size:0.93em;text-align:center;">'
             _ofc4_html += f'<tr style="{_RP_HDR_STYLE}">'
             for _ in range(2):
-                _ofc4_html += f'<th style="border:1px solid {_RP_BDR};padding:10px 6px;">구분</th>'
-                _ofc4_html += f'<th style="border:1px solid {_RP_BDR};padding:10px 6px;">종합점수</th>'
-                _ofc4_html += f'<th style="border:1px solid {_RP_BDR};padding:10px 6px;">본부대비</th>'
-                _ofc4_html += f'<th style="border:1px solid {_RP_BDR};padding:10px 6px;">{compare_label}대비</th>'
+                _ofc4_html += f'<th style="border:1px solid {_RP_BDR};padding:7px 6px;">구분</th>'
+                _ofc4_html += f'<th style="border:1px solid {_RP_BDR};padding:7px 6px;">종합점수</th>'
+                _ofc4_html += f'<th style="border:1px solid {_RP_BDR};padding:7px 6px;">본부대비</th>'
+                _ofc4_html += f'<th style="border:1px solid {_RP_BDR};padding:7px 6px;">{compare_label}대비</th>'
             _ofc4_html += '</tr>'
 
             for i in range(_max_len):
@@ -3139,12 +3139,12 @@ with tab1:
                             _score_str = "-"
                             _diff_hq_str = "-"
                             _diff_prev_str = "-"
-                        _ofc4_html += f'<td style="border:1px solid {_RP_BDR};padding:10px 6px;font-weight:700;background:{_RP_SUB_BG};color:{C["navy"]};">{_disp_name}</td>'
-                        _ofc4_html += f'<td style="border:1px solid {_RP_BDR};padding:10px 6px;">{_score_str}</td>'
-                        _ofc4_html += f'<td style="border:1px solid {_RP_BDR};padding:10px 6px;">{_diff_hq_str}</td>'
-                        _ofc4_html += f'<td style="border:1px solid {_RP_BDR};padding:10px 6px;">{_diff_prev_str}</td>'
+                        _ofc4_html += f'<td style="border:1px solid {_RP_BDR};padding:7px 6px;font-weight:700;background:{_RP_SUB_BG};color:{C["navy"]};">{_disp_name}</td>'
+                        _ofc4_html += f'<td style="border:1px solid {_RP_BDR};padding:7px 6px;">{_score_str}</td>'
+                        _ofc4_html += f'<td style="border:1px solid {_RP_BDR};padding:7px 6px;">{_diff_hq_str}</td>'
+                        _ofc4_html += f'<td style="border:1px solid {_RP_BDR};padding:7px 6px;">{_diff_prev_str}</td>'
                     else:
-                        _ofc4_html += f'<td colspan="4" style="border:1px solid {_RP_BDR};padding:10px 6px;color:#bbb;">-</td>'
+                        _ofc4_html += f'<td colspan="4" style="border:1px solid {_RP_BDR};padding:7px 6px;color:#bbb;">-</td>'
                 _ofc4_html += '</tr>'
             _ofc4_html += '</table>'
             st.markdown(f'<div style="{_RP_CARD}">{_ofc4_html}</div>', unsafe_allow_html=True)
