@@ -3170,25 +3170,26 @@ with tab1:
                                      text=[f"{r:.1f}% ({int(c):,}건)" for r, c in zip(_biz_df["비율(%)"], _biz_df["건수"])],
                                      color_discrete_map={"상위 3": C["navy"], "일반": C["sky"]},
                                      template=PLOTLY_TPL, title=f"{_title} 분포")
-                    fig_biz.update_traces(textposition="outside", textfont_size=11,
+                    fig_biz.update_traces(textposition="outside", textfont_size=14,
                                           hovertemplate="%{y}: %{x:.1f}% (%{customdata[0]:,}건)<extra></extra>",
                                           customdata=_biz_df[["건수"]].values)
                     _biz_x_max = _biz_df["비율(%)"].max() * 1.45
-                    fig_biz.update_layout(height=max(360, len(_biz_df) * 30 + 80),
+                    fig_biz.update_layout(height=max(400, len(_biz_df) * 32 + 80),
                                            margin=dict(t=50, b=20, l=20, r=20), showlegend=False,
-                                           title_font=dict(size=15, color=C["navy"]),
-                                           xaxis=dict(title="비율(%)", range=[0, _biz_x_max]), yaxis_title="")
+                                           title_font=dict(size=17, color=C["navy"]),
+                                           xaxis=dict(title="비율(%)", range=[0, _biz_x_max], tickfont=dict(size=12)),
+                                           yaxis=dict(tickfont=dict(size=13)), yaxis_title="")
                     st.plotly_chart(fig_biz, use_container_width=True, config={'staticPlot': True})
                 else:
                     # 연령대, 계약종별: 파이차트 (건수 포함)
                     _pie_labels = [f"{nm} ({cnt:,}건)" for nm, cnt in zip(counts.index, counts.values)]
                     fig_pie = px.pie(names=_pie_labels, values=counts.values, color_discrete_sequence=PIE_COLORS,
                                      hole=0.42, title=f"{_title} 분포", template=PLOTLY_TPL)
-                    fig_pie.update_traces(textposition="outside", textinfo="percent+label", textfont_size=11,
+                    fig_pie.update_traces(textposition="outside", textinfo="percent+label", textfont_size=14,
                                            marker=dict(line=dict(color="#ffffff", width=2)),
                                            hovertemplate="%{label}<br>%{percent}<extra></extra>")
-                    fig_pie.update_layout(height=360, margin=dict(t=50, b=20, l=20, r=20), showlegend=False,
-                                           title_font=dict(size=15, color=C["navy"]))
+                    fig_pie.update_layout(height=400, margin=dict(t=50, b=20, l=20, r=20), showlegend=False,
+                                           title_font=dict(size=17, color=C["navy"]))
                     st.plotly_chart(fig_pie, use_container_width=True, config={'staticPlot': True})
 
 
