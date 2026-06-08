@@ -2895,20 +2895,29 @@ with tab1:
         g_col, b_col, t_col = st.columns([1, 1, 1])
         with g_col:
             st.markdown('<p class="sec-head">🎯 종합 만족도 게이지</p>', unsafe_allow_html=True)
+            _gauge_val = round(avg_score_100, 1)
             fig_gauge = go.Figure(go.Indicator(
                 mode="gauge+number",
-                value=round(avg_score_100, 1),
+                value=_gauge_val,
                 number={"suffix": "점", "font": {"size": 40, "color": C["navy"]}},
                 gauge={
-                    "axis": {"range": [0, 100], "tickfont": {"size": 11}},
-                    "bar": {"color": C["blue"], "thickness": 0.28},
+                    "axis": {"range": [0, 100], "tickfont": {"size": 10, "color": "#888"},
+                              "tickwidth": 1, "tickcolor": "#bbb"},
+                    "bar": {"color": "rgba(0,0,0,0)", "thickness": 0},
                     "bgcolor": "white",
+                    "borderwidth": 0,
                     "steps": [
-                        {"range": [0, 50], "color": "#ffcdd2"},
-                        {"range": [50, 70], "color": "#fff9c4"},
-                        {"range": [70, 90], "color": "#c8e6c9"},
-                        {"range": [90, 100], "color": "#a5d6a7"},
+                        {"range": [0, 30],  "color": "#e74c3c"},
+                        {"range": [30, 50], "color": "#f39c12"},
+                        {"range": [50, 70], "color": "#f7dc6f"},
+                        {"range": [70, 90], "color": "#82c97c"},
+                        {"range": [90, 100], "color": "#27ae60"},
                     ],
+                    "threshold": {
+                        "line": {"color": "#1a1a1a", "width": 5},
+                        "thickness": 0.85,
+                        "value": _gauge_val,
+                    },
                 },
                 title={"text": "종합 만족도 (100점 환산)",
                        "font": {"size": 14, "color": C["navy"]}},
