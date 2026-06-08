@@ -520,32 +520,36 @@ plt.rcParams["axes.unicode_minus"] = False
 #  1. 디자인 상수
 # ══════════════════════════════════════════════════════════════
 C = dict(
-    navy   = "#1a3a6c",
-    blue   = "#0055a5",
-    sky    = "#2196f3",
-    light  = "#e3f2fd",
-    gold   = "#f0a500",
-    teal   = "#00897b",
-    red    = "#c62828",
-    orange = "#e65100",
-    green  = "#2e7d32",
-    gray   = "#546e7a",
+    # ── 브랜드 크롬 (제목/배경/카드/테두리) ──
+    navy   = "#1a3a6c",   # 1순위 강조 (sec-head, 차트 타이틀, 강조 텍스트)
+    blue   = "#0055a5",   # 2순위 강조 (한전 톤)
+    sky    = "#2196f3",   # 보조 강조 (칩/태그)
+    light  = "#e3f2fd",   # 카드/패널 배경
+    bg     = "#f4f7fc",   # 페이지 배경
     white  = "#ffffff",
-    bg     = "#f4f7fc",
-    # 채널별 테마 색상 (리포트 양식)
-    ch_employee = "#4caf50",   # 직원 응대 — 녹색
-    ch_center   = "#1976d2",   # 고객센터 — 파란색
-    ch_online   = "#fbc02d",   # 회사ON — 노란색
-    ch_etc      = "#9e9e9e",   # 기타
+    gray   = "#546e7a",
+    # ── 마스터 신호 팔레트 (점수/심각도) ──
+    # 어디서든 동일 코드 재사용. red = 50점 미만, gold = 50~69점, ok = 70~89점, green = 90+.
+    red    = "#c62828",   # 위험 / 50점 미만 / 본부평균 미달
+    orange = "#e65100",   # 경고 (게이지 30~50 zone 전용)
+    gold   = "#f0a500",   # 주의 / 50~69점
+    ok     = "#66bb6a",   # 양호 / 70~89점 (신규)
+    green  = "#2e7d32",   # 우수 / 90점 이상 / 본부평균 이상
+    teal   = "#00897b",   # 부가 액센트 (드물게 사용)
+    # ── 카테고리 색 (채널/분류) — 신호 색과 충돌 안 나도록 남색 그라데이션 ──
+    ch_employee = "#1a3a6c",   # 직원 응대 — navy
+    ch_center   = "#0055a5",   # 고객센터 — blue
+    ch_online   = "#2196f3",   # 회사ON — sky
+    ch_etc      = "#9e9e9e",   # 기타 — gray
 )
 
 PIE_COLORS   = ["#1a3a6c","#0055a5","#2196f3","#42a5f5","#90caf9",
                 "#64b5f6","#1565c0","#0288d1","#0097a7","#00897b"]
 MIXED_COLORS = ["#1a3a6c","#f0a500","#2196f3","#00897b","#c62828",
                 "#7b1fa2","#e65100","#558b2f","#0288d1","#ad1457"]
-# 점수 구간 색상 (리포트 양식)
-BUCKET_COLORS = {"90점 이상": "#2e7d32", "70~90점": "#1976d2",
-                 "50~70점": "#f0a500", "50점 미만": "#c62828"}
+# 점수 구간 색상 (마스터 신호 팔레트 재사용)
+BUCKET_COLORS = {"90점 이상": C["green"], "70~90점": C["ok"],
+                 "50~70점": C["gold"], "50점 미만": C["red"]}
 BUCKET_ORDER  = ["90점 이상", "70~90점", "50~70점", "50점 미만"]
 OFFICE_ORDER  = ["경남본부", "직할", "진주지사", "마산지사", "거제지사", "밀양지사", "사천지사",
                  "통영지사", "거창지사", "함안의령지사", "창녕지사", "합천지사", "진해지사",
@@ -2907,11 +2911,11 @@ with tab1:
                     "bgcolor": "white",
                     "borderwidth": 0,
                     "steps": [
-                        {"range": [0, 30],  "color": "#e74c3c"},
-                        {"range": [30, 50], "color": "#f39c12"},
-                        {"range": [50, 70], "color": "#f7dc6f"},
-                        {"range": [70, 90], "color": "#82c97c"},
-                        {"range": [90, 100], "color": "#27ae60"},
+                        {"range": [0, 30],   "color": C["red"]},
+                        {"range": [30, 50],  "color": C["orange"]},
+                        {"range": [50, 70],  "color": C["gold"]},
+                        {"range": [70, 90],  "color": C["ok"]},
+                        {"range": [90, 100], "color": C["green"]},
                     ],
                     "threshold": {
                         "line": {"color": "#1a1a1a", "width": 5},
@@ -2992,7 +2996,7 @@ with tab1:
             _ofc_grp_bar["_표시"] = _ofc_grp_bar.apply(
                 lambda r: f"{r['평균만족도']:.1f} ({'+' if r['_차이']>=0 else ''}{r['_차이']:.1f}점)", axis=1)
             fig_bench = px.bar(_ofc_grp_bar, x="평균만족도", y="사업소", color="그룹",
-                               color_discrete_map={"⬆ 본부평균 이상": C["teal"], "⬇ 본부평균 미달": C["red"]},
+                               color_discrete_map={"⬆ 본부평균 이상": C["green"], "⬇ 본부평균 미달": C["red"]},
                                orientation="h", text="_표시", template=PLOTLY_TPL,
                                title=f"사업소별 평균 만족도 — 본부 평균: {_bar_avg:.1f}점")
             fig_bench.update_traces(texttemplate="%{text}", textposition="outside", cliponaxis=False,
@@ -4740,7 +4744,7 @@ with tab_sol:
                                                     _rn = str(_c3_df.at[_idx, M["receipt_no"]]).strip()
                                                     if _rn and _rn not in ("nan", ""):
                                                         _receipt_html = (
-                                                            f'<span style="color:#1976d2;font-weight:600;'
+                                                            f'<span style="color:{C["blue"]};font-weight:600;'
                                                             f'font-size:0.8em;">[{_rn}]</span> ')
                                                 st.markdown(
                                                     '<div style="border-left:3px solid #ef9a9a;'
@@ -4810,9 +4814,9 @@ with tab_sol:
                     if _kw_data and isinstance(_kw_data, dict) and _kw_data.get("부정"):
                         st.markdown("---")
                         st.markdown(
-                            f'<div style="background:#f5f5f5;border-left:4px solid #1976d2;'
+                            f'<div style="background:#f5f5f5;border-left:4px solid {C["blue"]};'
                             f'border-radius:6px;padding:12px 16px;margin:8px 0;">'
-                            f'<span style="font-weight:700;color:#1976d2;">🔬 VOC 키워드</span>'
+                            f'<span style="font-weight:700;color:{C["blue"]};">🔬 VOC 키워드</span>'
                             f'<span style="margin-left:16px;">부정: <b>{_kw_data["부정"]}</b></span>'
                             f'<span style="margin-left:16px;color:#666;">특이: {_kw_data["특이"]}</span>'
                             f'</div>', unsafe_allow_html=True)
