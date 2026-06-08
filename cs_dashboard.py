@@ -2944,91 +2944,6 @@ with tab_weekly:
 # ─────────────────────────────────────────────────────────────
 with tab1:
     if M["score"] and avg_score_100 is not None and not np.isnan(avg_score_100):
-        # ── 게이지 + 도넛 + 표 (3컬럼 1:1:1) ──
-        g_col, b_col, t_col = st.columns([1, 1, 1])
-        with g_col:
-            st.markdown('<p class="sec-head">🎯 종합 만족도 게이지</p>', unsafe_allow_html=True)
-            _gauge_val = round(avg_score_100, 1)
-            fig_gauge = go.Figure(go.Indicator(
-                mode="gauge+number",
-                value=_gauge_val,
-                number={"suffix": "점", "font": {"size": 40, "color": C["navy"]}},
-                gauge={
-                    "axis": {"range": [0, 100], "tickfont": {"size": 10, "color": "#888"},
-                              "tickwidth": 1, "tickcolor": "#bbb"},
-                    "bar": {"color": "rgba(0,0,0,0)", "thickness": 0},
-                    "bgcolor": "white",
-                    "borderwidth": 0,
-                    "steps": [
-                        {"range": [0, 30],   "color": C["red"]},
-                        {"range": [30, 50],  "color": C["orange"]},
-                        {"range": [50, 70],  "color": C["gold"]},
-                        {"range": [70, 90],  "color": C["ok"]},
-                        {"range": [90, 100], "color": C["green"]},
-                    ],
-                    "threshold": {
-                        "line": {"color": "#1a1a1a", "width": 5},
-                        "thickness": 0.85,
-                        "value": _gauge_val,
-                    },
-                },
-            ))
-            fig_gauge.update_layout(height=300, margin=dict(t=30, b=20, l=30, r=30), paper_bgcolor="white")
-            st.plotly_chart(fig_gauge, use_container_width=True, config={'staticPlot': True})
-        with b_col:
-            st.markdown('<p class="sec-head">📊 만족도 점수 구간별 비중</p>', unsafe_allow_html=True)
-            bucket_cnt = df_f["_점수구간"].value_counts()
-            _SHORT_BUCKET = {"90점 이상": "≥90점", "70~90점": "70~89점",
-                             "50~70점": "50~69점", "50점 미만": "<50점"}
-            bucket_data = pd.DataFrame({
-                "구간": BUCKET_ORDER,
-                "건수": [bucket_cnt.get(b, 0) for b in BUCKET_ORDER],
-            })
-            bucket_data["비율(%)"] = (bucket_data["건수"] / max(bucket_data["건수"].sum(), 1) * 100).round(1)
-            bucket_data["라벨"] = bucket_data["구간"].map(_SHORT_BUCKET)
-            _bk_color_map = {_SHORT_BUCKET[k]: v for k, v in BUCKET_COLORS.items()
-                             if k in bucket_data["구간"].values}
-            fig_bp = px.pie(bucket_data, names="라벨", values="건수", color="라벨",
-                            color_discrete_map=_bk_color_map, hole=0.45, template=PLOTLY_TPL)
-            fig_bp.update_traces(textposition="inside", textinfo="percent", textfont_size=12,
-                                  marker=dict(line=dict(color="#ffffff", width=2)),
-                                  hovertemplate="%{label}<br>%{percent}<extra></extra>")
-            fig_bp.update_layout(
-                height=300, margin=dict(t=20, b=10, l=10, r=10),
-                showlegend=True,
-                legend=dict(orientation="h", yanchor="top", y=-0.05,
-                            xanchor="center", x=0.5, font=dict(size=11),
-                            title_text=""))
-            st.plotly_chart(fig_bp, use_container_width=True, config={'staticPlot': True})
-
-        with t_col:
-            st.markdown('<p class="sec-head">📋 구간별 응답 현황</p>', unsafe_allow_html=True)
-            _tbl_order = ["50점 미만", "50~70점", "70~90점", "90점 이상"]
-            _tbl_labels = ["50점 미만", "50~70점 미만", "70~90점 미만", "90점 이상"]
-            _tbl_cnts = [int(bucket_cnt.get(b, 0)) for b in _tbl_order]
-            _tbl_total = sum(_tbl_cnts)
-            _tbl_pcts = [round(c / max(_tbl_total, 1) * 100, 1) for c in _tbl_cnts]
-            _tbl_colors = [BUCKET_COLORS[b] for b in _tbl_order]
-            _hdr_bg = "#d6e4f0"
-            _bdr = "#b0b0b0"
-            _bk_html = ('<table style="width:100%;border-collapse:collapse;'
-                        'font-size:0.88em;text-align:center;margin-top:50px;">')
-            _bk_html += f'<tr style="background:{_hdr_bg};font-weight:bold;">'
-            _bk_html += f'<th style="border:1px solid {_bdr};padding:8px 4px;">구분</th>'
-            for lbl, col in zip(_tbl_labels, _tbl_colors):
-                _bk_html += f'<th style="border:1px solid {_bdr};padding:8px 4px;color:{col};">{lbl}</th>'
-            _bk_html += f'<th style="border:1px solid {_bdr};padding:8px 4px;">합계</th></tr>'
-            _bk_html += f'<tr><td style="border:1px solid {_bdr};padding:8px;font-weight:bold;background:#f9f9f9;">응답수(건)</td>'
-            for c in _tbl_cnts:
-                _bk_html += f'<td style="border:1px solid {_bdr};padding:8px;">{c:,}</td>'
-            _bk_html += f'<td style="border:1px solid {_bdr};padding:8px;font-weight:bold;">{_tbl_total:,}</td></tr>'
-            _bk_html += f'<tr><td style="border:1px solid {_bdr};padding:8px;font-weight:bold;background:#f9f9f9;">비중(%)</td>'
-            for p in _tbl_pcts:
-                _bk_html += f'<td style="border:1px solid {_bdr};padding:8px;">{p:.1f}</td>'
-            _bk_html += f'<td style="border:1px solid {_bdr};padding:8px;font-weight:bold;">100.0</td></tr>'
-            _bk_html += '</table>'
-            st.markdown(_bk_html, unsafe_allow_html=True)
-
         # ── CS리포트 표 공통 스타일 ──
         _RP_HDR_BG = "#d6e4f0"
         _RP_BDR = "#b0b0b0"
@@ -3108,32 +3023,59 @@ with tab1:
             _title3 = f'본부 만족도 90점 이상 비중 {_p90:.1f}%로 {compare_label} 대비 (   )%p 감소'
         st.markdown(f'<p class="sec-head">{_title3}</p>', unsafe_allow_html=True)
 
+        # ── [도넛 | 표] 2컬럼 ──
         _bk_colors_lr = [BUCKET_COLORS[b] for b in _bk_order_lr]
-        _bk3_html = '<table style="width:100%;border-collapse:collapse;font-size:0.92em;text-align:center;">'
-        _bk3_html += f'<tr style="background:{_RP_HDR_BG};font-weight:bold;">'
-        _bk3_html += f'<th style="border:1px solid {_RP_BDR};padding:8px;">구분</th>'
-        for lbl, col in zip(_bk_lbl_lr, _bk_colors_lr):
-            _bk3_html += f'<th style="border:1px solid {_RP_BDR};padding:8px;color:{col};">{lbl}</th>'
-        _bk3_html += f'<th style="border:1px solid {_RP_BDR};padding:8px;">합계</th></tr>'
-        _bk3_html += f'<tr><td style="border:1px solid {_RP_BDR};padding:8px;font-weight:bold;background:{_RP_SUB_BG};">응답수(건)</td>'
-        for c in _bk_cnts_lr:
-            _bk3_html += f'<td style="border:1px solid {_RP_BDR};padding:8px;">{c:,}</td>'
-        _bk3_html += f'<td style="border:1px solid {_RP_BDR};padding:8px;font-weight:bold;">{_bk_total_lr:,}</td></tr>'
-        _bk3_html += f'<tr><td style="border:1px solid {_RP_BDR};padding:8px;font-weight:bold;background:{_RP_SUB_BG};">비중(%)</td>'
-        for p in _bk_pcts_lr:
-            _bk3_html += f'<td style="border:1px solid {_RP_BDR};padding:8px;">{p:.1f}</td>'
-        _bk3_html += f'<td style="border:1px solid {_RP_BDR};padding:8px;font-weight:bold;">100.0</td></tr>'
-        _bk3_html += f'<tr><td style="border:1px solid {_RP_BDR};padding:8px;font-weight:bold;background:{_RP_SUB_BG};">{compare_label}대비(%p)</td>'
-        if _diff_pcts is not None:
-            for d in _diff_pcts:
-                _bk3_html += f'<td style="border:1px solid {_RP_BDR};padding:8px;">{_fmt_diff(d)}</td>'
-            _bk3_html += f'<td style="border:1px solid {_RP_BDR};padding:8px;">-</td></tr>'
-        else:
-            for _ in range(5):
-                _bk3_html += f'<td style="border:1px solid {_RP_BDR};padding:8px;">-</td>'
-            _bk3_html += '</tr>'
-        _bk3_html += '</table>'
-        st.markdown(_bk3_html, unsafe_allow_html=True)
+        _bk_donut_col, _bk_tbl_col = st.columns([1, 1])
+
+        with _bk_donut_col:
+            _SHORT_BUCKET = {"90점 이상": "≥90점", "70~90점": "70~89점",
+                             "50~70점": "50~69점", "50점 미만": "<50점"}
+            _donut_df = pd.DataFrame({
+                "구간": BUCKET_ORDER,
+                "건수": [int(_bk_cnt_full.get(b, 0)) for b in BUCKET_ORDER],
+            })
+            _donut_df["라벨"] = _donut_df["구간"].map(_SHORT_BUCKET)
+            _bk_color_map = {_SHORT_BUCKET[k]: v for k, v in BUCKET_COLORS.items()
+                             if k in _donut_df["구간"].values}
+            fig_bp = px.pie(_donut_df, names="라벨", values="건수", color="라벨",
+                            color_discrete_map=_bk_color_map, hole=0.45, template=PLOTLY_TPL)
+            fig_bp.update_traces(textposition="inside", textinfo="percent", textfont_size=12,
+                                  marker=dict(line=dict(color="#ffffff", width=2)),
+                                  hovertemplate="%{label}<br>%{percent}<extra></extra>")
+            fig_bp.update_layout(
+                height=320, margin=dict(t=20, b=10, l=10, r=10),
+                showlegend=True,
+                legend=dict(orientation="h", yanchor="top", y=-0.05,
+                            xanchor="center", x=0.5, font=dict(size=11),
+                            title_text=""))
+            st.plotly_chart(fig_bp, use_container_width=True, config={'staticPlot': True})
+
+        with _bk_tbl_col:
+            _bk3_html = '<table style="width:100%;border-collapse:collapse;font-size:0.92em;text-align:center;margin-top:40px;">'
+            _bk3_html += f'<tr style="background:{_RP_HDR_BG};font-weight:bold;">'
+            _bk3_html += f'<th style="border:1px solid {_RP_BDR};padding:8px;">구분</th>'
+            for lbl, col in zip(_bk_lbl_lr, _bk_colors_lr):
+                _bk3_html += f'<th style="border:1px solid {_RP_BDR};padding:8px;color:{col};">{lbl}</th>'
+            _bk3_html += f'<th style="border:1px solid {_RP_BDR};padding:8px;">합계</th></tr>'
+            _bk3_html += f'<tr><td style="border:1px solid {_RP_BDR};padding:8px;font-weight:bold;background:{_RP_SUB_BG};">응답수(건)</td>'
+            for c in _bk_cnts_lr:
+                _bk3_html += f'<td style="border:1px solid {_RP_BDR};padding:8px;">{c:,}</td>'
+            _bk3_html += f'<td style="border:1px solid {_RP_BDR};padding:8px;font-weight:bold;">{_bk_total_lr:,}</td></tr>'
+            _bk3_html += f'<tr><td style="border:1px solid {_RP_BDR};padding:8px;font-weight:bold;background:{_RP_SUB_BG};">비중(%)</td>'
+            for p in _bk_pcts_lr:
+                _bk3_html += f'<td style="border:1px solid {_RP_BDR};padding:8px;">{p:.1f}</td>'
+            _bk3_html += f'<td style="border:1px solid {_RP_BDR};padding:8px;font-weight:bold;">100.0</td></tr>'
+            _bk3_html += f'<tr><td style="border:1px solid {_RP_BDR};padding:8px;font-weight:bold;background:{_RP_SUB_BG};">{compare_label}대비(%p)</td>'
+            if _diff_pcts is not None:
+                for d in _diff_pcts:
+                    _bk3_html += f'<td style="border:1px solid {_RP_BDR};padding:8px;">{_fmt_diff(d)}</td>'
+                _bk3_html += f'<td style="border:1px solid {_RP_BDR};padding:8px;">-</td></tr>'
+            else:
+                for _ in range(5):
+                    _bk3_html += f'<td style="border:1px solid {_RP_BDR};padding:8px;">-</td>'
+                _bk3_html += '</tr>'
+            _bk3_html += '</table>'
+            st.markdown(_bk3_html, unsafe_allow_html=True)
 
         # ════════════════════════════════════════════════════════
         # CS리포트 4번 — 사업소별 만족도 (군별 2단 표)
