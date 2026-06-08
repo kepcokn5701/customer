@@ -3014,7 +3014,7 @@ with tab1:
 #  TAB 3  계약종별 · 업무유형별 분석
 # ─────────────────────────────────────────────────────────────
 def _render_category_section(df, cat_col, cat_label, office_col, score_col, overall_avg):
-    """범주별 분석 공통 렌더링: 전체 막대 + 지사별 히트맵 + 하위 3개 카드. returns download DataFrame."""
+    """범주별 분석 공통 렌더링: 줄글 요약 + 접이식(차트·히트맵·카드). returns download DataFrame."""
     _return_dl_df = None
     grp = df.groupby(cat_col)[score_col].agg(["mean","count"]).reset_index()
     grp.columns = [cat_label, "평균만족도", "응답수"]
@@ -3024,249 +3024,276 @@ def _render_category_section(df, cat_col, cat_label, office_col, score_col, over
     bottom3_names = bottom3[cat_label].tolist()
     grp["구분"] = grp[cat_label].apply(lambda x: "하위 3" if x in bottom3_names else "일반")
 
-    # ── 전체 평균 막대 차트 ──
-    fig = px.bar(grp, x="평균만족도", y=cat_label, color="구분",
-                 color_discrete_map={"하위 3": C["red"], "일반": C["sky"]},
-                 orientation="h", text="평균만족도", template=PLOTLY_TPL,
-                 title=f"{cat_label}별 평균 만족도 (빨간색 = 하위 3개)")
-    fig.update_traces(texttemplate="%{text:.1f}", textposition="outside", cliponaxis=False,
-                      hovertemplate="%{y}<br>평균: %{x:.1f}점<br>응답: %{customdata[0]:,}건<extra></extra>",
-                      customdata=grp[["응답수"]].values)
-    fig.add_vline(x=overall_avg, line_color="#aaa", line_dash="dash", line_width=1.2,
-                  annotation_text=f"▼ 전체 평균 {overall_avg:.1f}",
-                  annotation_font_size=11, annotation_font_color="#888",
-                  annotation_position="top", annotation_yshift=10)
-    fig.update_layout(height=max(300, len(grp) * 30 + 80),
-                       margin=dict(t=80, b=20, l=10, r=160), legend_title_text="",
-                       title_font=dict(size=14, color=C["navy"]))
-    st.plotly_chart(fig, use_container_width=True, config={'staticPlot': True})
-
-    # ── 하위 3개 카드 ──
-    b3_cols = st.columns(min(3, len(bottom3)))
-    for i, (_, row) in enumerate(bottom3.iterrows()):
-        if i < len(b3_cols):
-            with b3_cols[i]:
-                st.markdown(
-                    f'<div class="card-red">'
-                    f'<b style="font-size:1.05rem;">🔴 {row[cat_label]}</b><br><br>'
-                    f'평균: <b>{row["평균만족도"]:.1f}점</b><br>'
-                    f'응답: {row["응답수"]:,}건<br>'
-                    f'전체 대비: <b style="color:{C["red"]}">{row["평균만족도"] - overall_avg:+.1f}점</b>'
-                    f'</div>', unsafe_allow_html=True)
-
-    # ── 지사별 × 범주별 점수 테이블/히트맵 ──
+    # ── 줄글 요약 분석 ──
+    _grp_desc = grp.sort_values("평균만족도", ascending=False)
+    _top = _grp_desc.iloc[0]
+    _bot = _grp_desc.iloc[-1]
+    _total_resp = int(grp["응답수"].sum())
+    _summary_lines = []
+    _summary_lines.append(f"전체 {cat_label} {len(grp)}개 중 **{_top[cat_label]}**이(가) {_top['평균만족도']:.1f}점으로 가장 높고, "
+                          f"**{_bot[cat_label]}**이(가) {_bot['평균만족도']:.1f}점으로 가장 낮습니다. "
+                          f"(전체 평균 {overall_avg:.1f}점, 총 응답 {_total_resp:,}건)")
+    _below = _grp_desc[_grp_desc["평균만족도"] < overall_avg]
+    if len(_below) > 0:
+        _below_names = ", ".join([f"**{r[cat_label]}**({r['평균만족도']:.1f}점)" for _, r in _below.iterrows()])
+        _summary_lines.append(f"전체 평균 미달 {cat_label}: {_below_names}")
     if office_col:
-        st.markdown(f'<p class="sec-head">🏢 지사별 {cat_label} 평균 만족도</p>', unsafe_allow_html=True)
-        # 점수 pivot
-        pivot = df.pivot_table(values=score_col, index=office_col,
-                               columns=cat_col, aggfunc="mean").round(1)
-        # 건수 pivot
-        pivot_cnt = df.pivot_table(values=score_col, index=office_col,
-                                   columns=cat_col, aggfunc="count").fillna(0).astype(int)
-        _offices_sorted = _sort_offices(pivot.index.tolist())
-        pivot = pivot.reindex(_offices_sorted)
-        pivot_cnt = pivot_cnt.reindex(_offices_sorted).fillna(0).astype(int)
+        _ofc_avg = df.groupby(office_col)[score_col].mean()
+        if len(_ofc_avg) > 0:
+            _best_ofc = _ofc_avg.idxmax()
+            _worst_ofc = _ofc_avg.idxmin()
+            _summary_lines.append(
+                f"지사별로는 **{_best_ofc}**({_ofc_avg[_best_ofc]:.1f}점)이(가) 가장 높고, "
+                f"**{_worst_ofc}**({_ofc_avg[_worst_ofc]:.1f}점)이(가) 가장 낮아 "
+                f"본부 평균 대비 {_ofc_avg[_worst_ofc] - overall_avg:+.1f}점 차이를 보입니다.")
+    _summary_md = "\n\n".join(_summary_lines)
+    st.markdown(f'<div style="background:#f8f9fb;border-left:4px solid #1a3a6c;padding:16px 20px;margin-bottom:16px;border-radius:6px;font-size:0.95em;line-height:1.7;">{_summary_md}</div>', unsafe_allow_html=True)
 
-        _is_contract = (cat_label == "계약종별")
-        # 계약종별 컬럼 순서 고정
-        if _is_contract:
-            _ct_order = ["주택용", "일반용", "산업용", "농사용", "교육용", "가로등"]
-            _ordered = [c for c in _ct_order if c in pivot.columns]
-            _rest = [c for c in pivot.columns if c not in _ct_order]
-            pivot = pivot[_ordered + _rest]
-            pivot_cnt = pivot_cnt.reindex(columns=pivot.columns).fillna(0).astype(int)
-        elif cat_label == "업무유형":
-            _biz_ordered = [c for c in _BIZ_ORDER if c in pivot.columns]
-            _biz_rest = [c for c in pivot.columns if c not in _BIZ_ORDER]
-            pivot = pivot[_biz_ordered + _biz_rest]
-            pivot_cnt = pivot_cnt.reindex(columns=pivot.columns).fillna(0).astype(int)
+    with st.expander(f"📊 {cat_label} 상세 차트 · 히트맵 보기", expanded=False):
 
-        if not pivot.empty:
-            # ── 본부 평균 사전 계산 (카테고리별) ──
-            _hq_avgs = {}
-            for c in pivot.columns:
-                _hq_s = df.loc[df[cat_col].eq(c), score_col].mean()
-                _hq_avgs[c] = float(_hq_s) if pd.notna(_hq_s) else None
-            _hq_total_avg = float(df[score_col].mean()) if pd.notna(df[score_col].mean()) else None
+        # ── 전체 평균 막대 차트 ──
+        fig = px.bar(grp, x="평균만족도", y=cat_label, color="구분",
+                     color_discrete_map={"하위 3": C["red"], "일반": C["sky"]},
+                     orientation="h", text="평균만족도", template=PLOTLY_TPL,
+                     title=f"{cat_label}별 평균 만족도 (빨간색 = 하위 3개)")
+        fig.update_traces(texttemplate="%{text:.1f}", textposition="outside", cliponaxis=False,
+                          hovertemplate="%{y}<br>평균: %{x:.1f}점<br>응답: %{customdata[0]:,}건<extra></extra>",
+                          customdata=grp[["응답수"]].values)
+        fig.add_vline(x=overall_avg, line_color="#aaa", line_dash="dash", line_width=1.2,
+                      annotation_text=f"▼ 전체 평균 {overall_avg:.1f}",
+                      annotation_font_size=11, annotation_font_color="#888",
+                      annotation_position="top", annotation_yshift=10)
+        fig.update_layout(height=max(300, len(grp) * 30 + 80),
+                           margin=dict(t=80, b=20, l=10, r=160), legend_title_text="",
+                           title_font=dict(size=14, color=C["navy"]))
+        st.plotly_chart(fig, use_container_width=True, config={'staticPlot': True})
 
-            def _below_avg_color(v, hq_avg):
-                """본부 평균 미만 → 연라벤더~진보라 그라데이션, 이상 → 투명"""
-                if pd.isna(v) or hq_avg is None:
-                    return ""
-                gap = hq_avg - v
-                if gap <= 0:
-                    return ""
-                # gap 0→10+ : 연라벤더(237,233,254) → 진보라(167,139,250)
-                t = min(gap / 10.0, 1.0)
-                r = int(237 - (237 - 167) * t)
-                g = int(233 - (233 - 139) * t)
-                b = int(254 - (254 - 250) * t)
-                return f"background:rgba({r},{g},{b},0.55);"
+        # ── 하위 3개 카드 ──
+        b3_cols = st.columns(min(3, len(bottom3)))
+        for i, (_, row) in enumerate(bottom3.iterrows()):
+            if i < len(b3_cols):
+                with b3_cols[i]:
+                    st.markdown(
+                        f'<div class="card-red">'
+                        f'<b style="font-size:1.05rem;">🔴 {row[cat_label]}</b><br><br>'
+                        f'평균: <b>{row["평균만족도"]:.1f}점</b><br>'
+                        f'응답: {row["응답수"]:,}건<br>'
+                        f'전체 대비: <b style="color:{C["red"]}">{row["평균만족도"] - overall_avg:+.1f}점</b>'
+                        f'</div>', unsafe_allow_html=True)
 
-            _hdr = "#d6e4f0"
-            _bdr = "#b0b0b0"
-            _ylw = "#fef9e7"
-            _cols = list(pivot.columns)
+        # ── 지사별 × 범주별 점수 테이블/히트맵 ──
+        if office_col:
+            st.markdown(f'<p class="sec-head">🏢 지사별 {cat_label} 평균 만족도</p>', unsafe_allow_html=True)
+            # 점수 pivot
+            pivot = df.pivot_table(values=score_col, index=office_col,
+                                   columns=cat_col, aggfunc="mean").round(1)
+            # 건수 pivot
+            pivot_cnt = df.pivot_table(values=score_col, index=office_col,
+                                       columns=cat_col, aggfunc="count").fillna(0).astype(int)
+            _offices_sorted = _sort_offices(pivot.index.tolist())
+            pivot = pivot.reindex(_offices_sorted)
+            pivot_cnt = pivot_cnt.reindex(_offices_sorted).fillna(0).astype(int)
 
-            html = '<div style="overflow-x:auto;"><table style="border-collapse:collapse;width:100%;font-size:0.85em;text-align:center;">'
-
+            _is_contract = (cat_label == "계약종별")
+            # 계약종별 컬럼 순서 고정
             if _is_contract:
-                # ── 양식2: 2단 헤더 (계약종 > 종합점수/응답호수) ──
-                html += f'<tr style="background:{_hdr};font-weight:bold;">'
-                html += f'<th rowspan="2" style="border:1px solid {_bdr};padding:6px 10px;min-width:70px;">지사</th>'
-                for c in _cols:
-                    html += f'<th colspan="2" style="border:1px solid {_bdr};padding:6px 4px;">{c}</th>'
-                html += f'<th colspan="2" style="border:1px solid {_bdr};padding:6px 4px;">합계</th>'
-                html += '</tr>'
-                html += f'<tr style="background:{_hdr};font-weight:bold;font-size:0.9em;">'
-                for _ in _cols:
+                _ct_order = ["주택용", "일반용", "산업용", "농사용", "교육용", "가로등"]
+                _ordered = [c for c in _ct_order if c in pivot.columns]
+                _rest = [c for c in pivot.columns if c not in _ct_order]
+                pivot = pivot[_ordered + _rest]
+                pivot_cnt = pivot_cnt.reindex(columns=pivot.columns).fillna(0).astype(int)
+            elif cat_label == "업무유형":
+                _biz_ordered = [c for c in _BIZ_ORDER if c in pivot.columns]
+                _biz_rest = [c for c in pivot.columns if c not in _BIZ_ORDER]
+                pivot = pivot[_biz_ordered + _biz_rest]
+                pivot_cnt = pivot_cnt.reindex(columns=pivot.columns).fillna(0).astype(int)
+
+            if not pivot.empty:
+                # ── 본부 평균 사전 계산 (카테고리별) ──
+                _hq_avgs = {}
+                for c in pivot.columns:
+                    _hq_s = df.loc[df[cat_col].eq(c), score_col].mean()
+                    _hq_avgs[c] = float(_hq_s) if pd.notna(_hq_s) else None
+                _hq_total_avg = float(df[score_col].mean()) if pd.notna(df[score_col].mean()) else None
+
+                def _below_avg_color(v, hq_avg):
+                    """본부 평균 미만 → 연라벤더~진보라 그라데이션, 이상 → 투명"""
+                    if pd.isna(v) or hq_avg is None:
+                        return ""
+                    gap = hq_avg - v
+                    if gap <= 0:
+                        return ""
+                    # gap 0→10+ : 연라벤더(237,233,254) → 진보라(167,139,250)
+                    t = min(gap / 10.0, 1.0)
+                    r = int(237 - (237 - 167) * t)
+                    g = int(233 - (233 - 139) * t)
+                    b = int(254 - (254 - 250) * t)
+                    return f"background:rgba({r},{g},{b},0.55);"
+
+                _hdr = "#d6e4f0"
+                _bdr = "#b0b0b0"
+                _ylw = "#fef9e7"
+                _cols = list(pivot.columns)
+
+                html = '<div style="overflow-x:auto;"><table style="border-collapse:collapse;width:100%;font-size:0.85em;text-align:center;">'
+
+                if _is_contract:
+                    # ── 양식2: 2단 헤더 (계약종 > 종합점수/응답호수) ──
+                    html += f'<tr style="background:{_hdr};font-weight:bold;">'
+                    html += f'<th rowspan="2" style="border:1px solid {_bdr};padding:6px 10px;min-width:70px;">지사</th>'
+                    for c in _cols:
+                        html += f'<th colspan="2" style="border:1px solid {_bdr};padding:6px 4px;">{c}</th>'
+                    html += f'<th colspan="2" style="border:1px solid {_bdr};padding:6px 4px;">합계</th>'
+                    html += '</tr>'
+                    html += f'<tr style="background:{_hdr};font-weight:bold;font-size:0.9em;">'
+                    for _ in _cols:
+                        html += f'<th style="border:1px solid {_bdr};padding:4px;">종합<br>점수</th>'
+                        html += f'<th style="border:1px solid {_bdr};padding:4px;">응답<br>호수</th>'
                     html += f'<th style="border:1px solid {_bdr};padding:4px;">종합<br>점수</th>'
                     html += f'<th style="border:1px solid {_bdr};padding:4px;">응답<br>호수</th>'
-                html += f'<th style="border:1px solid {_bdr};padding:4px;">종합<br>점수</th>'
-                html += f'<th style="border:1px solid {_bdr};padding:4px;">응답<br>호수</th>'
-                html += '</tr>'
-            else:
-                # ── 양식3: 1단 헤더 (업무유형/접수채널) ──
-                html += f'<tr style="background:{_hdr};font-weight:bold;">'
-                html += f'<th style="border:1px solid {_bdr};padding:6px 10px;min-width:70px;">구분</th>'
-                for c in _cols:
-                    html += f'<th style="border:1px solid {_bdr};padding:6px 4px;">{c}</th>'
-                html += f'<th style="border:1px solid {_bdr};padding:6px 4px;">합계</th>'
-                html += '</tr>'
-
-            # 본부 합계 행
-            _dbl = f"border-bottom:3px double {_bdr};"
-            html += f'<tr style="background:#e8eef5;font-weight:bold;">'
-            html += f'<td style="border:1px solid {_bdr};{_dbl}padding:5px 8px;font-weight:bold;background:#dce6f0;">본부</td>'
-            for c in _cols:
-                _hq_v = df[cat_col].eq(c).astype(int)
-                _hq_score = df.loc[_hq_v == 1, score_col].mean()
-                _hq_str = f"{_hq_score:.1f}" if pd.notna(_hq_score) else ""
-                if _is_contract:
-                    _hq_cnt = int(df.loc[_hq_v == 1, score_col].count())
-                    html += f'<td style="border:1px solid {_bdr};{_dbl}padding:4px;">{_hq_str}</td>'
-                    html += f'<td style="border:1px solid {_bdr};{_dbl}padding:4px;">{_hq_cnt}</td>'
+                    html += '</tr>'
                 else:
-                    html += f'<td style="border:1px solid {_bdr};{_dbl}padding:4px;">{_hq_str}</td>'
-            # 본부 합계 총합
-            _hq_total = df[score_col].mean()
-            _hq_total_str = f"{_hq_total:.1f}" if pd.notna(_hq_total) else ""
-            if _is_contract:
-                _hq_total_cnt = int(df[score_col].count())
-                html += f'<td style="border:1px solid {_bdr};{_dbl}padding:4px;font-weight:bold;">{_hq_total_str}</td>'
-                html += f'<td style="border:1px solid {_bdr};{_dbl}padding:4px;">{_hq_total_cnt}</td>'
-            else:
-                html += f'<td style="border:1px solid {_bdr};{_dbl}padding:4px;font-weight:bold;">{_hq_total_str}</td>'
-            html += '</tr>'
+                    # ── 양식3: 1단 헤더 (업무유형/접수채널) ──
+                    html += f'<tr style="background:{_hdr};font-weight:bold;">'
+                    html += f'<th style="border:1px solid {_bdr};padding:6px 10px;min-width:70px;">구분</th>'
+                    for c in _cols:
+                        html += f'<th style="border:1px solid {_bdr};padding:6px 4px;">{c}</th>'
+                    html += f'<th style="border:1px solid {_bdr};padding:6px 4px;">합계</th>'
+                    html += '</tr>'
 
-            # 지사별 하위 3개 업무유형 사전 계산 (업무유형 테이블만)
-            _is_biz = (cat_label == "업무유형")
-            _ofc_bottom3 = {}
-            if _is_biz:
-                for ofc in pivot.index:
-                    _row = pivot.loc[ofc].dropna().sort_values()
-                    _ofc_bottom3[ofc] = {cat: rank + 1 for rank, (cat, _) in enumerate(_row.head(3).items())}
-
-            # 데이터 행
-            for ofc in pivot.index:
-                html += '<tr>'
-                html += f'<td style="border:1px solid {_bdr};padding:5px 8px;font-weight:bold;background:#f9f9f9;">{ofc}</td>'
+                # 본부 합계 행
+                _dbl = f"border-bottom:3px double {_bdr};"
+                html += f'<tr style="background:#e8eef5;font-weight:bold;">'
+                html += f'<td style="border:1px solid {_bdr};{_dbl}padding:5px 8px;font-weight:bold;background:#dce6f0;">본부</td>'
                 for c in _cols:
-                    v = pivot.loc[ofc, c]
-                    v_str = f"{v:.1f}" if pd.notna(v) else ""
-                    _bg = _below_avg_color(v, _hq_avgs.get(c))
+                    _hq_v = df[cat_col].eq(c).astype(int)
+                    _hq_score = df.loc[_hq_v == 1, score_col].mean()
+                    _hq_str = f"{_hq_score:.1f}" if pd.notna(_hq_score) else ""
                     if _is_contract:
-                        cnt = int(pivot_cnt.loc[ofc, c])
-                        cnt_str = str(cnt) if cnt > 0 else ""
-                        html += f'<td style="border:1px solid {_bdr};padding:4px;{_bg}">{v_str}</td>'
-                        html += f'<td style="border:1px solid {_bdr};padding:4px;">{cnt_str}</td>'
+                        _hq_cnt = int(df.loc[_hq_v == 1, score_col].count())
+                        html += f'<td style="border:1px solid {_bdr};{_dbl}padding:4px;">{_hq_str}</td>'
+                        html += f'<td style="border:1px solid {_bdr};{_dbl}padding:4px;">{_hq_cnt}</td>'
                     else:
-                        _rank = _ofc_bottom3.get(ofc, {}).get(c)
-                        if _rank:
-                            _mk = f' <span style="font-size:0.8em;">(▼{_rank})</span>'
-                            html += f'<td style="border:1px solid {_bdr};padding:4px;{_bg}color:#d32f2f;font-weight:bold;">{v_str}{_mk}</td>'
-                        else:
-                            html += f'<td style="border:1px solid {_bdr};padding:4px;{_bg}">{v_str}</td>'
-                # 합계 열
-                _t_score = df[df[office_col] == ofc][score_col].mean()
-                _t_str = f"{_t_score:.1f}" if pd.notna(_t_score) else ""
-                _t_bg = _below_avg_color(_t_score, _hq_total_avg)
+                        html += f'<td style="border:1px solid {_bdr};{_dbl}padding:4px;">{_hq_str}</td>'
+                # 본부 합계 총합
+                _hq_total = df[score_col].mean()
+                _hq_total_str = f"{_hq_total:.1f}" if pd.notna(_hq_total) else ""
                 if _is_contract:
-                    _t_cnt = int(df[df[office_col] == ofc][score_col].count())
-                    html += f'<td style="border:1px solid {_bdr};padding:4px;font-weight:bold;">{_t_str}</td>'
-                    html += f'<td style="border:1px solid {_bdr};padding:4px;">{_t_cnt}</td>'
+                    _hq_total_cnt = int(df[score_col].count())
+                    html += f'<td style="border:1px solid {_bdr};{_dbl}padding:4px;font-weight:bold;">{_hq_total_str}</td>'
+                    html += f'<td style="border:1px solid {_bdr};{_dbl}padding:4px;">{_hq_total_cnt}</td>'
                 else:
-                    html += f'<td style="border:1px solid {_bdr};padding:4px;font-weight:bold;">{_t_str}</td>'
+                    html += f'<td style="border:1px solid {_bdr};{_dbl}padding:4px;font-weight:bold;">{_hq_total_str}</td>'
                 html += '</tr>'
 
-            html += '</table>'
-            _unit = "(단위 : 호, 점)" if _is_contract else "(단위 : 점)"
-            html += f'<div style="text-align:right;font-size:0.8em;margin-top:4px;color:#555;">{_unit}</div></div>'
-            st.markdown(html, unsafe_allow_html=True)
+                # 지사별 하위 3개 업무유형 사전 계산 (업무유형 테이블만)
+                _is_biz = (cat_label == "업무유형")
+                _ofc_bottom3 = {}
+                if _is_biz:
+                    for ofc in pivot.index:
+                        _row = pivot.loc[ofc].dropna().sort_values()
+                        _ofc_bottom3[ofc] = {cat: rank + 1 for rank, (cat, _) in enumerate(_row.head(3).items())}
 
-            # ── 엑셀 다운로드 ──
-            _dl_key = f"dl_{cat_label.replace(' ','')}"
-            if _is_contract:
-                # 계약종별: 종합점수+응답호수 병합 테이블
-                _dl_rows = []
+                # 데이터 행
                 for ofc in pivot.index:
-                    _r = {"지사": ofc}
-                    for c in pivot.columns:
-                        _r[f"{c}_종합점수"] = round(pivot.loc[ofc, c], 1) if pd.notna(pivot.loc[ofc, c]) else ""
-                        _r[f"{c}_응답호수"] = int(pivot_cnt.loc[ofc, c])
-                    _r["합계_종합점수"] = round(df[df[office_col] == ofc][score_col].mean(), 1)
-                    _r["합계_응답호수"] = int(df[df[office_col] == ofc][score_col].count())
-                    _dl_rows.append(_r)
-                _dl_df = pd.DataFrame(_dl_rows)
-                _dl_bytes = df_to_excel_bytes(_dl_df)
-            else:
-                # 업무유형/접수채널: 점수만 (소수점 1자리 + 스타일링)
-                _dl_df = pivot.copy().round(1)
-                _dl_df.index.name = "지사"
-                _dl_df["합계"] = [round(df[df[office_col] == ofc][score_col].mean(), 1) for ofc in _dl_df.index]
-                _dl_df = _dl_df.reset_index()
-                # 본부 행 맨 위 삽입
-                _hq_row = {"지사": "본부"}
-                for _c in pivot.columns:
-                    _hq_row[_c] = round(_hq_avgs[_c], 1) if _hq_avgs.get(_c) is not None else ""
-                _hq_row["합계"] = round(_hq_total_avg, 1) if _hq_total_avg is not None else ""
-                _dl_df = pd.concat([pd.DataFrame([_hq_row]), _dl_df], ignore_index=True)
-                # openpyxl 스타일링 (보라배경 + 빨간볼드 하위3개)
-                from openpyxl.styles import PatternFill, Font
-                _red_ft = Font(color="D32F2F", bold=True)
-                _buf = io.BytesIO()
-                with pd.ExcelWriter(_buf, engine="openpyxl") as _w:
-                    _dl_df.to_excel(_w, index=False, sheet_name="Sheet1")
-                    _ws = _w.sheets["Sheet1"]
-                    _col_names = list(_dl_df.columns)
-                    for _ri, _ofc in enumerate(_dl_df["지사"], start=2):
-                        for _ci, _cn in enumerate(_col_names, start=1):
-                            if _ci == 1 or _cn == "합계":
-                                continue
-                            _cell = _ws.cell(row=_ri, column=_ci)
-                            _cv = _cell.value
-                            if not isinstance(_cv, (int, float)):
-                                continue
-                            # 본부 평균 미만 → 라벤더 배경
-                            _ha = _hq_avgs.get(_cn)
-                            if _ha is not None and _cv < _ha:
-                                _g = min((_ha - _cv) / 10.0, 1.0)
-                                _cr = int(237 - (237 - 167) * _g)
-                                _cg = int(233 - (233 - 139) * _g)
-                                _cb = int(254 - (254 - 250) * _g)
-                                _cell.fill = PatternFill(start_color=f"{_cr:02X}{_cg:02X}{_cb:02X}",
-                                                         end_color=f"{_cr:02X}{_cg:02X}{_cb:02X}", fill_type="solid")
-                            # 하위 3개 → 빨간 볼드
-                            if _ofc_bottom3.get(_ofc, {}).get(_cn):
-                                _cell.font = _red_ft
-                _dl_bytes = _buf.getvalue()
-            _return_dl_df = _dl_df
-            st.download_button(
-                label=f"📥 {cat_label} 테이블 엑셀 다운로드",
-                data=_dl_bytes,
-                file_name=f"지사별_{cat_label}_만족도.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                key=_dl_key, use_container_width=True)
+                    html += '<tr>'
+                    html += f'<td style="border:1px solid {_bdr};padding:5px 8px;font-weight:bold;background:#f9f9f9;">{ofc}</td>'
+                    for c in _cols:
+                        v = pivot.loc[ofc, c]
+                        v_str = f"{v:.1f}" if pd.notna(v) else ""
+                        _bg = _below_avg_color(v, _hq_avgs.get(c))
+                        if _is_contract:
+                            cnt = int(pivot_cnt.loc[ofc, c])
+                            cnt_str = str(cnt) if cnt > 0 else ""
+                            html += f'<td style="border:1px solid {_bdr};padding:4px;{_bg}">{v_str}</td>'
+                            html += f'<td style="border:1px solid {_bdr};padding:4px;">{cnt_str}</td>'
+                        else:
+                            _rank = _ofc_bottom3.get(ofc, {}).get(c)
+                            if _rank:
+                                _mk = f' <span style="font-size:0.8em;">(▼{_rank})</span>'
+                                html += f'<td style="border:1px solid {_bdr};padding:4px;{_bg}color:#d32f2f;font-weight:bold;">{v_str}{_mk}</td>'
+                            else:
+                                html += f'<td style="border:1px solid {_bdr};padding:4px;{_bg}">{v_str}</td>'
+                    # 합계 열
+                    _t_score = df[df[office_col] == ofc][score_col].mean()
+                    _t_str = f"{_t_score:.1f}" if pd.notna(_t_score) else ""
+                    _t_bg = _below_avg_color(_t_score, _hq_total_avg)
+                    if _is_contract:
+                        _t_cnt = int(df[df[office_col] == ofc][score_col].count())
+                        html += f'<td style="border:1px solid {_bdr};padding:4px;font-weight:bold;">{_t_str}</td>'
+                        html += f'<td style="border:1px solid {_bdr};padding:4px;">{_t_cnt}</td>'
+                    else:
+                        html += f'<td style="border:1px solid {_bdr};padding:4px;font-weight:bold;">{_t_str}</td>'
+                    html += '</tr>'
+
+                html += '</table>'
+                _unit = "(단위 : 호, 점)" if _is_contract else "(단위 : 점)"
+                html += f'<div style="text-align:right;font-size:0.8em;margin-top:4px;color:#555;">{_unit}</div></div>'
+                st.markdown(html, unsafe_allow_html=True)
+
+                # ── 엑셀 다운로드 ──
+                _dl_key = f"dl_{cat_label.replace(' ','')}"
+                if _is_contract:
+                    # 계약종별: 종합점수+응답호수 병합 테이블
+                    _dl_rows = []
+                    for ofc in pivot.index:
+                        _r = {"지사": ofc}
+                        for c in pivot.columns:
+                            _r[f"{c}_종합점수"] = round(pivot.loc[ofc, c], 1) if pd.notna(pivot.loc[ofc, c]) else ""
+                            _r[f"{c}_응답호수"] = int(pivot_cnt.loc[ofc, c])
+                        _r["합계_종합점수"] = round(df[df[office_col] == ofc][score_col].mean(), 1)
+                        _r["합계_응답호수"] = int(df[df[office_col] == ofc][score_col].count())
+                        _dl_rows.append(_r)
+                    _dl_df = pd.DataFrame(_dl_rows)
+                    _dl_bytes = df_to_excel_bytes(_dl_df)
+                else:
+                    # 업무유형/접수채널: 점수만 (소수점 1자리 + 스타일링)
+                    _dl_df = pivot.copy().round(1)
+                    _dl_df.index.name = "지사"
+                    _dl_df["합계"] = [round(df[df[office_col] == ofc][score_col].mean(), 1) for ofc in _dl_df.index]
+                    _dl_df = _dl_df.reset_index()
+                    # 본부 행 맨 위 삽입
+                    _hq_row = {"지사": "본부"}
+                    for _c in pivot.columns:
+                        _hq_row[_c] = round(_hq_avgs[_c], 1) if _hq_avgs.get(_c) is not None else ""
+                    _hq_row["합계"] = round(_hq_total_avg, 1) if _hq_total_avg is not None else ""
+                    _dl_df = pd.concat([pd.DataFrame([_hq_row]), _dl_df], ignore_index=True)
+                    # openpyxl 스타일링 (보라배경 + 빨간볼드 하위3개)
+                    from openpyxl.styles import PatternFill, Font
+                    _red_ft = Font(color="D32F2F", bold=True)
+                    _buf = io.BytesIO()
+                    with pd.ExcelWriter(_buf, engine="openpyxl") as _w:
+                        _dl_df.to_excel(_w, index=False, sheet_name="Sheet1")
+                        _ws = _w.sheets["Sheet1"]
+                        _col_names = list(_dl_df.columns)
+                        for _ri, _ofc in enumerate(_dl_df["지사"], start=2):
+                            for _ci, _cn in enumerate(_col_names, start=1):
+                                if _ci == 1 or _cn == "합계":
+                                    continue
+                                _cell = _ws.cell(row=_ri, column=_ci)
+                                _cv = _cell.value
+                                if not isinstance(_cv, (int, float)):
+                                    continue
+                                # 본부 평균 미만 → 라벤더 배경
+                                _ha = _hq_avgs.get(_cn)
+                                if _ha is not None and _cv < _ha:
+                                    _g = min((_ha - _cv) / 10.0, 1.0)
+                                    _cr = int(237 - (237 - 167) * _g)
+                                    _cg = int(233 - (233 - 139) * _g)
+                                    _cb = int(254 - (254 - 250) * _g)
+                                    _cell.fill = PatternFill(start_color=f"{_cr:02X}{_cg:02X}{_cb:02X}",
+                                                             end_color=f"{_cr:02X}{_cg:02X}{_cb:02X}", fill_type="solid")
+                                # 하위 3개 → 빨간 볼드
+                                if _ofc_bottom3.get(_ofc, {}).get(_cn):
+                                    _cell.font = _red_ft
+                    _dl_bytes = _buf.getvalue()
+                _return_dl_df = _dl_df
+                st.download_button(
+                    label=f"📥 {cat_label} 테이블 엑셀 다운로드",
+                    data=_dl_bytes,
+                    file_name=f"지사별_{cat_label}_만족도.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    key=_dl_key, use_container_width=True)
 
         # ── 저점수 건 상세 조회 (60점 이하 전체 표) ──
         _uid = cat_label.replace(" ", "")
