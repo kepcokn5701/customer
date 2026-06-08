@@ -3472,9 +3472,9 @@ with tab3:
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 key="dl_all_combined", use_container_width=True)
 
-        # ── ⑤ 업무유형별 사분면 버블 차트 ──
+        # ── ⑤ 업무유형별 AI 진단 보고서 ──
         if M["business"] and M["score"]:
-            st.markdown('<p class="sec-head">⭕ 업무유형별 사분면 분석 — 처리 건수 × 평균 만족도 (버블 크기 = 불만족 건수)</p>', unsafe_allow_html=True)
+            st.markdown('<p class="sec-head">🤖 업무유형별 진단 보고서 — 강점·약점 자동 분석</p>', unsafe_allow_html=True)
             _bbl_grp = df_f.groupby(M["business"]).agg(
                 처리건수=("_점수100", "count"),
                 평균만족도=("_점수100", "mean"),
@@ -3486,22 +3486,16 @@ with tab3:
             if M["business"] in _bbl_grp.columns and M["business"] != "업무유형":
                 _bbl_grp.drop(columns=[M["business"]], inplace=True)
             _bbl_grp["불만족건수"] = _bbl_grp["불만족건수"].fillna(0).astype(int)
-            _bbl_grp["버블크기"] = _bbl_grp["불만족건수"] + 1
 
-            # ── 사분면 기준값 ──
+            # ── 사분면 기준값 (AI 입력용 분류) ──
             _q_x_avg = _bbl_grp["처리건수"].mean()
             _q_y_avg = _bbl_grp["평균만족도"].mean()
             _total_n = _bbl_grp["처리건수"].sum()
 
-            # 사분면 분류
             _q_names = {(True, True): "1사분면: 본부 견인형",
                         (False, True): "2사분면: 전문 특화형",
                         (False, False): "3사분면: 개별 개선형",
                         (True, False): "4사분면: 최우선 혁신"}
-            _q_colors = {"1사분면: 본부 견인형": C["green"],
-                         "2사분면: 전문 특화형": C["blue"],
-                         "3사분면: 개별 개선형": C["gold"],
-                         "4사분면: 최우선 혁신": C["red"]}
             _bbl_grp["사분면"] = _bbl_grp.apply(
                 lambda r: _q_names[(r["처리건수"] >= _q_x_avg, r["평균만족도"] >= _q_y_avg)], axis=1)
 
@@ -3547,228 +3541,10 @@ with tab3:
                         _unreliable_list.append((n, round(v, 1), int(_bdf_cnt.get(n, 0))))
                     _biz_ofc_stats[biz] = {"bottom3": _bot3, "top1": _top1, "unreliable": _unreliable_list}
 
-            # ── Hover 텍스트 ──
-            _hover_texts = []
-            for _, row in _bbl_grp.iterrows():
-                biz = row["업무유형"]
-                _n = int(row["처리건수"])
-                _dissat_pct = round(row["불만족건수"] / _n * 100, 1) if _n > 0 else 0
-
-                _h = f"<b>📌 {biz}</b><br><br>"
-                _h += f"<b>[데이터 현황]</b><br>"
-                _h += f"처리건수 {_n:,}건 / 만족도 {row['평균만족도']:.1f}점 (본부 평균 대비 {row['점수갭']:+.1f}점)<br><br>"
-                _h += f"<b>[리스크 진단]</b><br>"
-                _h += f"불만족 응답 비중 {_dissat_pct}% ({int(row['불만족건수'])}건) · 전체 점수 영향 {row['가중영향']:+.2f}점<br><br>"
-
-                kws = _biz_kw_map.get(biz, [])
-                if kws:
-                    _h += f"<b>[현장 목소리]</b><br>"
-                    _h += f"불만 키워드 TOP3: {', '.join(kws)}<br><br>"
-
-                _stats = _biz_ofc_stats.get(biz)
-                if _stats and _stats["bottom3"]:
-                    _bot3 = _stats["bottom3"][:3]
-                    _h += f"<b>[관리 포인트]</b><br>"
-                    for _bn, _bv, _bc in _bot3:
-                        _h += f"  · {_bn} ({_bv}점, N={_bc})<br>"
-                    if _stats.get("unreliable"):
-                        _ur3 = _stats["unreliable"][:2]
-                        for _un, _uv, _uc in _ur3:
-                            _h += f"  · {_un} ({_uv}점, N={_uc}) ⚠모수부족<br>"
-                    _h += "<br>"
-
-                if _stats and _stats.get("top1"):
-                    _best_name, _best_score, _best_n = _stats["top1"]
-                    if _best_n >= _MIN_N:
-                        _h += f"<b>[한 줄 처방]</b><br>"
-                        _h += f"{_best_name}({_best_score}점, N={_best_n})의 우수 사례를 참고하여 프로세스 개선 권고<br>"
-                    else:
-                        _h += f"<b>[한 줄 처방]</b><br>"
-                        _h += f"{_best_name}({_best_score}점, N={_best_n}) [신뢰도: 매우 낮음] — 모수 확보 후 재평가 필요<br>"
-
-                if "최우선" in row["사분면"]:
-                    _h += f"<br>🚨 <b>[최우선 혁신 대상]</b><br>"
-                    _h += f"건수 多 + 점수 低 → TF 가동 · 시스템 개선 우선 배치"
-                _hover_texts.append(_h)
-
-            # ── 차트 그리기 (사분면별 trace) ──
-            fig_bbl = go.Figure()
-            _q_order = ["1사분면: 본부 견인형", "2사분면: 전문 특화형", "3사분면: 개별 개선형", "4사분면: 최우선 혁신"]
-
-            # 라벨 겹침 방지: 텍스트 너비 고려 + 데이터포인트 회피
-            _ann_boxes = []   # (cx, cy, half_w, half_h) — 라벨 바운딩 박스
-            _dot_positions = []  # 데이터 포인트 픽셀 좌표
-            _bbl_annotations = []
-            _x_range = max(_bbl_grp["처리건수"].max() - _bbl_grp["처리건수"].min(), 1)
-            _y_range = max(_bbl_grp["평균만족도"].max() - _bbl_grp["평균만족도"].min(), 1)
-            _CHART_W, _CHART_H = 800, 450  # 논리 차트 크기
-
-            # 후보 오프셋: 아래 우선 (도형 밑에 라벨) → 겹칠 때만 주변으로
-            _cand_offsets = [
-                (0, 20),                                    # 1순위: 바로 아래
-                (-30, 20), (30, 20),                        # 좌하, 우하
-                (0, -20),                                   # 위
-                (-30, -20), (30, -20),                      # 좌상, 우상
-                (0, 35), (-40, 35), (40, 35),               # 더 아래
-                (0, -35), (-40, -35), (40, -35),            # 더 위
-                (-60, 15), (60, 15), (-60, -15), (60, -15), # 좌우
-                (0, 50), (-50, 50), (50, 50),               # 원거리 아래
-                (0, -50), (-50, -50), (50, -50),            # 원거리 위
-                (-80, 0), (80, 0),                          # 좌우 수평
-            ]
-
-            # 모든 trace 먼저 그리기
-            _all_rows = []
-            for q_name in _q_order:
-                _sub = _bbl_grp[_bbl_grp["사분면"] == q_name]
-                if _sub.empty:
-                    continue
-                _sub_idx = _sub.index.tolist()
-                fig_bbl.add_trace(go.Scatter(
-                    x=_sub["처리건수"], y=_sub["평균만족도"],
-                    mode="markers",
-                    marker=dict(size=(_sub["버블크기"] * 8).clip(lower=22, upper=90),
-                                color=_q_colors[q_name], opacity=0.7,
-                                line=dict(width=2, color="white")),
-                    hovertext=[_hover_texts[i] for i in _sub_idx],
-                    hovertemplate="%{hovertext}<extra></extra>",
-                    name=q_name,
-                ))
-                for _, _r in _sub.iterrows():
-                    _all_rows.append(_r)
-
-            # 데이터 포인트 픽셀 좌표 미리 계산
-            _x_min_val = _bbl_grp["처리건수"].min()
-            _y_min_val = _bbl_grp["평균만족도"].min()
-            for _r in _all_rows:
-                _dpx = (_r["처리건수"] - _x_min_val) / _x_range * _CHART_W
-                _dpy = (1 - (_r["평균만족도"] - _y_min_val) / _y_range) * _CHART_H
-                _dot_positions.append((_dpx, _dpy))
-
-            # 밀집도 높은 버블 먼저 배치
-            def _neighbor_cnt(row):
-                cnt = 0
-                for other in _all_rows:
-                    if row.name == other.name:
-                        continue
-                    if abs(row["처리건수"] - other["처리건수"]) / _x_range < 0.25 and \
-                       abs(row["평균만족도"] - other["평균만족도"]) / _y_range < 0.25:
-                        cnt += 1
-                return cnt
-            _all_rows.sort(key=lambda r: _neighbor_cnt(r), reverse=True)
-
-            def _boxes_overlap(cx1, cy1, hw1, hh1, cx2, cy2, hw2, hh2, pad=6):
-                """두 라벨 박스가 겹치는지 (패딩 포함)"""
-                return (abs(cx1 - cx2) < hw1 + hw2 + pad) and (abs(cy1 - cy2) < hh1 + hh2 + pad)
-
-            for _r in _all_rows:
-                _rx = _r["처리건수"]
-                _ry = _r["평균만족도"]
-                _base_px = (_rx - _x_min_val) / _x_range * _CHART_W
-                _base_py = (1 - (_ry - _y_min_val) / _y_range) * _CHART_H
-                # 텍스트 크기 추정 (한글 1자 ≈ 6px wide at font 11, 높이 ≈ 14px)
-                _txt_len = len(_r["업무유형"])
-                _half_w = max(_txt_len * 6, 25)
-                _half_h = 8
-                # 버블 크기(px) 추정 — 라벨이 버블 바깥에 붙도록
-                _bbl_r = max(float(_r["버블크기"]) * 2.5, 7)
-                _best_ax, _best_ay = _cand_offsets[0]
-                _best_score = -99999
-                for _cax, _cay in _cand_offsets:
-                    _lbl_cx = _base_px + _cax
-                    _lbl_cy = _base_py + _cay
-                    # 1) 기존 라벨과 겹침 체크
-                    _overlap = False
-                    for _ocx, _ocy, _ohw, _ohh in _ann_boxes:
-                        if _boxes_overlap(_lbl_cx, _lbl_cy, _half_w, _half_h, _ocx, _ocy, _ohw, _ohh):
-                            _overlap = True
-                            break
-                    if _overlap:
-                        continue
-                    # 2) 점수: 가까울수록 좋음 (버블 근접 배치)
-                    _dist_penalty = (abs(_cax) + abs(_cay)) * 0.5
-                    _score = 100 - _dist_penalty
-                    if _score > _best_score:
-                        _best_score = _score
-                        _best_ax, _best_ay = _cax, _cay
-                _final_cx = _base_px + _best_ax
-                _final_cy = _base_py + _best_ay
-                _ann_boxes.append((_final_cx, _final_cy, _half_w, _half_h))
-                # 화살표 항상 표시
-                _bbl_annotations.append(dict(
-                    x=_rx, y=_ry,
-                    text=_r["업무유형"],
-                    showarrow=True,
-                    arrowhead=2, arrowwidth=1.2, arrowcolor="#000",
-                    ax=_best_ax, ay=_best_ay,
-                    font=dict(size=13, color="#222"),
-                    bgcolor="rgba(255,255,255,0)", borderpad=1,
-                ))
-
-            # 사분면 기준선
-            fig_bbl.add_hline(y=_q_y_avg, line_color="#aaa", line_dash="dot", line_width=1,
-                              annotation_text=f"만족도 평균 {_q_y_avg:.1f}", annotation_font_size=10,
-                              annotation_font_color="#888", annotation_position="top left")
-            fig_bbl.add_vline(x=_q_x_avg, line_color="#aaa", line_dash="dot", line_width=1,
-                              annotation_text=f"건수 평균 {_q_x_avg:.0f}", annotation_font_size=10,
-                              annotation_font_color="#888", annotation_position="top right")
-
-            # 사분면 영역 라벨
-            _x_min, _x_max = _bbl_grp["처리건수"].min(), _bbl_grp["처리건수"].max()
-            _y_min, _y_max = _bbl_grp["평균만족도"].min(), _bbl_grp["평균만족도"].max()
-            _qlabels = [
-                ((_q_x_avg + _x_max) / 2, _y_max + 0.5, "★ 본부 견인형", C["green"]),
-                ((_x_min + _q_x_avg) / 2, _y_max + 0.5, "전문 특화형", C["blue"]),
-                ((_x_min + _q_x_avg) / 2, _y_min - 1.0, "개별 개선형", C["gold"]),
-                ((_q_x_avg + _x_max) / 2, _y_min - 1.0, "🚨 최우선 혁신", C["red"]),
-            ]
-            for _qx, _qy, _qt, _qc in _qlabels:
-                fig_bbl.add_annotation(x=_qx, y=_qy, text=_qt, showarrow=False,
-                                       font=dict(color=_qc, size=17, weight="bold"), xanchor="center")
-
-            # 라벨 annotations 추가
-            for _ann in _bbl_annotations:
-                fig_bbl.add_annotation(**_ann)
-
-            # y축 여유 (라벨이 잘리지 않도록)
-            _y_pad = _y_range * 0.12
-            fig_bbl.update_layout(
-                height=640, margin=dict(t=60, b=60, l=60, r=60),
-                xaxis_title="처리 건수", yaxis_title="평균 만족도 (100점 환산)",
-                xaxis=dict(fixedrange=True),
-                yaxis=dict(range=[_bbl_grp["평균만족도"].min() - _y_pad - 2,
-                                  _bbl_grp["평균만족도"].max() + _y_pad + 2],
-                           fixedrange=True),
-                dragmode=False,
-                legend=dict(orientation="h", yanchor="bottom", y=-0.15, xanchor="center", x=0.5, font=dict(size=14)),
-                template=PLOTLY_TPL)
-            st.plotly_chart(fig_bbl, use_container_width=True)
-
-            # ── 사분면별 분류 카드 ──
-            _q1_list = _bbl_grp[_bbl_grp["사분면"].str.contains("견인")].sort_values("처리건수", ascending=False)
-            _q2_list = _bbl_grp[_bbl_grp["사분면"].str.contains("특화")].sort_values("평균만족도", ascending=False)
-            _q3_list = _bbl_grp[_bbl_grp["사분면"].str.contains("개별")].sort_values("평균만족도")
-            _q4_list = _bbl_grp[_bbl_grp["사분면"].str.contains("최우선")].sort_values("가중영향")
-
-            _col_l, _col_r = st.columns(2)
-            with _col_l:
-                if not _q1_list.empty:
-                    _q1_names = ", ".join(_q1_list["업무유형"].tolist())
-                    st.success(f"**★ 본부 견인형** (건수↑ 만족도↑ · 효자 업무): {_q1_names}")
-                if not _q2_list.empty:
-                    _q2_names = ", ".join(_q2_list["업무유형"].tolist())
-                    st.info(f"**전문 특화형** (건수↓ 만족도↑ · 잘하는 업무): {_q2_names}")
-            with _col_r:
-                if not _q3_list.empty:
-                    _q3_names = ", ".join(_q3_list["업무유형"].tolist())
-                    st.warning(f"**개별 개선형** (건수↓ 점수↓ · 소외 업무): {_q3_names}")
-                if not _q4_list.empty:
-                    _q4_names = ", ".join(_q4_list["업무유형"].tolist())
-                    st.error(f"**🚨 최우선 혁신** (건수↑ 점수↓ · 핵심 리스크): {_q4_names}")
-
-            # ── AI 사분면 분석 버튼 ──
+            # ── AI 자동 분석 트리거 ──
             _q_ss_key = "_ai_quadrant_result"
-            if st.button("🤖 AI 업무유형 분석", key="ai_quadrant_btn", type="primary", use_container_width=True):
+            _refresh = st.button("🔄 보고서 새로 생성", key="ai_quadrant_refresh", type="secondary")
+            if (_q_ss_key not in st.session_state) or _refresh:
                 if not GEMINI_AVAILABLE:
                     st.error("Gemini API 키가 설정되지 않았습니다. `.env` 파일에 `GEMINI_API_KEY`를 설정해주세요.")
                 else:
@@ -3808,49 +3584,54 @@ with tab3:
                             _ai_q_ofc.append(f"[{_biz}] 최고 {_tv}점 vs 최저 {_bv}점 (격차 {_gap}점, 지사 수 {len(_st['bottom3'])+1}개)")
 
                     _ai_q_prompt = f"""당신은 한국전력 경남본부 고객 만족도 데이터 분석가입니다.
-사분면 데이터와 VOC 원문, 지사별 점수를 종합하여 현장 진단과 비교 분석을 제공합니다.
+사분면 데이터와 VOC 원문, 지사별 점수를 종합하여 본부의 약점·강점을 진단합니다.
 
-[사분면 해석 기준: 건수(x축) × 만족도(y축)]
-- 4사분면 (건수↑ 점수↓): **병목 구간**. 처리량이 많은데 점수가 낮음.
-- 3사분면 (건수↓ 점수↓): **사각지대**. 빈도가 낮아 대응이 미숙.
+[사분면 분류 기준: 건수(x축) × 만족도(y축) — 내부 분류용. 출력에는 사분면 용어 쓰지 말 것]
+- 4사분면 (건수↑ 점수↓): 병목 구간. 처리량 많은데 점수 낮음 → **약점**
+- 3사분면 (건수↓ 점수↓): 사각지대. 빈도 낮아 대응 미숙 → **약점**
+- 1·2사분면: 만족도 높음 → **강점**
 
 [이번 달 사분면 데이터]
 {_ai_q_data}
-[3·4사분면 업무의 불만족 VOC 원문]
+[약점 업무(3·4사분면)의 불만족 VOC 원문]
 {chr(10).join(_ai_q_voc) if _ai_q_voc else '- 해당 없음'}
-[3·4사분면 업무의 지사별 점수 비교]
+[약점 업무의 지사별 점수 격차]
 {chr(10).join(_ai_q_ofc) if _ai_q_ofc else '- 해당 없음'}
 
-# 출력 형식 (반드시 아래 3개 블록만 순서대로 출력)
+# 출력 형식 (반드시 아래 3개 블록만 순서대로 출력. 모두 마크다운 표 활용)
 
-#### 📋 현장 진단
-- 3·4사분면 업무를 한 업무당 반드시 별도 bullet(-)로 나열
-- 형식: - **업무명** [사분면] — VOC에서 드러난 핵심 문제 키워드 (점수, 건수)
-- 예시:
-- **신규증설** [4사분면] — 접수 후 진행 안내 부재, 고객 재문의 반복 (91.3점, 79건)
-- **휴지부활** [3사분면] — 복구 절차 안내 누락 (79.3점, 3건)
+#### 📋 현장 진단 — 약점 업무
 
-#### 🔍 비교 분석 (3·4사분면 업무 대상)
-- 업무당 sub-bullet 구성. 한 분석 포인트는 반드시 별도 줄로 분리.
-- 지사명은 절대 언급 금지. 격차 수치와 원인만 분석.
-- 아래 2가지 관점으로 작성:
-  1. **지사 간 격차**: 같은 업무 내 최고-최저 점수 차이 + VOC에서 추정되는 격차 원인
-  2. **업무 간 공통 패턴**: 서로 다른 업무에서 반복되는 동일한 불만 유형 (1가지만)
-- 형식 (업무별로 나누고, 분석 포인트마다 줄바꿈):
-- **[신규증설]**
-  - 격차: 최고 96점 vs 최저 73점 (23점 차이)
-  - 원인: VOC에서 "진행 안내 부재" 불만이 저점수 지사에 집중
-- **[공통 패턴]**
-  - 신규증설·검침 모두 "완료 후 결과 미안내"가 불만 키워드로 반복
+| 업무 | 점수 | 건수 | 핵심 문제 (VOC 기반) |
+| --- | ---: | ---: | --- |
+| 신규증설 | 91.3점 | 79건 | 접수 후 진행 안내 부재, 고객 재문의 반복 |
+| 휴지부활 | 79.3점 | 3건 | 복구 절차 안내 누락 |
 
-#### ✅ 유지 (1사분면이 있을 경우만)
-- 높은 만족도가 유지되는 핵심 포인트를 한 줄로 정리
-- 형식: - **업무명** — 유지 포인트 한 줄
+(주의: 위는 형식 예시. 실제로는 3·4사분면 업무를 모두 점수 낮은 순으로 나열)
+
+#### 🔍 비교 분석
+
+**1) 지사 간 격차** (약점 업무별 최고-최저 점수 차이 · 지사명 절대 금지)
+
+| 업무 | 최고 | 최저 | 격차 | 원인 (VOC 기반) |
+| --- | ---: | ---: | ---: | --- |
+| 신규증설 | 96점 | 73점 | 23점 | "진행 안내 부재" 불만이 저점수 지사에 집중 |
+
+**2) 업무 간 공통 패턴** (서로 다른 약점 업무에서 반복되는 불만 유형 1가지만)
+- 신규증설·검침 모두 "완료 후 결과 미안내"가 불만 키워드로 반복
+
+#### ✅ 유지 — 강점 업무 (1·2사분면이 있을 경우만)
+
+| 업무 | 점수 | 유지 포인트 |
+| --- | ---: | --- |
+| 자동이체 | 95.2점 | 자동 처리 + 정기 안내로 만족도 안정적 |
 
 [필수 규칙]
-- 개조식 bullet만. 줄글·산문체 금지.
-- 업무당 별도 줄. 한 줄에 여러 업무 합치지 말 것.
+- 모든 섹션은 마크다운 표 또는 bullet만 사용. 줄글·산문체 금지.
+- 표 컬럼 정렬 유지: 점수·건수·격차는 우측 정렬 (`---:`).
 - 수치(점수, 건수, 격차)를 반드시 근거로 포함할 것.
+- 지사명 절대 언급 금지. 격차 수치와 원인만.
+- 출력에는 "1사분면/4사분면" 등 사분면 용어 쓰지 말 것 ("약점 업무", "강점 업무"로 표현).
 - "친절하게", "자세히", "명확히" 같은 추상적 형용사/부사 금지.
 - 백틱(`)·코드 블록 금지. 강조는 **굵은 글씨**만.
 - '전기세' → '전기요금'.
