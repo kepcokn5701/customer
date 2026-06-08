@@ -3029,24 +3029,28 @@ with tab1:
         with _bk_donut_col:
             _SHORT_BUCKET = {"90점 이상": "≥90점", "70~90점": "70~89점",
                              "50~70점": "50~69점", "50점 미만": "<50점"}
+            # 점수 높은 순으로 고정 (BUCKET_ORDER 기준)
             _donut_df = pd.DataFrame({
                 "구간": BUCKET_ORDER,
                 "건수": [int(_bk_cnt_full.get(b, 0)) for b in BUCKET_ORDER],
             })
             _donut_df["라벨"] = _donut_df["구간"].map(_SHORT_BUCKET)
+            _ordered_labels = [_SHORT_BUCKET[k] for k in BUCKET_ORDER]
             _bk_color_map = {_SHORT_BUCKET[k]: v for k, v in BUCKET_COLORS.items()
                              if k in _donut_df["구간"].values}
             fig_bp = px.pie(_donut_df, names="라벨", values="건수", color="라벨",
-                            color_discrete_map=_bk_color_map, hole=0.45, template=PLOTLY_TPL)
-            fig_bp.update_traces(textposition="inside", textinfo="percent", textfont_size=12,
+                            color_discrete_map=_bk_color_map, hole=0.45, template=PLOTLY_TPL,
+                            category_orders={"라벨": _ordered_labels})
+            fig_bp.update_traces(textposition="inside", textinfo="percent", textfont_size=16,
+                                  sort=False, direction="clockwise",
                                   marker=dict(line=dict(color="#ffffff", width=2)),
                                   hovertemplate="%{label}<br>%{percent}<extra></extra>")
             fig_bp.update_layout(
                 height=320, margin=dict(t=20, b=10, l=10, r=10),
                 showlegend=True,
                 legend=dict(orientation="h", yanchor="top", y=-0.05,
-                            xanchor="center", x=0.5, font=dict(size=11),
-                            title_text=""))
+                            xanchor="center", x=0.5, font=dict(size=14),
+                            traceorder="normal", title_text=""))
             st.plotly_chart(fig_bp, use_container_width=True, config={'staticPlot': True})
 
         with _bk_tbl_col:
