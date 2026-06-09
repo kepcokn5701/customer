@@ -1849,7 +1849,7 @@ st.markdown(f"""
   [data-testid="stHorizontalBlock"]:has(.bk-row-marker) {{
     background: #ffffff;
     border-radius: 12px;
-    padding: 16px 24px 0 24px;
+    padding: 16px 24px;
     box-shadow: 0 1px 3px rgba(15,23,42,0.04), 0 4px 12px rgba(15,23,42,0.06);
     margin-bottom: 8px;
     align-items: center;
@@ -2945,7 +2945,7 @@ with tab1:
         _RP_BDR = "#e5e7eb"           # 테두리 (gray-200)
         _RP_SUB_BG = "#fafbfc"        # 행 라벨 배경 (거의 흰색)
         _RP_CARD = (
-            'background:#ffffff;border-radius:12px;padding:16px 24px 4px 24px;'
+            'background:#ffffff;border-radius:12px;padding:16px 24px;'
             'box-shadow:0 1px 3px rgba(15,23,42,0.04),0 4px 12px rgba(15,23,42,0.06);'
             'margin-bottom:8px;'
         )
@@ -3074,7 +3074,7 @@ with tab1:
                 showarrow=False,
                 font=dict(size=24, color=C["navy"]))
             fig_bp.update_layout(
-                height=320, margin=dict(t=10, b=0, l=100, r=100),
+                height=320, margin=dict(t=20, b=20, l=100, r=100),
                 paper_bgcolor="white", plot_bgcolor="white",
                 showlegend=False)
             st.plotly_chart(fig_bp, use_container_width=True, config={'staticPlot': True})
