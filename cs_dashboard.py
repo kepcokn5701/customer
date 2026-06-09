@@ -3033,17 +3033,36 @@ with tab1:
             fig_bp = px.pie(_donut_df, names="라벨", values="건수", color="라벨",
                             color_discrete_map=_bk_color_map, hole=0, template=PLOTLY_TPL,
                             category_orders={"라벨": _ordered_labels})
-            # textposition='auto' → 큰 조각 안쪽 / 작은 조각 자동 outside (leader line)
+            # 큰 조각(≥50%)은 trace 텍스트 숨기고 차트 중심에 annotation으로 배치
+            _bp_total = int(_donut_df["건수"].sum())
+            _bp_text = []
+            for _bi in range(len(_donut_df)):
+                _bc = int(_donut_df["건수"].iloc[_bi])
+                _bp = (_bc / max(_bp_total, 1)) * 100
+                if _bp >= 50:
+                    _bp_text.append("")
+                else:
+                    _bp_text.append(f"{_donut_df['라벨'].iloc[_bi]}<br>{_bp:.1f}%")
             fig_bp.update_traces(
-                textposition="auto", textinfo="label+percent",
-                insidetextfont=dict(color="white", size=14),
-                outsidetextfont=dict(color="#333", size=14),
+                text=_bp_text, textposition="auto", textinfo="text",
+                insidetextfont=dict(color="white", size=15),
+                outsidetextfont=dict(color="#333", size=15),
                 insidetextorientation="horizontal",
                 sort=False, direction="clockwise",
                 marker=dict(line=dict(color="#ffffff", width=2)),
                 hovertemplate="%{label}<br>%{percent}<extra></extra>")
+            # 큰 조각은 차트 중심(0.5, 0.5)에 큰 글씨 annotation
+            for _bi in range(len(_donut_df)):
+                _bc = int(_donut_df["건수"].iloc[_bi])
+                _bp = (_bc / max(_bp_total, 1)) * 100
+                if _bp >= 50:
+                    fig_bp.add_annotation(
+                        x=0.5, y=0.5, xref="paper", yref="paper",
+                        text=f"<b>{_donut_df['라벨'].iloc[_bi]}<br>{_bp:.1f}%</b>",
+                        showarrow=False,
+                        font=dict(size=20, color="white"))
             fig_bp.update_layout(
-                height=360, margin=dict(t=30, b=30, l=130, r=130),
+                height=420, margin=dict(t=30, b=30, l=130, r=130),
                 paper_bgcolor="white", plot_bgcolor="white",
                 showlegend=False)
             st.plotly_chart(fig_bp, use_container_width=True, config={'staticPlot': True})
@@ -3193,10 +3212,11 @@ with tab1:
                         outsidetextfont=dict(color="#333", size=14),
                         insidetextorientation="horizontal",
                         marker=dict(line=dict(color="#ffffff", width=2)),
+                        domain=dict(x=[0.25, 0.75], y=[0.15, 0.85]),
                         hovertemplate="%{label}<br>%{percent}<extra></extra>")
                     fig_pie.update_layout(
                         height=500,
-                        margin=dict(t=30, b=30, l=160, r=160),
+                        margin=dict(t=20, b=20, l=20, r=20),
                         showlegend=False,
                         paper_bgcolor="white", plot_bgcolor="white")
                     st.plotly_chart(fig_pie, use_container_width=True, config={'staticPlot': True})
