@@ -3013,7 +3013,7 @@ with tab1:
             _title3 = f'본부 만족도 90점 이상 비중 {_p90:.1f}%로 {compare_label} 대비 {_fmt_diff(_diff_p90)}%p {_delta_word}'
         else:
             _title3 = f'본부 만족도 90점 이상 비중 {_p90:.1f}%로 {compare_label} 대비 (   )%p 감소'
-        st.markdown(f'<p class="sec-head">{_title3}</p>', unsafe_allow_html=True)
+        st.markdown('<p class="sec-head">📊 만족도 구간 분포</p>', unsafe_allow_html=True)
 
         # ── [도넛 | 표] 2컬럼 — 표 쪽 살짝 넓게 ──
         _bk_colors_lr = [BUCKET_COLORS[b] for b in _bk_order_lr]
@@ -3070,6 +3070,11 @@ with tab1:
             st.plotly_chart(fig_bp, use_container_width=True, config={'staticPlot': True})
 
         with _bk_tbl_col:
+            # 표 위에 동적 멘트 (이전 sec-head에 있던 텍스트)
+            st.markdown(
+                f'<p style="font-size:0.95rem;font-weight:600;color:{C["navy"]};'
+                f'margin:0 0 14px 0;line-height:1.5;">{_title3}</p>',
+                unsafe_allow_html=True)
             _bk3_html = '<table style="width:96%;margin:0 auto 0 0;border-collapse:collapse;font-size:0.95em;text-align:center;">'
             _bk3_html += f'<tr style="{_RP_HDR_STYLE}">'
             _bk3_html += f'<th style="border:1px solid {_RP_BDR};padding:8px 8px;">구분</th>'
