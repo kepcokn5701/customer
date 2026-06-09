@@ -3253,30 +3253,26 @@ def _render_category_section(df, cat_col, cat_label, office_col, score_col, over
     _total_resp = int(grp["응답수"].sum())
     _below = _grp_desc[_grp_desc["평균만족도"] < overall_avg]
 
-    # 사실 단락
+    # 사실 단락 (지사별 정보는 인사이트로만, 사실에선 제거)
+    _bold_color = C["navy"]
     _fact_lines = []
-    _fact_lines.append(f"전체 {cat_label} {len(grp)}개 중 **{_top[cat_label]}**({_top['평균만족도']:.1f}점)이 가장 높고, "
-                       f"**{_bot[cat_label]}**({_bot['평균만족도']:.1f}점)이 가장 낮습니다.")
+    _fact_lines.append(
+        f"전체 {cat_label} {len(grp)}개 중 "
+        f"<b style='color:{_bold_color}'>{_top[cat_label]}</b>({_top['평균만족도']:.1f}점)이 가장 높고, "
+        f"<b style='color:{_bold_color}'>{_bot[cat_label]}</b>({_bot['평균만족도']:.1f}점)이 가장 낮습니다.")
     if len(_below) > 0:
-        _below_names = ", ".join([f"**{r[cat_label]}**({r['평균만족도']:.1f})" for _, r in _below.iterrows()])
+        _below_names = ", ".join([f"<b style='color:{_bold_color}'>{r[cat_label]}</b>({r['평균만족도']:.1f})"
+                                   for _, r in _below.iterrows()])
         _fact_lines.append(f"본부 평균 미달 {len(_below)}개: {_below_names}")
-    _ofc_avg = None
-    if office_col:
-        _ofc_avg = df.groupby(office_col)[score_col].mean()
-        if len(_ofc_avg) > 0:
-            _best_ofc = _ofc_avg.idxmax()
-            _worst_ofc = _ofc_avg.idxmin()
-            _fact_lines.append(
-                f"지사별로는 **{_best_ofc}**({_ofc_avg[_best_ofc]:.1f})이 최고, "
-                f"**{_worst_ofc}**({_ofc_avg[_worst_ofc]:.1f})이 최저입니다.")
+    _ofc_avg = df.groupby(office_col)[score_col].mean() if office_col else None
 
     # 인사이트 단락 (자동 규칙)
     _insight_lines = []
     _max_gap = _bot["평균만족도"] - overall_avg
     if _max_gap <= -3:
-        _insight_lines.append(f"**{_bot[cat_label]}**이 본부 평균 대비 {abs(_max_gap):.1f}점 낮아 격차 큼 → 즉시 점검 권장.")
+        _insight_lines.append(f"<b style='color:{C['red']}'>{_bot[cat_label]}</b>이 본부 평균 대비 {abs(_max_gap):.1f}점 낮아 격차 큼 → 즉시 점검 권장.")
     elif _max_gap <= -1:
-        _insight_lines.append(f"**{_bot[cat_label]}**가 본부 평균 대비 {abs(_max_gap):.1f}점 낮음 → 관리 강화 필요.")
+        _insight_lines.append(f"<b style='color:{C['gold']}'>{_bot[cat_label]}</b>가 본부 평균 대비 {abs(_max_gap):.1f}점 낮음 → 관리 강화 필요.")
     _below_ratio = len(_below) / max(len(grp), 1)
     if _below_ratio >= 0.5:
         _insight_lines.append(f"전체 {len(grp)}개 중 절반 이상({len(_below)}개)이 평균 미달 → 광범위한 관리 필요.")
@@ -3290,12 +3286,14 @@ def _render_category_section(df, cat_col, cat_label, office_col, score_col, over
     _fact_md = "<br>".join(_fact_lines)
     _insight_md = "<br>".join(_insight_lines)
 
-    # ── [좌: 줄글] [우: KPI 2x2] ──
+    # ── [좌: 줄글] [우: KPI 2x2] — 높이 균형 ──
     _smry_col, _kpi_col = st.columns([1.3, 1])
+    _SMRY_MIN_H = 240  # 좌우 박스 균형용 최소 높이
     with _smry_col:
         st.markdown(
             f'<div style="background:#f8fafc;border-left:4px solid {C["navy"]};border-radius:8px;'
-            f'padding:14px 18px;margin-bottom:8px;font-size:0.92em;line-height:1.7;">'
+            f'padding:14px 18px;margin-bottom:8px;font-size:0.92em;line-height:1.7;'
+            f'min-height:{_SMRY_MIN_H}px;box-sizing:border-box;">'
             f'<div style="font-weight:700;color:{C["navy"]};font-size:0.85em;margin-bottom:4px;">📋 현황</div>'
             f'{_fact_md}'
             f'<div style="border-top:1px solid #e5e7eb;margin:10px 0;"></div>'
@@ -3305,11 +3303,14 @@ def _render_category_section(df, cat_col, cat_label, office_col, score_col, over
             unsafe_allow_html=True)
 
     with _kpi_col:
-        # KPI 카드 4개 (2x2 그리드)
+        # KPI 카드 4개 (2x2). 박스 height 명시로 좌측 박스랑 균형
+        # 좌측 min-height 240 → 각 박스 약 (240-8)/2 = 116px (gap 8 제외)
+        _kpi_box_h = (_SMRY_MIN_H - 8) // 2  # = 116
         _kpi_card_style = (
-            'background:#ffffff;border-radius:10px;padding:10px 12px;'
+            'background:#ffffff;border-radius:10px;padding:14px 12px;'
             'box-shadow:0 1px 3px rgba(15,23,42,0.04),0 2px 8px rgba(15,23,42,0.05);'
-            'text-align:center;'
+            'text-align:center;box-sizing:border-box;'
+            f'height:{_kpi_box_h}px;display:flex;flex-direction:column;justify-content:center;'
         )
         _kpi_a, _kpi_b = st.columns(2)
         with _kpi_a:
@@ -3343,7 +3344,26 @@ def _render_category_section(df, cat_col, cat_label, office_col, score_col, over
                 f'</div>',
                 unsafe_allow_html=True)
 
-    # 상세 차트 expander 제거 (사용자 피드백 — 도움 안 됨)
+    with st.expander(f"📊 {cat_label} 상세 차트 보기", expanded=False):
+        # 막대 그래프 — 제목 가운데 정렬, 하위 3 카드는 미포함
+        fig = px.bar(grp, x="평균만족도", y=cat_label, color="구분",
+                     color_discrete_map={"하위 3": C["red"], "일반": C["sky"]},
+                     orientation="h", text="평균만족도", template=PLOTLY_TPL)
+        fig.update_traces(texttemplate="%{text:.1f}", textposition="outside", cliponaxis=False,
+                          hovertemplate="%{y}<br>평균: %{x:.1f}점<br>응답: %{customdata[0]:,}건<extra></extra>",
+                          customdata=grp[["응답수"]].values)
+        fig.add_vline(x=overall_avg, line_color="#aaa", line_dash="dash", line_width=1.2,
+                      annotation_text=f"▼ 전체 평균 {overall_avg:.1f}",
+                      annotation_font_size=11, annotation_font_color="#888",
+                      annotation_position="top", annotation_yshift=10)
+        fig.update_layout(
+            height=max(300, len(grp) * 30 + 80),
+            margin=dict(t=60, b=20, l=10, r=160),
+            legend_title_text="",
+            title=dict(text=f"<b>{cat_label}별 평균 만족도 (빨간색 = 하위 3개)</b>",
+                       x=0.5, xanchor="center", y=0.97, yanchor="top",
+                       font=dict(size=14, color=C["navy"])))
+        st.plotly_chart(fig, use_container_width=True, config={'staticPlot': True})
 
     # ── 지사별 × 범주별 점수 테이블/히트맵 ──
     if office_col:
