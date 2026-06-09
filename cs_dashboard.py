@@ -1809,15 +1809,17 @@ st.set_page_config(
 
 st.markdown(f"""
 <style>
+  /* 전체 base font-size 축소 (1rem = 14px → 컴팩트 톤) */
+  html {{ font-size: 14px; }}
   .stApp {{ background-color: {C['bg']}; }}
 
   .dash-header {{
     background: linear-gradient(120deg, {C['navy']} 0%, {C['blue']} 55%, {C['sky']} 100%);
-    padding: 1.8rem 2.4rem; border-radius: 14px; color: white;
-    margin-bottom: 1.5rem; box-shadow: 0 2px 12px rgba(15,23,42,0.10);
+    padding: 1.5rem 2.1rem; border-radius: 14px; color: white;
+    margin-bottom: 1.3rem; box-shadow: 0 2px 12px rgba(15,23,42,0.10);
   }}
-  .dash-header h1 {{ font-size:1.9rem; font-weight:800; margin:0; letter-spacing:-0.5px; }}
-  .dash-header p  {{ font-size:0.95rem; margin:0.4rem 0 0 0; opacity:0.85; }}
+  .dash-header h1 {{ font-size:1.45rem; font-weight:800; margin:0; letter-spacing:-0.5px; }}
+  .dash-header p  {{ font-size:0.85rem; margin:0.35rem 0 0 0; opacity:0.85; }}
   .dash-badge {{
     display:inline-block; background:rgba(255,255,255,0.18);
     border:1px solid rgba(255,255,255,0.35); border-radius:20px;
