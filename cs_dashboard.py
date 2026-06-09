@@ -1787,32 +1787,6 @@ def generate_ai_recommendations(kw_list, category_name, max_recs=5):
     return recs[:max_recs]
 
 
-def generate_auto_insight(df, score_col, indiv_scores, cat_cols):
-    """데이터 기반 한 줄 인사이트 자동 생성 (특정 지사 지목 없이 전반적 요약)"""
-    parts = []
-    # 1. 전체 만족도 수준 판정
-    if score_col and score_col in df.columns:
-        avg = df[score_col].mean()
-        n = len(df)
-        if avg >= 95:
-            parts.append(f"전체 {n:,}건 평균 **{avg:.1f}점**으로 매우 우수한 수준입니다.")
-        elif avg >= 90:
-            parts.append(f"전체 {n:,}건 평균 **{avg:.1f}점**으로 양호하나, 세부 항목별 편차 점검이 필요합니다.")
-        elif avg >= 80:
-            parts.append(f"전체 {n:,}건 평균 **{avg:.1f}점**으로 개선 여지가 있습니다.")
-        else:
-            parts.append(f"전체 {n:,}건 평균 **{avg:.1f}점**으로 집중 관리가 필요한 수준입니다.")
-    # 2. 종합점수에 가장 영향력 큰 항목
-    if score_col and score_col in df.columns and indiv_scores:
-        num = df[indiv_scores + [score_col]].apply(pd.to_numeric, errors="coerce").dropna()
-        if len(num) > 3:
-            corr = num.corr()[score_col].drop(score_col).sort_values(ascending=False)
-            parts.append(f"종합 점수에 가장 큰 영향을 미치는 항목은 **'{corr.index[0]}'**(상관계수 {corr.iloc[0]:.3f})입니다.")
-    if not parts:
-        return "데이터가 업로드되었습니다. 각 탭에서 상세 분석을 확인하세요."
-    return " ".join(parts)
-
-
 def find_vulnerable_group(df, cat_col, score_col, percentile=30):
     """범주형 컬럼에서 종합 점수 하위 N% 그룹 탐색"""
     grp = df.groupby(cat_col)[score_col].agg(["mean","count"]).reset_index()
@@ -1917,15 +1891,6 @@ st.markdown(f"""
   [data-testid="stSidebar"] [data-testid="stFileUploader"] button {{ background:{C['gold']} !important; color:{C['navy']} !important; font-weight:700 !important; border:none !important; border-radius:8px !important; padding:0.4rem 1.2rem !important; }}
   [data-testid="stSidebar"] [data-testid="stFileUploader"] button:hover {{ opacity:0.85 !important; }}
   [data-testid="stSidebar"] hr {{ border-color:rgba(255,255,255,0.2) !important; }}
-
-  .insight-box {{
-    background: linear-gradient(135deg, #e8f5e9 0%, #f1f8e9 100%);
-    border-left: 6px solid {C['teal']}; border-radius: 12px;
-    padding: 1.2rem 1.5rem; margin-bottom: 1.5rem;
-    box-shadow: 0 2px 12px rgba(0,137,123,0.12);
-    font-size: 1.02rem; line-height: 1.7; color: #333;
-  }}
-  .insight-box b {{ color: {C['navy']}; }}
 
   .stDownloadButton > button {{ background:linear-gradient(90deg,{C['navy']},{C['blue']}) !important; color:white !important; font-weight:700 !important; border-radius:10px !important; border:none !important; padding:0.65rem 1.5rem !important; box-shadow:0 3px 10px rgba(0,85,165,0.3) !important; }}
   .stDownloadButton > button:hover {{ opacity:0.88 !important; }}
@@ -2411,15 +2376,8 @@ if M["voc"]:
 _pre_neg_r = _pre_neg_n / max(len(df_f), 1) * 100
 
 # ══════════════════════════════════════════════════════════════
-#  12. 자동 인사이트 & KPI 메트릭
+#  12. KPI 메트릭
 # ══════════════════════════════════════════════════════════════
-# ── 데이터 기반 한 줄 인사이트 ──
-_insight_text = generate_auto_insight(
-    df_f, M.get("score"), individual_scores, available_cats)
-st.markdown(
-    f'<div class="insight-box">💡 <b>AI 인사이트:</b> {_insight_text}</div>',
-    unsafe_allow_html=True)
-
 st.markdown('<p class="sec-head">📌 핵심 요약 지표 (100점 환산)</p>', unsafe_allow_html=True)
 m1, m2, m3, m4, m5 = st.columns(5)
 with m1:
