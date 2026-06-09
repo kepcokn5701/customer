@@ -4461,57 +4461,86 @@ with tab_sol:
         if M.get("business"):
             _sol_mid_l, _sol_mid_r = st.columns([1, 1])
 
-            # ── 좌측: 레이더 차트 ──────────────────────────────
-            with _sol_mid_l:
-                st.markdown("##### 🎯 업무별 강점 / 약점 — 본부 평균과 비교")
-                _biz_sel_avg = _df_sel.groupby(M["business"])["_점수100"].mean()
-                _biz_all_avg = df_f.groupby(M["business"])["_점수100"].mean()
-                _radar_cats = sorted(set(_biz_sel_avg.index) & set(_biz_all_avg.index))
-                if len(_radar_cats) >= 3:
-                    _r_sel = [round(_biz_sel_avg.get(c, 0), 1) for c in _radar_cats]
-                    _r_all = [round(_biz_all_avg.get(c, 0), 1) for c in _radar_cats]
-                    fig_radar = go.Figure()
-                    fig_radar.add_trace(go.Scatterpolar(
-                        r=_r_sel + [_r_sel[0]], theta=_radar_cats + [_radar_cats[0]],
-                        fill="toself", fillcolor="rgba(255,215,0,0.15)",
-                        line=dict(color="#FFD700", width=2.5),
-                        name=_sel_off,
-                        hovertemplate="%{theta}: %{r:.1f}점<extra></extra>"))
-                    fig_radar.add_trace(go.Scatterpolar(
-                        r=_r_all + [_r_all[0]], theta=_radar_cats + [_radar_cats[0]],
-                        fill="toself", fillcolor="rgba(144,164,174,0.08)",
-                        line=dict(color="#90a4ae", width=1.5, dash="dash"),
-                        name="본부 평균",
-                        hovertemplate="%{theta}: %{r:.1f}점<extra></extra>"))
-                    fig_radar.update_layout(
-                        polar=dict(radialaxis=dict(range=[60, 105], dtick=10, showticklabels=True, tickfont_size=9)),
-                        template=PLOTLY_TPL, height=340,
-                        margin=dict(t=30, b=30, l=60, r=60),
-                        legend=dict(orientation="h", yanchor="bottom", y=-0.15),
-                        showlegend=True)
-                    st.plotly_chart(fig_radar, use_container_width=True, config={'staticPlot': True})
-
-                    # 강점/약점 TOP 3
-                    _biz_gap = pd.DataFrame({
-                        "업무": _radar_cats,
-                        "지사": _r_sel[:len(_radar_cats)],
-                        "본부": _r_all[:len(_radar_cats)]})
-                    _biz_gap["편차"] = _biz_gap["지사"] - _biz_gap["본부"]
-                    _strengths = _biz_gap.sort_values("편차", ascending=False).head(3)
-                    _weaknesses = _biz_gap.sort_values("편차").head(3)
-                    _sw_l, _sw_r = st.columns(2)
-                    with _sw_l:
-                        _s_html = '<div style="background:#e8f5e9;border-radius:8px;padding:10px 14px;font-size:0.88em;"><b>💪 강점 TOP 3</b><br>'
-                        for _, r in _strengths.iterrows():
-                            _s_html += f'🟢 {r["업무"]} — {r["지사"]:.1f}점 (본부 대비 <b>{r["편차"]:+.1f}</b>점)<br>'
-                        st.markdown(_s_html + '</div>', unsafe_allow_html=True)
-                    with _sw_r:
-                        _w_html = '<div style="background:#ffebee;border-radius:8px;padding:10px 14px;font-size:0.88em;"><b>🩹 약점 TOP 3</b><br>'
-                        for _, r in _weaknesses.iterrows():
-                            _w_html += f'🔴 {r["업무"]} — {r["지사"]:.1f}점 (본부 대비 <b style="color:#c62828">{r["편차"]:+.1f}</b>점)<br>'
-                        st.markdown(_w_html + '</div>', unsafe_allow_html=True)
-                else:
+            # ── 좌측: 레이더 차트 (3개 탭: 본부/전월/전년) ──────────
+            def _render_radar_compare(sel_df, ref_df, ref_label, is_timeseries):
+                """레이더 + 강점/약점(개선/악화) 카드. is_timeseries=True면 시계열 비교."""
+                _biz_sel = sel_df.groupby(M["business"])["_점수100"].mean()
+                _biz_ref = ref_df.groupby(M["business"])["_점수100"].mean()
+                _cats = sorted(set(_biz_sel.index) & set(_biz_ref.index))
+                if len(_cats) < 3:
                     st.info("업무유형이 3개 이상이어야 레이더 차트를 그릴 수 있습니다.")
+                    return
+                _r_sel = [round(_biz_sel.get(c, 0), 1) for c in _cats]
+                _r_ref = [round(_biz_ref.get(c, 0), 1) for c in _cats]
+                _fig = go.Figure()
+                _fig.add_trace(go.Scatterpolar(
+                    r=_r_sel + [_r_sel[0]], theta=_cats + [_cats[0]],
+                    fill="toself", fillcolor="rgba(255,215,0,0.15)",
+                    line=dict(color="#FFD700", width=2.5),
+                    name=f"{_sel_off} (이번 달)",
+                    hovertemplate="%{theta}: %{r:.1f}점<extra></extra>"))
+                _fig.add_trace(go.Scatterpolar(
+                    r=_r_ref + [_r_ref[0]], theta=_cats + [_cats[0]],
+                    fill="toself", fillcolor="rgba(144,164,174,0.08)",
+                    line=dict(color="#90a4ae", width=1.5, dash="dash"),
+                    name=ref_label,
+                    hovertemplate="%{theta}: %{r:.1f}점<extra></extra>"))
+                _fig.update_layout(
+                    polar=dict(radialaxis=dict(range=[60, 105], dtick=10, showticklabels=True, tickfont_size=9)),
+                    template=PLOTLY_TPL, height=340,
+                    margin=dict(t=30, b=30, l=60, r=60),
+                    legend=dict(orientation="h", yanchor="bottom", y=-0.15),
+                    showlegend=True)
+                st.plotly_chart(_fig, use_container_width=True, config={'staticPlot': True})
+                _gap = pd.DataFrame({"업무": _cats, "지사": _r_sel, "기준": _r_ref})
+                _gap["편차"] = _gap["지사"] - _gap["기준"]
+                _good = _gap.sort_values("편차", ascending=False).head(3)
+                _bad = _gap.sort_values("편차").head(3)
+                if is_timeseries:
+                    _good_label, _bad_label = "📈 개선 TOP 3", "📉 악화 TOP 3"
+                    _good_icon, _bad_icon = "🔼", "🔽"
+                else:
+                    _good_label, _bad_label = "💪 강점 TOP 3", "🩹 약점 TOP 3"
+                    _good_icon, _bad_icon = "🟢", "🔴"
+                _gl, _gr = st.columns(2)
+                with _gl:
+                    _h = f'<div style="background:#e8f5e9;border-radius:8px;padding:10px 14px;font-size:0.88em;"><b>{_good_label}</b><br>'
+                    for _, r in _good.iterrows():
+                        _h += f'{_good_icon} {r["업무"]} — {r["지사"]:.1f}점 ({ref_label} 대비 <b>{r["편차"]:+.1f}</b>점)<br>'
+                    st.markdown(_h + '</div>', unsafe_allow_html=True)
+                with _gr:
+                    _h = f'<div style="background:#ffebee;border-radius:8px;padding:10px 14px;font-size:0.88em;"><b>{_bad_label}</b><br>'
+                    for _, r in _bad.iterrows():
+                        _h += f'{_bad_icon} {r["업무"]} — {r["지사"]:.1f}점 ({ref_label} 대비 <b style="color:#c62828">{r["편차"]:+.1f}</b>점)<br>'
+                    st.markdown(_h + '</div>', unsafe_allow_html=True)
+
+            with _sol_mid_l:
+                st.markdown("##### 🎯 업무별 강점 / 약점")
+                _tab_hq, _tab_m, _tab_y = st.tabs(["본부 대비", "전월 대비", "전년 동월 대비"])
+                with _tab_hq:
+                    _render_radar_compare(_df_sel, df_f, "본부 평균", is_timeseries=False)
+                with _tab_m:
+                    if prev_df_f is None:
+                        st.info("📁 전월 비교 파일을 먼저 사이드바에서 업로드해주세요.")
+                    elif M["office"] not in prev_df_f.columns:
+                        st.warning("전월 비교 파일에 지사 컬럼이 없습니다.")
+                    else:
+                        _prev_sel = prev_df_f[prev_df_f[M["office"]] == _sel_off]
+                        if len(_prev_sel) > 0 and "_점수100" in _prev_sel.columns:
+                            _render_radar_compare(_df_sel, _prev_sel, "전월", is_timeseries=True)
+                        else:
+                            st.info(f"전월 비교 파일에 '{_sel_off}' 데이터가 없거나 점수 컬럼이 누락됐습니다.")
+                with _tab_y:
+                    if prev_y_df_f is None:
+                        st.info("📁 전년 동월 비교 파일을 먼저 사이드바에서 업로드해주세요.")
+                    elif M["office"] not in prev_y_df_f.columns:
+                        st.warning("전년 동월 비교 파일에 지사 컬럼이 없습니다.")
+                    else:
+                        _prev_y_sel = prev_y_df_f[prev_y_df_f[M["office"]] == _sel_off]
+                        if len(_prev_y_sel) > 0 and "_점수100" in _prev_y_sel.columns:
+                            _render_radar_compare(_df_sel, _prev_y_sel, "전년 동월", is_timeseries=True)
+                        else:
+                            st.info(f"전년 동월 비교 파일에 '{_sel_off}' 데이터가 없거나 점수 컬럼이 누락됐습니다.")
 
             # ── 우측: 페르소나별 미스매치 매트릭스 ──────────────
             with _sol_mid_r:
