@@ -3571,31 +3571,6 @@ def _render_category_section(df, cat_col, cat_label, office_col, score_col, over
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 key=_dl_key, use_container_width=True)
 
-    # ── 저점수 건 상세 조회 (60점 이하 전체 표) ──
-    _uid = cat_label.replace(" ", "")
-    with st.expander(f"🔍 60점 이하 저점수 건 상세 조회 ({cat_label})"):
-        _filtered = df[df[score_col] <= 60].copy()
-        if len(_filtered) > 0:
-            _filtered = _filtered.sort_values(score_col)
-            st.markdown(
-                f'총 <b style="color:{C["red"]}">{len(_filtered):,}건</b>이 60점 이하입니다.',
-                unsafe_allow_html=True)
-            _show_cols = []
-            if M.get("receipt_no") and M["receipt_no"] in _filtered.columns:
-                _show_cols.append(M["receipt_no"])
-            if office_col and office_col in _filtered.columns:
-                _show_cols.append(office_col)
-            _show_cols.append(cat_col)
-            if score_col in _filtered.columns:
-                _show_cols.append(score_col)
-            if M.get("voc") and M["voc"] in _filtered.columns:
-                _show_cols.append(M["voc"])
-            _show_cols = [c for c in _show_cols if c in _filtered.columns]
-            st.dataframe(_filtered[_show_cols].reset_index(drop=True),
-                         use_container_width=True, height=400, hide_index=True)
-        else:
-            st.success("60점 이하 데이터가 없습니다.")
-
     return _return_dl_df
 
 
@@ -3850,7 +3825,7 @@ with tab3:
 
             # ── AI 자동 분석 트리거 ──
             _q_ss_key = "_ai_quadrant_result"
-            _refresh = st.button("🔄 보고서 새로 생성", key="ai_quadrant_refresh", type="secondary")
+            _refresh = st.button("↻ 보고서 새로 생성", key="ai_quadrant_refresh", type="secondary")
             if (_q_ss_key not in st.session_state) or _refresh:
                 if not GEMINI_AVAILABLE:
                     st.error("Gemini API 키가 설정되지 않았습니다. `.env` 파일에 `GEMINI_API_KEY`를 설정해주세요.")
@@ -3984,6 +3959,7 @@ with tab3:
                                          "generationConfig": {"temperature": 0.7, "maxOutputTokens": 8192}}
                             _ctx = ssl._create_unverified_context()
                             _body = None
+                            _last_err_code = None
                             for _model in _models:
                                 _api_url = f"https://generativelanguage.googleapis.com/v1beta/models/{_model}:generateContent?key={_GEMINI_KEY}"
                                 _req = urllib.request.Request(_api_url, data=json.dumps(_payload).encode("utf-8"),
@@ -3993,11 +3969,18 @@ with tab3:
                                         _body = json.loads(_resp.read().decode("utf-8"))
                                     break
                                 except urllib.error.HTTPError as _http_err:
-                                    if _http_err.code in (429, 503):
+                                    _last_err_code = _http_err.code
+                                    # 403(권한/모델별 미지원), 404(모델 없음), 429(한도), 503(과부하) → 다음 모델 시도
+                                    if _http_err.code in (403, 404, 429, 503):
                                         continue
                                     raise
                             if _body is None:
-                                st.error("모든 AI 모델의 일일 한도가 소진되었습니다. 내일 다시 시도해주세요.")
+                                if _last_err_code == 403:
+                                    st.error("AI 분석 호출 권한 오류(403). API 키가 만료됐거나 일일 한도를 초과했을 수 있습니다. `GEMINI_API_KEY` 확인 또는 잠시 후 다시 시도해주세요.")
+                                elif _last_err_code in (429, 503):
+                                    st.error("모든 AI 모델의 일일 한도가 소진되었습니다. 내일 다시 시도해주세요.")
+                                else:
+                                    st.error(f"AI 분석 실패 (HTTP {_last_err_code}). 잠시 후 다시 시도해주세요.")
                             else:
                                 st.session_state[_q_ss_key] = _body["candidates"][0]["content"]["parts"][0]["text"].strip()
                         except Exception as e:
