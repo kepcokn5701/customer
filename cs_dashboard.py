@@ -1839,7 +1839,7 @@ st.markdown(f"""
   .stTabs [data-baseweb="tab"] {{ font-size:0.95rem; font-weight:700; padding:0.6rem 1.4rem; border-radius:8px 8px 0 0; color:{C['gray']}; background:transparent; }}
   .stTabs [aria-selected="true"] {{ color:{C['navy']} !important; background:{C['white']} !important; border-bottom:3px solid {C['blue']} !important; box-shadow:0 -2px 8px rgba(0,85,165,0.08); }}
 
-  .sec-head {{ font-size:1.15rem; font-weight:700; color:{C['navy']}; border-left:4px solid {C['blue']}; padding:0.1rem 0 0.1rem 0.85rem; margin:1.6rem 0 1.1rem 0; letter-spacing:-0.2px; }}
+  .sec-head {{ font-size:1.15rem; font-weight:700; color:{C['navy']}; border-left:4px solid {C['blue']}; padding:0.1rem 0 0.1rem 0.85rem; margin:0.6rem 0 0.9rem 0; letter-spacing:-0.2px; }}
 
   /* 도넛+표 한 흰 카드 안에 묶기 (.bk-row-marker가 있는 horizontalBlock만) */
   [data-testid="stHorizontalBlock"]:has(.bk-row-marker) {{
@@ -1847,7 +1847,7 @@ st.markdown(f"""
     border-radius: 12px;
     padding: 20px 24px;
     box-shadow: 0 1px 3px rgba(15,23,42,0.04), 0 4px 12px rgba(15,23,42,0.06);
-    margin-bottom: 18px;
+    margin-bottom: 8px;
     align-items: center;
   }}
 
@@ -1857,6 +1857,7 @@ st.markdown(f"""
     border-radius: 12px;
     padding: 16px 20px;
     box-shadow: 0 1px 3px rgba(15,23,42,0.04), 0 4px 12px rgba(15,23,42,0.06);
+    margin-bottom: 8px;
   }}
 
   /* 업로드 전 안내 영역 — 폰트 축소 (!important로 Streamlit 기본 스타일 덮어쓰기) */
@@ -3013,15 +3014,14 @@ with tab1:
             _title3 = f'본부 만족도 90점 이상 비중 {_p90:.1f}%로 {compare_label} 대비 (   )%p 감소'
         st.markdown(f'<p class="sec-head">{_title3}</p>', unsafe_allow_html=True)
 
-        # ── [도넛 | 표] 2컬럼 (CSS :has()로 한 흰 카드 안에 묶음) ──
+        # ── [도넛 | 표] 2컬럼 — 표 쪽 살짝 넓게 ──
         _bk_colors_lr = [BUCKET_COLORS[b] for b in _bk_order_lr]
-        _bk_donut_col, _bk_tbl_col = st.columns([1, 1])
+        _bk_donut_col, _bk_tbl_col = st.columns([1, 1.3])
 
         with _bk_donut_col:
             st.markdown('<span class="bk-row-marker" style="display:none;"></span>', unsafe_allow_html=True)
             _SHORT_BUCKET = {"90점 이상": "90점 이상", "70~90점": "70~90점 미만",
                              "50~70점": "50~70점 미만", "50점 미만": "50점 미만"}
-            # 점수 높은 순으로 고정 (BUCKET_ORDER 기준)
             _donut_df = pd.DataFrame({
                 "구간": BUCKET_ORDER,
                 "건수": [int(_bk_cnt_full.get(b, 0)) for b in BUCKET_ORDER],
@@ -3030,39 +3030,30 @@ with tab1:
             _ordered_labels = [_SHORT_BUCKET[k] for k in BUCKET_ORDER]
             _bk_color_map = {_SHORT_BUCKET[k]: v for k, v in BUCKET_COLORS.items()
                              if k in _donut_df["구간"].values}
-            fig_bp = px.pie(_donut_df, names="라벨", values="건수", color="라벨",
-                            color_discrete_map=_bk_color_map, hole=0, template=PLOTLY_TPL,
-                            category_orders={"라벨": _ordered_labels})
-            # 큰 조각(≥50%)은 trace 텍스트 숨기고 차트 중심에 annotation으로 배치
             _bp_total = int(_donut_df["건수"].sum())
-            _bp_text = []
-            for _bi in range(len(_donut_df)):
-                _bc = int(_donut_df["건수"].iloc[_bi])
-                _bp = (_bc / max(_bp_total, 1)) * 100
-                if _bp >= 50:
-                    _bp_text.append("")
-                else:
-                    _bp_text.append(f"{_donut_df['라벨'].iloc[_bi]}<br>{_bp:.1f}%")
+            fig_bp = px.pie(_donut_df, names="라벨", values="건수", color="라벨",
+                            color_discrete_map=_bk_color_map, hole=0.5, template=PLOTLY_TPL,
+                            category_orders={"라벨": _ordered_labels})
+            # 외곽 leader line으로 라벨만 (%는 표에 있음)
             fig_bp.update_traces(
-                text=_bp_text, textposition="auto", textinfo="text",
-                insidetextfont=dict(color="white", size=15),
-                outsidetextfont=dict(color="#333", size=15),
-                insidetextorientation="horizontal",
+                textposition="outside", textinfo="label",
+                outsidetextfont=dict(color="#333", size=13),
                 sort=False, direction="clockwise",
                 marker=dict(line=dict(color="#ffffff", width=2)),
                 hovertemplate="%{label}<br>%{percent}<extra></extra>")
-            # 큰 조각은 차트 중심(0.5, 0.5)에 큰 글씨 annotation
-            for _bi in range(len(_donut_df)):
-                _bc = int(_donut_df["건수"].iloc[_bi])
-                _bp = (_bc / max(_bp_total, 1)) * 100
-                if _bp >= 50:
-                    fig_bp.add_annotation(
-                        x=0.5, y=0.5, xref="paper", yref="paper",
-                        text=f"<b>{_donut_df['라벨'].iloc[_bi]}<br>{_bp:.1f}%</b>",
-                        showarrow=False,
-                        font=dict(size=20, color="white"))
+            # 도넛 가운데에 총응답 건수 표시 (예시 사진 스타일)
+            fig_bp.add_annotation(
+                x=0.5, y=0.56, xref="paper", yref="paper",
+                text="총 응답",
+                showarrow=False,
+                font=dict(size=13, color="#888"))
+            fig_bp.add_annotation(
+                x=0.5, y=0.42, xref="paper", yref="paper",
+                text=f"<b>{_bp_total:,}건</b>",
+                showarrow=False,
+                font=dict(size=24, color=C["navy"]))
             fig_bp.update_layout(
-                height=420, margin=dict(t=30, b=30, l=130, r=130),
+                height=380, margin=dict(t=30, b=30, l=100, r=100),
                 paper_bgcolor="white", plot_bgcolor="white",
                 showlegend=False)
             st.plotly_chart(fig_bp, use_container_width=True, config={'staticPlot': True})
@@ -3174,10 +3165,10 @@ with tab1:
             with pc_list[idx]:
                 st.markdown('<span class="dist-card-marker" style="display:none;"></span>', unsafe_allow_html=True)
                 _title = titles_map.get(col_nm, col_nm)
-                # 제목은 markdown으로 (들여쓰기)
+                # 제목은 카드 안 차트 위에 가운데 정렬
                 st.markdown(
-                    f'<p style="font-size:0.95rem;font-weight:700;color:{C["navy"]};'
-                    f'margin:6px 0 8px 12px;">{_title} 분포</p>',
+                    f'<p style="font-size:0.98rem;font-weight:700;color:{C["navy"]};'
+                    f'margin:4px 0 10px 0;text-align:center;">{_title} 분포</p>',
                     unsafe_allow_html=True)
                 if col_nm == M["business"]:
                     # 업무유형: 가로 막대그래프, 퍼센트 높은 순 정렬 (상위 3 navy 강조, 나머지 sky)
