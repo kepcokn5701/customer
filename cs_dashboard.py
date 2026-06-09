@@ -1046,11 +1046,14 @@ def _extract_voc_phrases(voc_texts, scores):
                         pos_counts[label].append(s)
                         break
 
-        # 건의/요청 감지 (전체 점수 대상)
-        for pat in _REQUEST_PATTERNS:
-            if re.search(pat, s):
-                notable.append((s, sc))
-                break
+        # 건의/요청 감지 (만족(≥90점) 제외 + 만족 키워드 들어간 문장 제외)
+        _is_high_score = sc is not None and sc >= 90
+        _has_satisfy_kw = any(kw in s for kw in ("좋아요", "좋습니다", "좋네요", "감사", "만족", "훌륭", "최고", "고맙"))
+        if not _is_high_score and not _has_satisfy_kw:
+            for pat in _REQUEST_PATTERNS:
+                if re.search(pat, s):
+                    notable.append((s, sc))
+                    break
 
     # 결과 정렬 (건수 내림차순, 샘플 최대 2건)
     neg_results = sorted(
