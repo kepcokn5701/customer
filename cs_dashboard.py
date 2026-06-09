@@ -1839,7 +1839,7 @@ st.markdown(f"""
   .stTabs [data-baseweb="tab"] {{ font-size:0.95rem; font-weight:700; padding:0.6rem 1.4rem; border-radius:8px 8px 0 0; color:{C['gray']}; background:transparent; }}
   .stTabs [aria-selected="true"] {{ color:{C['navy']} !important; background:{C['white']} !important; border-bottom:3px solid {C['blue']} !important; box-shadow:0 -2px 8px rgba(0,85,165,0.08); }}
 
-  .sec-head {{ font-size:1.15rem; font-weight:700; color:{C['navy']}; border-left:4px solid {C['blue']}; padding:0.1rem 0 0.1rem 0.85rem; margin:0.6rem 0 0.9rem 0; letter-spacing:-0.2px; }}
+  .sec-head {{ font-size:1.15rem; font-weight:700; color:{C['navy']}; border-left:4px solid {C['blue']}; padding:0.1rem 0 0.1rem 0.85rem; margin:1.3rem 0 0.9rem 0; letter-spacing:-0.2px; }}
 
   /* 도넛+표 한 흰 카드 안에 묶기 (.bk-row-marker가 있는 horizontalBlock만) */
   [data-testid="stHorizontalBlock"]:has(.bk-row-marker) {{
@@ -3031,17 +3031,27 @@ with tab1:
             _bk_color_map = {_SHORT_BUCKET[k]: v for k, v in BUCKET_COLORS.items()
                              if k in _donut_df["구간"].values}
             _bp_total = int(_donut_df["건수"].sum())
+            # 라벨에 % 같이 넣고 plotly auto가 큰 조각엔 안, 작은 건 leader line으로
+            _bp_text = []
+            for _bi in range(len(_donut_df)):
+                _bc = int(_donut_df["건수"].iloc[_bi])
+                _bp = (_bc / max(_bp_total, 1)) * 100
+                if _bp >= 5:
+                    _bp_text.append(f"{_bp:.1f}%")  # 큰 조각: 안쪽에 % 만
+                else:
+                    _bp_text.append(f"{_donut_df['라벨'].iloc[_bi]}")  # 작은 조각: 바깥에 라벨만
             fig_bp = px.pie(_donut_df, names="라벨", values="건수", color="라벨",
                             color_discrete_map=_bk_color_map, hole=0.5, template=PLOTLY_TPL,
                             category_orders={"라벨": _ordered_labels})
-            # 외곽 leader line으로 라벨만 (%는 표에 있음)
             fig_bp.update_traces(
-                textposition="outside", textinfo="label",
-                outsidetextfont=dict(color="#333", size=13),
+                text=_bp_text, textposition="auto", textinfo="text",
+                insidetextfont=dict(color="white", size=14),
+                outsidetextfont=dict(color="#333", size=14),
+                insidetextorientation="horizontal",
                 sort=False, direction="clockwise",
                 marker=dict(line=dict(color="#ffffff", width=2)),
                 hovertemplate="%{label}<br>%{percent}<extra></extra>")
-            # 도넛 가운데에 총응답 건수 표시 (예시 사진 스타일)
+            # 도넛 가운데에 총응답 건수 표시
             fig_bp.add_annotation(
                 x=0.5, y=0.56, xref="paper", yref="paper",
                 text="총 응답",
@@ -3059,7 +3069,7 @@ with tab1:
             st.plotly_chart(fig_bp, use_container_width=True, config={'staticPlot': True})
 
         with _bk_tbl_col:
-            _bk3_html = '<table style="width:100%;border-collapse:collapse;font-size:0.95em;text-align:center;">'
+            _bk3_html = '<table style="width:96%;margin:0 auto 0 0;border-collapse:collapse;font-size:0.95em;text-align:center;">'
             _bk3_html += f'<tr style="{_RP_HDR_STYLE}">'
             _bk3_html += f'<th style="border:1px solid {_RP_BDR};padding:8px 8px;">구분</th>'
             for lbl, col in zip(_bk_lbl_lr, _bk_colors_lr):
@@ -3165,11 +3175,11 @@ with tab1:
             with pc_list[idx]:
                 st.markdown('<span class="dist-card-marker" style="display:none;"></span>', unsafe_allow_html=True)
                 _title = titles_map.get(col_nm, col_nm)
-                # 제목은 카드 안 차트 위에 가운데 정렬
-                st.markdown(
-                    f'<p style="font-size:0.98rem;font-weight:700;color:{C["navy"]};'
-                    f'margin:4px 0 10px 0;text-align:center;">{_title} 분포</p>',
-                    unsafe_allow_html=True)
+                # 제목은 차트 안 (plotly title)으로 들어가 카드 안에 가운데 정렬
+                _chart_title = dict(
+                    text=f"<b>{_title} 분포</b>", x=0.5, xanchor="center",
+                    y=0.97, yanchor="top",
+                    font=dict(size=15, color=C["navy"]))
                 if col_nm == M["business"]:
                     # 업무유형: 가로 막대그래프, 퍼센트 높은 순 정렬 (상위 3 navy 강조, 나머지 sky)
                     _biz_df = pd.DataFrame({"유형": counts.index, "건수": counts.values})
@@ -3186,8 +3196,9 @@ with tab1:
                                           customdata=_biz_df[["건수"]].values)
                     _biz_x_max = _biz_df["비율(%)"].max() * 1.45
                     fig_biz.update_layout(height=500,
-                                           margin=dict(t=20, b=15, l=10, r=10), showlegend=False,
+                                           margin=dict(t=50, b=15, l=10, r=10), showlegend=False,
                                            paper_bgcolor="white", plot_bgcolor="white",
+                                           title=_chart_title,
                                            xaxis=dict(title="비율(%)", range=[0, _biz_x_max], tickfont=dict(size=12)),
                                            yaxis=dict(tickfont=dict(size=13)), yaxis_title="")
                     st.plotly_chart(fig_biz, use_container_width=True, config={'staticPlot': True})
@@ -3207,8 +3218,9 @@ with tab1:
                         hovertemplate="%{label}<br>%{percent}<extra></extra>")
                     fig_pie.update_layout(
                         height=500,
-                        margin=dict(t=20, b=20, l=20, r=20),
+                        margin=dict(t=50, b=20, l=20, r=20),
                         showlegend=False,
+                        title=_chart_title,
                         paper_bgcolor="white", plot_bgcolor="white")
                     st.plotly_chart(fig_pie, use_container_width=True, config={'staticPlot': True})
 
