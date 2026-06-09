@@ -3018,8 +3018,8 @@ with tab1:
 
         with _bk_donut_col:
             st.markdown('<span class="bk-row-marker" style="display:none;"></span>', unsafe_allow_html=True)
-            _SHORT_BUCKET = {"90점 이상": "≥90점", "70~90점": "70~89점",
-                             "50~70점": "50~69점", "50점 미만": "<50점"}
+            _SHORT_BUCKET = {"90점 이상": "90점 이상", "70~90점": "70~90점 미만",
+                             "50~70점": "50~70점 미만", "50점 미만": "50점 미만"}
             # 점수 높은 순으로 고정 (BUCKET_ORDER 기준)
             _donut_df = pd.DataFrame({
                 "구간": BUCKET_ORDER,
@@ -3030,19 +3030,39 @@ with tab1:
             _bk_color_map = {_SHORT_BUCKET[k]: v for k, v in BUCKET_COLORS.items()
                              if k in _donut_df["구간"].values}
             fig_bp = px.pie(_donut_df, names="라벨", values="건수", color="라벨",
-                            color_discrete_map=_bk_color_map, hole=0.45, template=PLOTLY_TPL,
+                            color_discrete_map=_bk_color_map, hole=0, template=PLOTLY_TPL,
                             category_orders={"라벨": _ordered_labels})
-            fig_bp.update_traces(textposition="inside", textinfo="percent", textfont_size=16,
-                                  sort=False, direction="clockwise",
-                                  marker=dict(line=dict(color="#ffffff", width=2)),
-                                  hovertemplate="%{label}<br>%{percent}<extra></extra>")
+            # 카테고리명을 모두 바깥에 leader line으로 표시
+            fig_bp.update_traces(
+                textposition="outside", textinfo="label",
+                textfont=dict(size=13, color="#444"),
+                sort=False, direction="clockwise",
+                marker=dict(line=dict(color="#ffffff", width=2)),
+                hovertemplate="%{label}<br>%{percent}<extra></extra>")
+            # 큰 조각(≥5%)의 % 값만 안쪽에 annotation으로
+            _total_n = int(_donut_df["건수"].sum())
+            _cum = 0
+            for _i in range(len(_donut_df)):
+                _cnt = int(_donut_df["건수"].iloc[_i])
+                _pct = (_cnt / max(_total_n, 1)) * 100
+                if _pct >= 5:
+                    _mid_frac = (_cum + _cnt / 2) / max(_total_n, 1)
+                    _mid_deg = _mid_frac * 360
+                    # plotly pie: 12시 = 0°, 시계방향 → 표준 좌표 변환
+                    _angle_rad = math.radians(90 - _mid_deg)
+                    _r = 0.27
+                    _x = 0.5 + _r * math.cos(_angle_rad)
+                    _y = 0.5 + _r * math.sin(_angle_rad)
+                    fig_bp.add_annotation(
+                        x=_x, y=_y, xref="paper", yref="paper",
+                        text=f"<b>{_pct:.1f}%</b>",
+                        showarrow=False,
+                        font=dict(size=15, color="white"))
+                _cum += _cnt
             fig_bp.update_layout(
-                height=320, margin=dict(t=20, b=10, l=10, r=10),
+                height=380, margin=dict(t=40, b=40, l=80, r=80),
                 paper_bgcolor="white", plot_bgcolor="white",
-                showlegend=True,
-                legend=dict(orientation="h", yanchor="top", y=-0.05,
-                            xanchor="center", x=0.5, font=dict(size=14),
-                            traceorder="normal", title_text=""))
+                showlegend=False)
             st.plotly_chart(fig_bp, use_container_width=True, config={'staticPlot': True})
 
         with _bk_tbl_col:
