@@ -1876,6 +1876,14 @@ st.markdown(f"""
     margin-bottom: 18px;
   }}
 
+  /* 응답 분포 현황 — 각 컬럼(도넛/막대) 흰 카드로 */
+  [data-testid="column"]:has(.dist-card-marker) {{
+    background: #ffffff;
+    border-radius: 12px;
+    padding: 16px 20px;
+    box-shadow: 0 1px 3px rgba(15,23,42,0.04), 0 4px 12px rgba(15,23,42,0.06);
+  }}
+
   .card     {{ background:{C['white']}; border-radius:14px; padding:1.3rem 1.5rem; box-shadow:0 2px 12px rgba(0,85,165,0.09); margin-bottom:1rem; color:#333; }}
   .card-red {{ background:#fff5f5; border-radius:14px; padding:1.3rem 1.5rem; box-shadow:0 2px 12px rgba(198,40,40,0.10); border-left:5px solid {C['red']}; margin-bottom:1rem; color:#333; }}
   .card-gold {{ background:#fffbf0; border-radius:14px; padding:1.3rem 1.5rem; box-shadow:0 2px 12px rgba(240,165,0,0.12); border-left:5px solid {C['gold']}; margin-bottom:1rem; color:#333; }}
@@ -3175,6 +3183,7 @@ with tab1:
             counts = df_f[col_nm].dropna().astype(str).value_counts()
             _total = counts.sum()
             with pc_list[idx]:
+                st.markdown('<span class="dist-card-marker" style="display:none;"></span>', unsafe_allow_html=True)
                 _title = titles_map.get(col_nm, col_nm)
                 if col_nm == M["business"]:
                     # 업무유형: 가로 막대그래프, 퍼센트 높은 순 정렬 (상위 3 navy 강조, 나머지 sky)
@@ -3191,9 +3200,10 @@ with tab1:
                                           hovertemplate="%{y}: %{x:.1f}% (%{customdata[0]:,}건)<extra></extra>",
                                           customdata=_biz_df[["건수"]].values)
                     _biz_x_max = _biz_df["비율(%)"].max() * 1.45
-                    fig_biz.update_layout(height=max(400, len(_biz_df) * 32 + 80),
-                                           margin=dict(t=50, b=20, l=20, r=20), showlegend=False,
-                                           title_font=dict(size=17, color=C["navy"]),
+                    fig_biz.update_layout(height=500,
+                                           margin=dict(t=45, b=15, l=10, r=10), showlegend=False,
+                                           paper_bgcolor="white", plot_bgcolor="white",
+                                           title_font=dict(size=16, color=C["navy"]),
                                            xaxis=dict(title="비율(%)", range=[0, _biz_x_max], tickfont=dict(size=12)),
                                            yaxis=dict(tickfont=dict(size=13)), yaxis_title="")
                     st.plotly_chart(fig_biz, use_container_width=True, config={'staticPlot': True})
@@ -3205,8 +3215,10 @@ with tab1:
                     fig_pie.update_traces(textposition="outside", textinfo="percent+label", textfont_size=14,
                                            marker=dict(line=dict(color="#ffffff", width=2)),
                                            hovertemplate="%{label}<br>%{percent}<extra></extra>")
-                    fig_pie.update_layout(height=400, margin=dict(t=50, b=20, l=20, r=20), showlegend=False,
-                                           title_font=dict(size=17, color=C["navy"]))
+                    fig_pie.update_layout(height=500,
+                                           margin=dict(t=45, b=15, l=10, r=10), showlegend=False,
+                                           paper_bgcolor="white", plot_bgcolor="white",
+                                           title_font=dict(size=16, color=C["navy"]))
                     st.plotly_chart(fig_pie, use_container_width=True, config={'staticPlot': True})
 
 
@@ -3358,8 +3370,8 @@ def _render_category_section(df, cat_col, cat_label, office_col, score_col, over
                 html += f'<th style="border:1px solid {_bdr};padding:8px 4px;">합계</th>'
                 html += '</tr>'
 
-            # 본부 합계 행
-            _dbl = f"border-bottom:2px solid {C['navy']};"
+            # 본부 합계 행 (얕은 구분선)
+            _dbl = "border-bottom:1px solid #94a3b8;"
             html += f'<tr style="background:#f8fafc;font-weight:700;color:{C["navy"]};">'
             html += f'<td style="border:1px solid {_bdr};{_dbl}padding:6px 10px;font-weight:700;background:#f1f5f9;color:{C["navy"]};">본부</td>'
             for c in _cols:
@@ -3396,10 +3408,12 @@ def _render_category_section(df, cat_col, cat_label, office_col, score_col, over
                     if _below:
                         _ofc_bottom3[ofc] = {cat for cat, _ in sorted(_below.items(), key=lambda x: x[1])[:3]}
 
-            # 데이터 행
+            # 데이터 행 (1군 마지막 = 창녕지사 다음에 얕은 구분선)
             for ofc in pivot.index:
+                # 군 구분선: 창녕지사 행 아래 얕은 선 (1군/2군 사이)
+                _sep = "border-bottom:1px solid #94a3b8;" if ofc == "창녕지사" else ""
                 html += '<tr>'
-                html += f'<td style="border:1px solid {_bdr};padding:6px 10px;font-weight:700;background:#fafbfc;color:{C["navy"]};">{ofc}</td>'
+                html += f'<td style="border:1px solid {_bdr};{_sep}padding:6px 10px;font-weight:700;background:#fafbfc;color:{C["navy"]};">{ofc}</td>'
                 _bot3_set = _ofc_bottom3.get(ofc, set())
                 for c in _cols:
                     v = pivot.loc[ofc, c]
@@ -3409,20 +3423,20 @@ def _render_category_section(df, cat_col, cat_label, office_col, score_col, over
                     if _is_contract:
                         cnt = int(pivot_cnt.loc[ofc, c])
                         cnt_str = str(cnt) if cnt > 0 else ""
-                        html += f'<td style="border:1px solid {_bdr};padding:5px 4px;">{v_str}</td>'
-                        html += f'<td style="border:1px solid {_bdr};padding:5px 4px;">{cnt_str}</td>'
+                        html += f'<td style="border:1px solid {_bdr};{_sep}padding:5px 4px;">{v_str}</td>'
+                        html += f'<td style="border:1px solid {_bdr};{_sep}padding:5px 4px;">{cnt_str}</td>'
                     else:
                         _red = "color:#d32f2f;" if c in _bot3_set else ""
-                        html += f'<td style="border:1px solid {_bdr};padding:5px 4px;{_bg}{_red}">{v_str}</td>'
+                        html += f'<td style="border:1px solid {_bdr};{_sep}padding:5px 4px;{_bg}{_red}">{v_str}</td>'
                 # 합계 열
                 _t_score = df[df[office_col] == ofc][score_col].mean()
                 _t_str = f"{_t_score:.1f}" if pd.notna(_t_score) else ""
                 if _is_contract:
                     _t_cnt = int(df[df[office_col] == ofc][score_col].count())
-                    html += f'<td style="border:1px solid {_bdr};padding:5px 4px;font-weight:700;">{_t_str}</td>'
-                    html += f'<td style="border:1px solid {_bdr};padding:5px 4px;">{_t_cnt}</td>'
+                    html += f'<td style="border:1px solid {_bdr};{_sep}padding:5px 4px;font-weight:700;">{_t_str}</td>'
+                    html += f'<td style="border:1px solid {_bdr};{_sep}padding:5px 4px;">{_t_cnt}</td>'
                 else:
-                    html += f'<td style="border:1px solid {_bdr};padding:5px 4px;font-weight:700;">{_t_str}</td>'
+                    html += f'<td style="border:1px solid {_bdr};{_sep}padding:5px 4px;font-weight:700;">{_t_str}</td>'
                 html += '</tr>'
 
             html += '</table>'
@@ -3577,31 +3591,34 @@ with tab3:
             _item_rows.insert(0, _hq_row)
 
             _item_df = pd.DataFrame(_item_rows)
-            # HTML 테이블 (양식1 스타일)
-            _hdr_bg = "#d6e4f0"
-            _border = "#b0b0b0"
-            _f1_html = '<div style="overflow-x:auto;"><table style="border-collapse:collapse;width:100%;font-size:0.85em;text-align:center;">'
-            _f1_html += f'<tr style="background:{_hdr_bg};font-weight:bold;">'
+            # HTML 테이블 (라이트 톤 양식)
+            _hdr_bg = "#f1f5f9"
+            _border = "#e5e7eb"
+            _hdr_style = f'background:{_hdr_bg};font-weight:700;color:{C["navy"]};'
+            _f1_html = ('<div style="overflow-x:auto;background:#ffffff;border-radius:12px;'
+                        'padding:18px 20px;box-shadow:0 1px 3px rgba(15,23,42,0.04),0 4px 12px rgba(15,23,42,0.06);'
+                        'margin-bottom:18px;"><table style="border-collapse:collapse;width:100%;font-size:0.88em;text-align:center;">')
+            _f1_html += f'<tr style="{_hdr_style}">'
             for _col in _item_df.columns:
-                _f1_html += f'<th style="border:1px solid {_border};padding:6px 4px;">{_col}</th>'
+                _f1_html += f'<th style="border:1px solid {_border};padding:8px 4px;">{_col}</th>'
             _f1_html += '</tr>'
             for _ri, (_, _row) in enumerate(_item_df.iterrows()):
                 _is_hq = (_ri == 0)
-                _bg = "background:#e8eef5;font-weight:bold;" if _is_hq else ""
-                _dbl_b = f"border-bottom:3px double {_border};" if _is_hq else ""
+                _bg = f"background:#f8fafc;font-weight:700;color:{C['navy']};" if _is_hq else ""
+                _dbl_b = f"border-bottom:2px solid {C['navy']};" if _is_hq else ""
                 _f1_html += f'<tr style="{_bg}">'
                 for _col in _item_df.columns:
                     _v = _row[_col]
                     if _col == "구분":
-                        _cell_bg = "background:#dce6f0;" if _is_hq else "background:#f9f9f9;"
-                        _f1_html += f'<td style="border:1px solid {_border};{_dbl_b}padding:5px 8px;font-weight:bold;{_cell_bg}">{_v}</td>'
+                        _cell_bg = "background:#f1f5f9;" if _is_hq else "background:#fafbfc;"
+                        _f1_html += f'<td style="border:1px solid {_border};{_dbl_b}padding:6px 10px;font-weight:700;color:{C["navy"]};{_cell_bg}">{_v}</td>'
                     elif _col == "종합점수":
-                        _f1_html += f'<td style="border:1px solid {_border};{_dbl_b}padding:4px;font-weight:bold;">{_v}</td>'
+                        _f1_html += f'<td style="border:1px solid {_border};{_dbl_b}padding:5px 4px;font-weight:700;">{_v}</td>'
                     else:
-                        _f1_html += f'<td style="border:1px solid {_border};{_dbl_b}padding:4px;">{_v}</td>'
+                        _f1_html += f'<td style="border:1px solid {_border};{_dbl_b}padding:5px 4px;">{_v}</td>'
                 _f1_html += '</tr>'
             _f1_html += '</table>'
-            _f1_html += f'<div style="text-align:right;font-size:0.8em;margin-top:4px;color:#555;">(단위 : 호, 점)</div>'
+            _f1_html += f'<div style="text-align:right;font-size:0.8em;margin-top:6px;color:#888;">(단위 : 호, 점)</div>'
             _f1_html += '</div>'
             st.markdown(_f1_html, unsafe_allow_html=True)
             _f1_xl = df_to_excel_bytes(_item_df)
