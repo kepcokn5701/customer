@@ -3570,12 +3570,7 @@ def _render_category_section(df, cat_col, cat_label, office_col, score_col, over
                                 _cell.fill = _lavender_fill
                 _dl_bytes = _buf.getvalue()
             _return_dl_df = _dl_df
-            st.download_button(
-                label=f"📥 {cat_label} 테이블 엑셀 다운로드",
-                data=_dl_bytes,
-                file_name=f"지사별_{cat_label}_만족도.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                key=_dl_key, use_container_width=True)
+            # 개별 다운로드 버튼 제거 — 상단 통합 다운로드로 일원화
 
     return _return_dl_df
 
@@ -3674,11 +3669,7 @@ with tab3:
             _f1_html += f'<div style="text-align:right;font-size:0.8em;margin-top:6px;color:#888;">(단위 : 호, 점)</div>'
             _f1_html += '</div>'
             st.markdown(_f1_html, unsafe_allow_html=True)
-            _f1_xl = df_to_excel_bytes(_item_df)
             _dl_sheets["항목별"] = _item_df
-            st.download_button("📥 항목별 결과 Excel 다운로드", _f1_xl,
-                               file_name="항목별_결과.xlsx",
-                               mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
             st.markdown("---")
 
         # ── ② 계약종별 분석 ──
