@@ -1843,15 +1843,15 @@ st.markdown(f"""
   .stTabs [data-baseweb="tab"] {{ font-size:0.95rem; font-weight:700; padding:0.6rem 1.4rem; border-radius:8px 8px 0 0; color:{C['gray']}; background:transparent; }}
   .stTabs [aria-selected="true"] {{ color:{C['navy']} !important; background:{C['white']} !important; border-bottom:3px solid {C['blue']} !important; box-shadow:0 -2px 8px rgba(0,85,165,0.08); }}
 
-  .sec-head {{ font-size:1.15rem; font-weight:700; color:{C['navy']}; border-left:4px solid {C['blue']}; padding:0.1rem 0 0.1rem 0.85rem; margin:1.8rem 0 0.9rem 0; letter-spacing:-0.2px; }}
+  .sec-head {{ font-size:1.15rem; font-weight:700; color:{C['navy']}; border-left:4px solid {C['blue']}; border-top:1px solid #e5e7eb; padding:1rem 0 0.1rem 0.85rem; margin:0.8rem 0 0.9rem 0; letter-spacing:-0.2px; }}
 
   /* 도넛+표 한 흰 카드 안에 묶기 (.bk-row-marker가 있는 horizontalBlock만) */
   [data-testid="stHorizontalBlock"]:has(.bk-row-marker) {{
     background: #ffffff;
     border-radius: 12px;
-    padding: 20px 24px;
+    padding: 20px 24px 8px 24px;
     box-shadow: 0 1px 3px rgba(15,23,42,0.04), 0 4px 12px rgba(15,23,42,0.06);
-    margin-bottom: 8px;
+    margin-bottom: 16px;
     align-items: center;
   }}
 
@@ -3133,7 +3133,7 @@ with tab1:
             _g2_top = _top_in_group(OFFICE_GROUP_2)
             _g1_name = _g1_top[0].replace("지사", "") if _g1_top else "-"
             _g2_name = _g2_top[0].replace("지사", "") if _g2_top else "-"
-            st.markdown(f'<p class="sec-head" style="margin-top:0.5rem;">🏢 사업소별 만족도 <span style="font-size:0.85em;color:#666;font-weight:normal;">(군별 상위권: {_g1_name}, {_g2_name})</span></p>', unsafe_allow_html=True)
+            st.markdown(f'<p class="sec-head">🏢 사업소별 만족도 <span style="font-size:0.85em;color:#666;font-weight:normal;">(군별 상위권: {_g1_name}, {_g2_name})</span></p>', unsafe_allow_html=True)
 
             _max_len = max(len(OFFICE_GROUP_1), len(OFFICE_GROUP_2))
             _ofc4_html = '<table style="width:100%;border-collapse:collapse;font-size:0.93em;text-align:center;margin:0;">'
