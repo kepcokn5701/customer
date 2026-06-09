@@ -2938,7 +2938,7 @@ with tab1:
         _RP_CARD = (
             'background:#ffffff;border-radius:12px;padding:20px 24px;'
             'box-shadow:0 1px 3px rgba(15,23,42,0.04),0 4px 12px rgba(15,23,42,0.06);'
-            'margin-bottom:20px;'
+            'margin-bottom:8px;'
         )
         _RP_HDR_STYLE = f'background:{_RP_HDR_BG};font-weight:700;color:{C["navy"]};'
 
