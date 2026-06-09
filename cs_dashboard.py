@@ -1858,6 +1858,13 @@ st.markdown(f"""
     box-shadow: 0 1px 3px rgba(15,23,42,0.04), 0 4px 12px rgba(15,23,42,0.06);
   }}
 
+  /* 업로드 전 안내 영역 — 폰트 살짝 축소 */
+  [data-testid="column"]:has(.onboard-marker) h4 {{ font-size: 1.05rem; }}
+  [data-testid="column"]:has(.onboard-marker) p,
+  [data-testid="column"]:has(.onboard-marker) li,
+  [data-testid="column"]:has(.onboard-marker) td,
+  [data-testid="column"]:has(.onboard-marker) th {{ font-size: 0.88rem; }}
+
   .card     {{ background:{C['white']}; border-radius:14px; padding:1.3rem 1.5rem; box-shadow:0 2px 12px rgba(0,85,165,0.09); margin-bottom:1rem; color:#333; }}
   .card-red {{ background:#fff5f5; border-radius:14px; padding:1.3rem 1.5rem; box-shadow:0 2px 12px rgba(198,40,40,0.10); border-left:5px solid {C['red']}; margin-bottom:1rem; color:#333; }}
   .card-gold {{ background:#fffbf0; border-radius:14px; padding:1.3rem 1.5rem; box-shadow:0 2px 12px rgba(240,165,0,0.12); border-left:5px solid {C['gold']}; margin-bottom:1rem; color:#333; }}
@@ -1938,6 +1945,7 @@ st.markdown("""
 if uploaded_file is None:
     c_l, c_r = st.columns([1, 1])
     with c_l:
+        st.markdown('<span class="onboard-marker" style="display:none;"></span>', unsafe_allow_html=True)
         st.markdown("#### 📋 사용 방법")
         st.markdown("""
 1. **왼쪽 사이드바**에서 엑셀(.xlsx) 또는 CSV 파일을 업로드하세요.
@@ -1950,6 +1958,7 @@ if uploaded_file is None:
 8. **💌 경험고객 서한문 생성** — 지사별 맞춤 서한문 생성 및 기념품 추천
         """)
     with c_r:
+        st.markdown('<span class="onboard-marker" style="display:none;"></span>', unsafe_allow_html=True)
         st.markdown("#### 📌 권장 엑셀 컬럼 구성")
         st.markdown("""
 | 컬럼명 예시 | 내용 |
