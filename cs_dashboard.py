@@ -1848,6 +1848,7 @@ st.markdown(f"""
     padding: 20px 24px;
     box-shadow: 0 1px 3px rgba(15,23,42,0.04), 0 4px 12px rgba(15,23,42,0.06);
     margin-bottom: 18px;
+    align-items: center;
   }}
 
   /* 응답 분포 현황 — 각 컬럼(도넛/막대) 흰 카드로 */
@@ -3035,21 +3036,20 @@ with tab1:
             # textposition='auto' → 큰 조각 안쪽 / 작은 조각 자동 outside (leader line)
             fig_bp.update_traces(
                 textposition="auto", textinfo="label+percent",
-                textfont=dict(size=15),
-                insidetextfont=dict(color="white", size=17),
-                outsidetextfont=dict(color="#333", size=13),
+                insidetextfont=dict(color="white", size=14),
+                outsidetextfont=dict(color="#333", size=14),
                 insidetextorientation="horizontal",
                 sort=False, direction="clockwise",
                 marker=dict(line=dict(color="#ffffff", width=2)),
                 hovertemplate="%{label}<br>%{percent}<extra></extra>")
             fig_bp.update_layout(
-                height=380, margin=dict(t=40, b=40, l=110, r=110),
+                height=360, margin=dict(t=30, b=30, l=130, r=130),
                 paper_bgcolor="white", plot_bgcolor="white",
                 showlegend=False)
             st.plotly_chart(fig_bp, use_container_width=True, config={'staticPlot': True})
 
         with _bk_tbl_col:
-            _bk3_html = '<table style="width:100%;border-collapse:collapse;font-size:0.95em;text-align:center;margin-top:50px;">'
+            _bk3_html = '<table style="width:100%;border-collapse:collapse;font-size:0.95em;text-align:center;">'
             _bk3_html += f'<tr style="{_RP_HDR_STYLE}">'
             _bk3_html += f'<th style="border:1px solid {_RP_BDR};padding:8px 8px;">구분</th>'
             for lbl, col in zip(_bk_lbl_lr, _bk_colors_lr):
@@ -3155,6 +3155,11 @@ with tab1:
             with pc_list[idx]:
                 st.markdown('<span class="dist-card-marker" style="display:none;"></span>', unsafe_allow_html=True)
                 _title = titles_map.get(col_nm, col_nm)
+                # 제목은 markdown으로 (들여쓰기)
+                st.markdown(
+                    f'<p style="font-size:0.95rem;font-weight:700;color:{C["navy"]};'
+                    f'margin:6px 0 8px 12px;">{_title} 분포</p>',
+                    unsafe_allow_html=True)
                 if col_nm == M["business"]:
                     # 업무유형: 가로 막대그래프, 퍼센트 높은 순 정렬 (상위 3 navy 강조, 나머지 sky)
                     _biz_df = pd.DataFrame({"유형": counts.index, "건수": counts.values})
@@ -3165,36 +3170,35 @@ with tab1:
                     fig_biz = px.bar(_biz_df, x="비율(%)", y="유형", orientation="h", color="구분",
                                      text=[f"{r:.1f}% ({int(c):,}건)" for r, c in zip(_biz_df["비율(%)"], _biz_df["건수"])],
                                      color_discrete_map={"상위 3": C["navy"], "일반": C["sky"]},
-                                     template=PLOTLY_TPL, title=f"{_title} 분포")
+                                     template=PLOTLY_TPL)
                     fig_biz.update_traces(textposition="outside", textfont_size=14,
                                           hovertemplate="%{y}: %{x:.1f}% (%{customdata[0]:,}건)<extra></extra>",
                                           customdata=_biz_df[["건수"]].values)
                     _biz_x_max = _biz_df["비율(%)"].max() * 1.45
                     fig_biz.update_layout(height=500,
-                                           margin=dict(t=45, b=15, l=10, r=10), showlegend=False,
+                                           margin=dict(t=20, b=15, l=10, r=10), showlegend=False,
                                            paper_bgcolor="white", plot_bgcolor="white",
-                                           title_font=dict(size=16, color=C["navy"]),
                                            xaxis=dict(title="비율(%)", range=[0, _biz_x_max], tickfont=dict(size=12)),
                                            yaxis=dict(tickfont=dict(size=13)), yaxis_title="")
                     st.plotly_chart(fig_biz, use_container_width=True, config={'staticPlot': True})
                 else:
                     # 연령대, 계약종별: 원형 파이 — 큰 조각 안쪽 / 작은 조각 자동 outside
                     _pie_labels = [f"{nm} ({cnt:,}건)" for nm, cnt in zip(counts.index, counts.values)]
-                    fig_pie = px.pie(names=_pie_labels, values=counts.values, color_discrete_sequence=PIE_COLORS,
-                                     hole=0, title=f"{_title} 분포", template=PLOTLY_TPL)
+                    fig_pie = px.pie(names=_pie_labels, values=counts.values,
+                                     color_discrete_sequence=PIE_COLORS,
+                                     hole=0, template=PLOTLY_TPL)
                     fig_pie.update_traces(
                         textposition="auto", textinfo="label+percent",
-                        insidetextfont=dict(color="white", size=15),
-                        outsidetextfont=dict(color="#333", size=12),
+                        insidetextfont=dict(color="white", size=14),
+                        outsidetextfont=dict(color="#333", size=14),
                         insidetextorientation="horizontal",
                         marker=dict(line=dict(color="#ffffff", width=2)),
                         hovertemplate="%{label}<br>%{percent}<extra></extra>")
                     fig_pie.update_layout(
                         height=500,
-                        margin=dict(t=60, b=60, l=120, r=120),
+                        margin=dict(t=30, b=30, l=160, r=160),
                         showlegend=False,
-                        paper_bgcolor="white", plot_bgcolor="white",
-                        title_font=dict(size=16, color=C["navy"]))
+                        paper_bgcolor="white", plot_bgcolor="white")
                     st.plotly_chart(fig_pie, use_container_width=True, config={'staticPlot': True})
 
 
