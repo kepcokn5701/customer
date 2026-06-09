@@ -1829,6 +1829,7 @@ st.markdown(f"""
     padding: 1.1rem 1.3rem 0.95rem 1.3rem;
     box-shadow: 0 1px 3px rgba(15,23,42,0.04), 0 4px 12px rgba(15,23,42,0.05);
     border-top: 3px solid {C['blue']}; transition: transform 0.15s;
+    min-height: 130px;
   }}
   [data-testid="stMetric"]:hover {{ transform: translateY(-2px); }}
   [data-testid="stMetricLabel"]  {{ font-size:0.82rem !important; color:{C['gray']} !important; font-weight:600; }}
