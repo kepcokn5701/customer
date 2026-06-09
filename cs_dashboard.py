@@ -1840,7 +1840,7 @@ st.markdown(f"""
   .stTabs [data-baseweb="tab"] {{ font-size:0.95rem; font-weight:700; padding:0.6rem 1.4rem; border-radius:8px 8px 0 0; color:{C['gray']}; background:transparent; }}
   .stTabs [aria-selected="true"] {{ color:{C['navy']} !important; background:{C['white']} !important; border-bottom:3px solid {C['blue']} !important; box-shadow:0 -2px 8px rgba(0,85,165,0.08); }}
 
-  .sec-head {{ font-size:1.15rem; font-weight:700; color:{C['navy']}; border-left:4px solid {C['blue']}; padding:0.1rem 0 0.1rem 0.85rem; margin:1.3rem 0 0.9rem 0; letter-spacing:-0.2px; }}
+  .sec-head {{ font-size:1.15rem; font-weight:700; color:{C['navy']}; border-left:4px solid {C['blue']}; padding:0.1rem 0 0.1rem 0.85rem; margin:1.8rem 0 0.9rem 0; letter-spacing:-0.2px; }}
 
   /* 도넛+표 한 흰 카드 안에 묶기 (.bk-row-marker가 있는 horizontalBlock만) */
   [data-testid="stHorizontalBlock"]:has(.bk-row-marker) {{
