@@ -1867,6 +1867,15 @@ st.markdown(f"""
 
   .sec-head {{ font-size:1.15rem; font-weight:700; color:{C['navy']}; border-left:4px solid {C['blue']}; padding:0.1rem 0 0.1rem 0.85rem; margin:1.6rem 0 1.1rem 0; letter-spacing:-0.2px; }}
 
+  /* 도넛+표 한 흰 카드 안에 묶기 (.bk-row-marker가 있는 horizontalBlock만) */
+  [data-testid="stHorizontalBlock"]:has(.bk-row-marker) {{
+    background: #ffffff;
+    border-radius: 12px;
+    padding: 20px 24px;
+    box-shadow: 0 1px 3px rgba(15,23,42,0.04), 0 4px 12px rgba(15,23,42,0.06);
+    margin-bottom: 18px;
+  }}
+
   .card     {{ background:{C['white']}; border-radius:14px; padding:1.3rem 1.5rem; box-shadow:0 2px 12px rgba(0,85,165,0.09); margin-bottom:1rem; color:#333; }}
   .card-red {{ background:#fff5f5; border-radius:14px; padding:1.3rem 1.5rem; box-shadow:0 2px 12px rgba(198,40,40,0.10); border-left:5px solid {C['red']}; margin-bottom:1rem; color:#333; }}
   .card-gold {{ background:#fffbf0; border-radius:14px; padding:1.3rem 1.5rem; box-shadow:0 2px 12px rgba(240,165,0,0.12); border-left:5px solid {C['gold']}; margin-bottom:1rem; color:#333; }}
@@ -3028,11 +3037,12 @@ with tab1:
             _title3 = f'본부 만족도 90점 이상 비중 {_p90:.1f}%로 {compare_label} 대비 (   )%p 감소'
         st.markdown(f'<p class="sec-head">{_title3}</p>', unsafe_allow_html=True)
 
-        # ── [도넛 | 표] 2컬럼 ──
+        # ── [도넛 | 표] 2컬럼 (CSS :has()로 한 흰 카드 안에 묶음) ──
         _bk_colors_lr = [BUCKET_COLORS[b] for b in _bk_order_lr]
         _bk_donut_col, _bk_tbl_col = st.columns([1, 1])
 
         with _bk_donut_col:
+            st.markdown('<span class="bk-row-marker" style="display:none;"></span>', unsafe_allow_html=True)
             _SHORT_BUCKET = {"90점 이상": "≥90점", "70~90점": "70~89점",
                              "50~70점": "50~69점", "50점 미만": "<50점"}
             # 점수 높은 순으로 고정 (BUCKET_ORDER 기준)
@@ -3053,6 +3063,7 @@ with tab1:
                                   hovertemplate="%{label}<br>%{percent}<extra></extra>")
             fig_bp.update_layout(
                 height=320, margin=dict(t=20, b=10, l=10, r=10),
+                paper_bgcolor="white", plot_bgcolor="white",
                 showlegend=True,
                 legend=dict(orientation="h", yanchor="top", y=-0.05,
                             xanchor="center", x=0.5, font=dict(size=14),
@@ -3060,7 +3071,7 @@ with tab1:
             st.plotly_chart(fig_bp, use_container_width=True, config={'staticPlot': True})
 
         with _bk_tbl_col:
-            _bk3_html = '<table style="width:100%;border-collapse:collapse;font-size:0.95em;text-align:center;margin-top:30px;">'
+            _bk3_html = '<table style="width:100%;border-collapse:collapse;font-size:0.95em;text-align:center;margin-top:50px;">'
             _bk3_html += f'<tr style="{_RP_HDR_STYLE}">'
             _bk3_html += f'<th style="border:1px solid {_RP_BDR};padding:8px 8px;">구분</th>'
             for lbl, col in zip(_bk_lbl_lr, _bk_colors_lr):
