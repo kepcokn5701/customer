@@ -1923,11 +1923,15 @@ with st.sidebar:
     uploaded_file = st.file_uploader("파일을 여기에 드래그하세요", type=["xlsx","xls","csv"], label_visibility="collapsed")
     st.markdown("<hr>", unsafe_allow_html=True)
     st.markdown("#### 📁 비교 데이터 (선택)")
-    st.caption("전월/전년 동월 데이터로 비교 분석")
-    compare_file = st.file_uploader("비교 파일", type=["xlsx","xls","csv"],
+    st.caption("전월/전년 동월 비교 분석용")
+    st.markdown("**전월 비교 파일**")
+    compare_file = st.file_uploader("전월 파일", type=["xlsx","xls","csv"],
                                      key="compare_uploader", label_visibility="collapsed")
-    compare_label = st.text_input("비교 기간 라벨", value="전월",
-                                   help="예: 전월, 전년동월, 2026년 1월 등")
+    st.markdown("**전년 동월 비교 파일**")
+    compare_y_file = st.file_uploader("전년 동월 파일", type=["xlsx","xls","csv"],
+                                       key="compare_y_uploader", label_visibility="collapsed")
+    compare_label = "전월"
+    compare_y_label = "전년 동월"
     st.markdown("<hr>", unsafe_allow_html=True)
     st.caption("© CS 분석 시스템")
 
@@ -2311,27 +2315,29 @@ if M["score"]:
     df_f["_점수구간"] = score_100.apply(score_bucket)
 
 # ── 비교 파일 처리 (전월/전년 동월 비교용) ──
-prev_df_raw = None
-prev_df_f = None
-prev_avg_score_100 = None
-if compare_file is not None:
+def _load_compare_file(_uploaded):
+    """비교 파일 → (df_raw, df_f, avg_score_100). 실패시 (None, None, None)"""
+    if _uploaded is None:
+        return None, None, None
     try:
-        _prev_raw_bytes = compare_file.read()
-        prev_df_raw, _prev_orig_len = load_data(_prev_raw_bytes, compare_file.name)
-        # 메인 파일과 동일한 컬럼 매핑(M) 사용 (양식 동일 가정)
-        prev_df_f = prev_df_raw.copy()
-        # 순번 컬럼 정리
-        if "순번" in prev_df_f.columns:
-            prev_df_f.drop(columns=["순번"], inplace=True)
-        if M["score"] and M["score"] in prev_df_f.columns:
-            _prev_score = normalize_score_100(prev_df_f[M["score"]])
-            prev_df_f["_점수100"] = _prev_score
-            prev_df_f["_점수구간"] = _prev_score.apply(score_bucket)
-            prev_avg_score_100 = _prev_score.mean()
-    except Exception as _prev_err:
-        st.warning(f"비교 파일 로드 실패: {_prev_err}")
-        prev_df_raw = prev_df_f = None
-        prev_avg_score_100 = None
+        _bytes = _uploaded.read()
+        _raw, _ = load_data(_bytes, _uploaded.name)
+        _f = _raw.copy()
+        if "순번" in _f.columns:
+            _f.drop(columns=["순번"], inplace=True)
+        _avg = None
+        if M["score"] and M["score"] in _f.columns:
+            _sc = normalize_score_100(_f[M["score"]])
+            _f["_점수100"] = _sc
+            _f["_점수구간"] = _sc.apply(score_bucket)
+            _avg = _sc.mean()
+        return _raw, _f, _avg
+    except Exception as _err:
+        st.warning(f"비교 파일 로드 실패: {_err}")
+        return None, None, None
+
+prev_df_raw, prev_df_f, prev_avg_score_100 = _load_compare_file(compare_file)
+prev_y_df_raw, prev_y_df_f, prev_y_avg_score_100 = _load_compare_file(compare_y_file)
 
 # ── CS리포트 표 비교 표기 헬퍼 ──
 def _fmt_diff(val, decimals=1):
@@ -4588,7 +4594,7 @@ with tab_sol:
         # ── 업무 × 계약종별 정밀 진단 ──────────────────────
         if M.get("business") and M.get("contract"):
             st.markdown("##### 🔥 업무 × 계약종별 리스크 히트맵 — " + _sel_off)
-            st.caption("업무유형(행) × 계약종별(열)의 평균 만족도입니다. **가장 빨간 칸**이 우선 관리 대상입니다. 하단 카드를 클릭하면 상세 분석이 열립니다.")
+            st.caption("업무유형(행) × 계약종별(열)의 평균 만족도입니다. **연라벤더 칸**은 지사 평균 미만으로 우선 관리 대상입니다.")
 
             _sol_pivot = _df_sel.pivot_table(
                 index=M["business"], columns=M["contract"],
@@ -4616,53 +4622,51 @@ with tab_sol:
                 _sol_pivot = _sol_pivot.reindex(_sol_pivot.mean(axis=1).sort_values().index)
                 _sol_cnt = _sol_cnt.reindex(_sol_pivot.index)
 
-                _hm_vals = _sol_pivot.values.flatten()
-                _hm_vals = _hm_vals[~np.isnan(_hm_vals)]
-                _hm_vmin = float(_hm_vals.min()) if len(_hm_vals) > 0 else 0
-                _hm_vmax = float(_hm_vals.max()) if len(_hm_vals) > 0 else 100
+                # 지사 평균 기준 라벤더 단일색 (Tab1 톤)
+                _hm_all_mean = float(_df_sel["_점수100"].mean()) if pd.notna(_df_sel["_점수100"].mean()) else 0.0
                 def _hm_color(v):
-                    if pd.isna(v): return ""
-                    t = max(0, min(1, (v - _hm_vmin) / (_hm_vmax - _hm_vmin))) if _hm_vmax > _hm_vmin else 0.5
-                    stops = [(0.0,215,48,39),(0.25,252,141,89),(0.5,255,255,191),(0.75,145,207,96),(1.0,26,152,80)]
-                    for i in range(len(stops)-1):
-                        t0,r0,g0,b0 = stops[i]; t1,r1,g1,b1 = stops[i+1]
-                        if t <= t1:
-                            p = (t-t0)/(t1-t0) if t1>t0 else 0
-                            return f"background:rgba({int(r0+(r1-r0)*p)},{int(g0+(g1-g0)*p)},{int(b0+(b1-b0)*p)},0.85);"
-                    return "background:rgba(26,152,80,0.85);"
+                    if pd.isna(v):
+                        return ""
+                    if v < _hm_all_mean:
+                        return "background:rgba(237,233,254,0.55);"
+                    return ""
 
-                _hm_bdr = "#b0b0b0"; _hm_hdr = "#d6e4f0"; _hm_ylw = "#fef9e7"
-                _hm_html = '<div style="overflow-x:auto;"><table style="border-collapse:collapse;width:100%;font-size:0.85em;text-align:center;">'
+                _hm_bdr = "#e5e7eb"
+                _hm_hdr = "#f1f5f9"
+                _hm_hdr_style = f'background:{_hm_hdr};font-weight:700;color:{C["navy"]};'
+                _hm_html = ('<div style="overflow-x:auto;background:#ffffff;border-radius:12px;'
+                            'padding:18px 20px;box-shadow:0 1px 3px rgba(15,23,42,0.04),0 4px 12px rgba(15,23,42,0.06);'
+                            'margin-bottom:8px;"><table style="border-collapse:collapse;width:100%;font-size:0.88em;text-align:center;margin:0;">')
                 # ── 헤더 1줄: 업무유형 | 계약종별들... | 합계
-                _hm_html += f'<tr style="background:{_hm_hdr};font-weight:bold;">'
-                _hm_html += f'<th style="border:1px solid {_hm_bdr};padding:6px 6px;min-width:56px;max-width:80px;">업무유형</th>'
+                _hm_html += f'<tr style="{_hm_hdr_style}">'
+                _hm_html += f'<th style="border:1px solid {_hm_bdr};padding:8px 6px;min-width:56px;max-width:80px;">업무유형</th>'
                 for c in _hm_cols:
-                    _hm_html += f'<th style="border:1px solid {_hm_bdr};padding:6px 4px;">{c}</th>'
-                _hm_html += f'<th style="border:1px solid {_hm_bdr};padding:6px 4px;">합계</th>'
+                    _hm_html += f'<th style="border:1px solid {_hm_bdr};padding:8px 4px;">{c}</th>'
+                _hm_html += f'<th style="border:1px solid {_hm_bdr};padding:8px 4px;">합계</th>'
                 _hm_html += '</tr>'
                 # ── 데이터 행: 각 셀에 "점수 (호수건)"
                 for biz in _sol_pivot.index:
                     _hm_html += '<tr>'
-                    _hm_html += f'<td style="border:1px solid {_hm_bdr};padding:5px 6px;font-weight:bold;background:#f9f9f9;white-space:nowrap;font-size:0.92em;">{biz}</td>'
+                    _hm_html += f'<td style="border:1px solid {_hm_bdr};padding:6px 8px;font-weight:700;background:#fafbfc;color:{C["navy"]};white-space:nowrap;font-size:0.92em;">{biz}</td>'
                     for c in _hm_cols:
                         v = _sol_pivot.loc[biz, c]
                         cnt = int(_sol_cnt.loc[biz, c]) if biz in _sol_cnt.index and c in _sol_cnt.columns else 0
                         if pd.notna(v):
                             _bg = _hm_color(v)
-                            _hm_html += f'<td style="border:1px solid {_hm_bdr};padding:4px;{_bg}">{v:.1f} <span style="font-size:0.8em;color:#444;">({cnt}건)</span></td>'
+                            _hm_html += f'<td style="border:1px solid {_hm_bdr};padding:5px 4px;{_bg}">{v:.1f} <span style="font-size:0.8em;color:#666;">({cnt}건)</span></td>'
                         else:
-                            _hm_html += f'<td style="border:1px solid {_hm_bdr};padding:4px;">-</td>'
+                            _hm_html += f'<td style="border:1px solid {_hm_bdr};padding:5px 4px;color:#bbb;">-</td>'
                     # 합계 열
                     t_score = _sol_score_total.get(biz, None)
                     t_cnt = _sol_cnt_total.get(biz, 0)
                     if pd.notna(t_score):
-                        _hm_html += f'<td style="border:1px solid {_hm_bdr};padding:4px;font-weight:bold;">{t_score:.1f} <span style="font-size:0.8em;color:#444;">({t_cnt}건)</span></td>'
+                        _hm_html += f'<td style="border:1px solid {_hm_bdr};padding:5px 4px;font-weight:700;color:{C["navy"]};">{t_score:.1f} <span style="font-size:0.8em;color:#666;">({t_cnt}건)</span></td>'
                     else:
-                        _hm_html += f'<td style="border:1px solid {_hm_bdr};padding:4px;">-</td>'
+                        _hm_html += f'<td style="border:1px solid {_hm_bdr};padding:5px 4px;color:#bbb;">-</td>'
                     _hm_html += '</tr>'
                 # ── 하단 합계 행: 계약종별 평균 + 총 건수
-                _hm_html += f'<tr style="background:{_hm_hdr};font-weight:bold;">'
-                _hm_html += f'<td style="border:1px solid {_hm_bdr};padding:5px 6px;">평균</td>'
+                _hm_html += f'<tr style="{_hm_hdr_style}">'
+                _hm_html += f'<td style="border:1px solid {_hm_bdr};padding:6px 8px;">평균</td>'
                 _hm_total_all = 0
                 for c in _hm_cols:
                     _col_mean = _sol_pivot[c].mean() if c in _sol_pivot.columns else None
@@ -4670,11 +4674,10 @@ with tab_sol:
                     _hm_total_all += _col_cnt
                     if pd.notna(_col_mean):
                         _bg = _hm_color(_col_mean)
-                        _hm_html += f'<td style="border:1px solid {_hm_bdr};padding:4px;{_bg}">{_col_mean:.1f} <span style="font-size:0.8em;color:#444;">({_col_cnt}건)</span></td>'
+                        _hm_html += f'<td style="border:1px solid {_hm_bdr};padding:5px 4px;{_bg}font-weight:700;">{_col_mean:.1f} <span style="font-size:0.8em;color:#666;">({_col_cnt}건)</span></td>'
                     else:
-                        _hm_html += f'<td style="border:1px solid {_hm_bdr};padding:4px;">-</td>'
-                _hm_all_mean = _df_sel["_점수100"].mean()
-                _hm_html += f'<td style="border:1px solid {_hm_bdr};padding:4px;font-weight:bold;">{_hm_all_mean:.1f} <span style="font-size:0.8em;color:#444;">({_hm_total_all}건)</span></td>'
+                        _hm_html += f'<td style="border:1px solid {_hm_bdr};padding:5px 4px;color:#bbb;">-</td>'
+                _hm_html += f'<td style="border:1px solid {_hm_bdr};padding:5px 4px;font-weight:700;">{_hm_all_mean:.1f} <span style="font-size:0.8em;color:#666;">({_hm_total_all}건)</span></td>'
                 _hm_html += '</tr>'
                 _hm_html += '</table></div>'
                 st.markdown(_hm_html, unsafe_allow_html=True)
