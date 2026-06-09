@@ -3133,7 +3133,7 @@ with tab1:
             _g2_top = _top_in_group(OFFICE_GROUP_2)
             _g1_name = _g1_top[0].replace("지사", "") if _g1_top else "-"
             _g2_name = _g2_top[0].replace("지사", "") if _g2_top else "-"
-            st.markdown(f'<p class="sec-head">🏢 사업소별 만족도 <span style="font-size:0.85em;color:#666;font-weight:normal;">(군별 상위권: {_g1_name}, {_g2_name})</span></p>', unsafe_allow_html=True)
+            st.markdown(f'<p class="sec-head" style="margin-top:0.5rem;">🏢 사업소별 만족도 <span style="font-size:0.85em;color:#666;font-weight:normal;">(군별 상위권: {_g1_name}, {_g2_name})</span></p>', unsafe_allow_html=True)
 
             _max_len = max(len(OFFICE_GROUP_1), len(OFFICE_GROUP_2))
             _ofc4_html = '<table style="width:100%;border-collapse:collapse;font-size:0.93em;text-align:center;margin:0;">'
