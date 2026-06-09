@@ -1938,7 +1938,6 @@ st.markdown("""
 if uploaded_file is None:
     c_l, c_r = st.columns([1, 1])
     with c_l:
-        st.markdown('<div class="card-blue">', unsafe_allow_html=True)
         st.markdown("### 📋 사용 방법")
         st.markdown("""
 1. **왼쪽 사이드바**에서 엑셀(.xlsx) 또는 CSV 파일을 업로드하세요.
@@ -1950,9 +1949,7 @@ if uploaded_file is None:
 7. **🎯 민원 조기 경보 시스템** — 잠재 민원고객 사전케어 리스트
 8. **💌 경험고객 서한문 생성** — 지사별 맞춤 서한문 생성 및 기념품 추천
         """)
-        st.markdown('</div>', unsafe_allow_html=True)
     with c_r:
-        st.markdown('<div class="card-teal">', unsafe_allow_html=True)
         st.markdown("### 📌 권장 엑셀 컬럼 구성")
         st.markdown("""
 | 컬럼명 예시 | 내용 |
@@ -1964,7 +1961,6 @@ if uploaded_file is None:
 | 주관식답변 | VOC 텍스트 |
         """)
         st.warning("⚠️ **개인정보 주의** — 고객명·고객번호·연락처 등 개인식별 정보는 업로드 전에 반드시 제거하세요.")
-        st.markdown('</div>', unsafe_allow_html=True)
     st.stop()
 
 # ══════════════════════════════════════════════════════════════
