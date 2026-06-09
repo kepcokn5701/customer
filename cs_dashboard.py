@@ -2960,7 +2960,7 @@ with tab1:
         if prev_avg_score_100 is not None and not pd.isna(prev_avg_score_100) and _cur_score_val is not None:
             _prev_diff_overall = round(_cur_score_val - round(prev_avg_score_100, 1), 1)
 
-        _hq2_html = '<table style="width:100%;border-collapse:collapse;font-size:0.95em;text-align:center;">'
+        _hq2_html = '<table style="width:100%;border-collapse:collapse;font-size:0.95em;text-align:center;margin:0;">'
         _hq2_html += f'<tr style="{_RP_HDR_STYLE}">'
         _hq2_html += f'<th rowspan="2" style="border:1px solid {_RP_BDR};padding:8px 8px;">구분</th>'
         _hq2_html += f'<th rowspan="2" style="border:1px solid {_RP_BDR};padding:8px 8px;">경험고객</th>'
@@ -3032,15 +3032,16 @@ with tab1:
             _bk_color_map = {_SHORT_BUCKET[k]: v for k, v in BUCKET_COLORS.items()
                              if k in _donut_df["구간"].values}
             _bp_total = int(_donut_df["건수"].sum())
-            # 라벨에 % 같이 넣고 plotly auto가 큰 조각엔 안, 작은 건 leader line으로
+            # 큰 조각: 라벨+% 같이, 작은 조각: 라벨만 (plotly auto가 위치 결정)
             _bp_text = []
             for _bi in range(len(_donut_df)):
                 _bc = int(_donut_df["건수"].iloc[_bi])
                 _bp = (_bc / max(_bp_total, 1)) * 100
+                _lbl = _donut_df["라벨"].iloc[_bi]
                 if _bp >= 5:
-                    _bp_text.append(f"{_bp:.1f}%")  # 큰 조각: 안쪽에 % 만
+                    _bp_text.append(f"{_lbl}<br>{_bp:.1f}%")  # 라벨 + %
                 else:
-                    _bp_text.append(f"{_donut_df['라벨'].iloc[_bi]}")  # 작은 조각: 바깥에 라벨만
+                    _bp_text.append(f"{_lbl}")  # 라벨만
             fig_bp = px.pie(_donut_df, names="라벨", values="건수", color="라벨",
                             color_discrete_map=_bk_color_map, hole=0.5, template=PLOTLY_TPL,
                             category_orders={"라벨": _ordered_labels})
@@ -3126,7 +3127,7 @@ with tab1:
             st.markdown(f'<p class="sec-head">🏢 사업소별 만족도 <span style="font-size:0.85em;color:#666;font-weight:normal;">(군별 상위권: {_g1_name}, {_g2_name})</span></p>', unsafe_allow_html=True)
 
             _max_len = max(len(OFFICE_GROUP_1), len(OFFICE_GROUP_2))
-            _ofc4_html = '<table style="width:100%;border-collapse:collapse;font-size:0.93em;text-align:center;">'
+            _ofc4_html = '<table style="width:100%;border-collapse:collapse;font-size:0.93em;text-align:center;margin:0;">'
             _ofc4_html += f'<tr style="{_RP_HDR_STYLE}">'
             for _ in range(2):
                 _ofc4_html += f'<th style="border:1px solid {_RP_BDR};padding:7px 6px;">구분</th>'
