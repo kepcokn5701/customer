@@ -3195,17 +3195,42 @@ with tab1:
                                            yaxis=dict(tickfont=dict(size=13)), yaxis_title="")
                     st.plotly_chart(fig_biz, use_container_width=True, config={'staticPlot': True})
                 else:
-                    # 연령대, 계약종별: 파이차트 (건수 포함)
+                    # 연령대, 계약종별: 원형 파이 + 라벨 바깥, 큰 % 안쪽
                     _pie_labels = [f"{nm} ({cnt:,}건)" for nm, cnt in zip(counts.index, counts.values)]
                     fig_pie = px.pie(names=_pie_labels, values=counts.values, color_discrete_sequence=PIE_COLORS,
-                                     hole=0.42, title=f"{_title} 분포", template=PLOTLY_TPL)
-                    fig_pie.update_traces(textposition="outside", textinfo="percent+label", textfont_size=14,
-                                           marker=dict(line=dict(color="#ffffff", width=2)),
-                                           hovertemplate="%{label}<br>%{percent}<extra></extra>")
-                    fig_pie.update_layout(height=500,
-                                           margin=dict(t=45, b=15, l=10, r=10), showlegend=False,
-                                           paper_bgcolor="white", plot_bgcolor="white",
-                                           title_font=dict(size=16, color=C["navy"]))
+                                     hole=0, title=f"{_title} 분포", template=PLOTLY_TPL)
+                    # 카테고리명+건수를 바깥에 leader line으로
+                    fig_pie.update_traces(
+                        textposition="outside", textinfo="label",
+                        textfont=dict(size=12, color="#444"),
+                        marker=dict(line=dict(color="#ffffff", width=2)),
+                        hovertemplate="%{label}<br>%{percent}<extra></extra>")
+                    # 큰 조각(≥5%) % 값만 안쪽 annotation으로
+                    _pie_total = int(counts.sum())
+                    _pie_cum = 0
+                    for _pi in range(len(counts)):
+                        _pcnt = int(counts.iloc[_pi])
+                        _ppct = (_pcnt / max(_pie_total, 1)) * 100
+                        if _ppct >= 5:
+                            _pmid = (_pie_cum + _pcnt / 2) / max(_pie_total, 1)
+                            _pdeg = _pmid * 360
+                            _prad = math.radians(90 - _pdeg)
+                            _pr = 0.18
+                            _px = 0.5 + _pr * math.cos(_prad)
+                            _py = 0.5 + _pr * math.sin(_prad)
+                            fig_pie.add_annotation(
+                                x=_px, y=_py, xref="paper", yref="paper",
+                                text=f"<b>{_ppct:.1f}%</b>",
+                                showarrow=False,
+                                font=dict(size=14, color="white"))
+                        _pie_cum += _pcnt
+                    # 원 크기 축소 + 가운데 정렬 (좌우 마진 크게)
+                    fig_pie.update_layout(
+                        height=500,
+                        margin=dict(t=60, b=60, l=100, r=100),
+                        showlegend=False,
+                        paper_bgcolor="white", plot_bgcolor="white",
+                        title_font=dict(size=16, color=C["navy"]))
                     st.plotly_chart(fig_pie, use_container_width=True, config={'staticPlot': True})
 
 
