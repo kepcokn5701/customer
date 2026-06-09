@@ -1858,12 +1858,16 @@ st.markdown(f"""
     box-shadow: 0 1px 3px rgba(15,23,42,0.04), 0 4px 12px rgba(15,23,42,0.06);
   }}
 
-  /* 업로드 전 안내 영역 — 폰트 살짝 축소 */
-  [data-testid="column"]:has(.onboard-marker) h4 {{ font-size: 1.05rem; }}
+  /* 업로드 전 안내 영역 — 폰트 축소 (!important로 Streamlit 기본 스타일 덮어쓰기) */
+  [data-testid="column"]:has(.onboard-marker) h4,
+  [data-testid="column"]:has(.onboard-marker) h3 {{ font-size: 1rem !important; font-weight: 700 !important; }}
   [data-testid="column"]:has(.onboard-marker) p,
   [data-testid="column"]:has(.onboard-marker) li,
+  [data-testid="column"]:has(.onboard-marker) ol,
+  [data-testid="column"]:has(.onboard-marker) ul,
   [data-testid="column"]:has(.onboard-marker) td,
-  [data-testid="column"]:has(.onboard-marker) th {{ font-size: 0.88rem; }}
+  [data-testid="column"]:has(.onboard-marker) th,
+  [data-testid="column"]:has(.onboard-marker) div[data-testid="stAlert"] p {{ font-size: 0.82rem !important; }}
 
   .card     {{ background:{C['white']}; border-radius:14px; padding:1.3rem 1.5rem; box-shadow:0 2px 12px rgba(0,85,165,0.09); margin-bottom:1rem; color:#333; }}
   .card-red {{ background:#fff5f5; border-radius:14px; padding:1.3rem 1.5rem; box-shadow:0 2px 12px rgba(198,40,40,0.10); border-left:5px solid {C['red']}; margin-bottom:1rem; color:#333; }}
