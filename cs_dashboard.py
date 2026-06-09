@@ -1809,17 +1809,15 @@ st.set_page_config(
 
 st.markdown(f"""
 <style>
-  /* 전체 base font-size 축소 (1rem = 14px → 컴팩트 톤) */
-  html {{ font-size: 14px; }}
   .stApp {{ background-color: {C['bg']}; }}
 
   .dash-header {{
     background: linear-gradient(120deg, {C['navy']} 0%, {C['blue']} 55%, {C['sky']} 100%);
-    padding: 1.5rem 2.1rem; border-radius: 14px; color: white;
-    margin-bottom: 1.3rem; box-shadow: 0 2px 12px rgba(15,23,42,0.10);
+    padding: 1.8rem 2.4rem; border-radius: 14px; color: white;
+    margin-bottom: 1.5rem; box-shadow: 0 2px 12px rgba(15,23,42,0.10);
   }}
-  .dash-header h1 {{ font-size:1.45rem; font-weight:800; margin:0; letter-spacing:-0.5px; }}
-  .dash-header p  {{ font-size:0.85rem; margin:0.35rem 0 0 0; opacity:0.85; }}
+  .dash-header h1 {{ font-size:1.9rem; font-weight:800; margin:0; letter-spacing:-0.5px; }}
+  .dash-header p  {{ font-size:0.95rem; margin:0.4rem 0 0 0; opacity:0.85; }}
   .dash-badge {{
     display:inline-block; background:rgba(255,255,255,0.18);
     border:1px solid rgba(255,255,255,0.35); border-radius:20px;
@@ -1940,7 +1938,7 @@ st.markdown("""
 if uploaded_file is None:
     c_l, c_r = st.columns([1, 1])
     with c_l:
-        st.markdown("### 📋 사용 방법")
+        st.markdown("#### 📋 사용 방법")
         st.markdown("""
 1. **왼쪽 사이드바**에서 엑셀(.xlsx) 또는 CSV 파일을 업로드하세요.
 2. 업로드 즉시 컬럼이 자동 인식되어 분석이 시작됩니다.
@@ -1952,7 +1950,7 @@ if uploaded_file is None:
 8. **💌 경험고객 서한문 생성** — 지사별 맞춤 서한문 생성 및 기념품 추천
         """)
     with c_r:
-        st.markdown("### 📌 권장 엑셀 컬럼 구성")
+        st.markdown("#### 📌 권장 엑셀 컬럼 구성")
         st.markdown("""
 | 컬럼명 예시 | 내용 |
 |---|---|
