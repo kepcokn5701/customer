@@ -3178,7 +3178,7 @@ with tab1:
     # ── 분포 차트 ──
     has_pie = any([M["age"], M["contract"], M["business"]])
     if has_pie:
-        st.markdown('<p class="sec-head">🍩 응답 분포 현황</p>', unsafe_allow_html=True)
+        st.markdown('<p class="sec-head" style="margin-top:40px !important;">🍩 응답 분포 현황</p>', unsafe_allow_html=True)
         pie_cols = [c for c in [M["age"], M["contract"], M["business"]] if c]
         pc_list = st.columns(len(pie_cols))
         titles_map = {}
