@@ -1865,13 +1865,28 @@ st.markdown(f"""
     align-items: center;
   }}
 
-  /* 응답 분포 현황 — 각 컬럼(도넛/막대) 흰 카드로 */
-  [data-testid="column"]:has(.dist-card-marker) {{
+  /* 응답 분포 현황 — 두 차트(파이+막대)를 한 흰 카드로 묶기 */
+  [data-testid="stHorizontalBlock"]:has(.dist-row-marker) {{
     background: #ffffff;
     border-radius: 12px;
-    padding: 16px 20px;
+    padding: 16px 24px;
     box-shadow: 0 1px 3px rgba(15,23,42,0.04), 0 4px 12px rgba(15,23,42,0.06);
     margin-bottom: 8px;
+  }}
+
+  /* 카테고리 상세 차트 expander — 테두리/배경 제거 (깔끔하게) */
+  [data-testid="stExpander"]:has(.no-border-expander) {{
+    border: none !important;
+    background: transparent !important;
+    box-shadow: none !important;
+  }}
+  [data-testid="stExpander"]:has(.no-border-expander) summary {{
+    border: none !important;
+    background: transparent !important;
+  }}
+  [data-testid="stExpander"]:has(.no-border-expander) details {{
+    border: none !important;
+    background: transparent !important;
   }}
 
   /* 업로드 전 안내 영역 — 폰트 축소 (!important로 Streamlit 기본 스타일 덮어쓰기) */
@@ -2983,7 +2998,7 @@ with tab1:
         # ════════════════════════════════════════════════════════
         # CS리포트 2번 — 경남본부 조사결과
         # ════════════════════════════════════════════════════════
-        st.markdown('<p class="sec-head">📋 경남본부 조사결과 <span style="font-size:0.75em;color:#888;font-weight:normal;">(단위: 호·점)</span></p>', unsafe_allow_html=True)
+        st.markdown('<p class="sec-head" style="margin-top:16px;">📋 경남본부 조사결과 <span style="font-size:0.75em;color:#888;font-weight:normal;">(단위: 호·점)</span></p>', unsafe_allow_html=True)
 
         _exp_cust = len(df_raw)
         _send_n = None
@@ -3021,12 +3036,15 @@ with tab1:
         _hq2_html += f'<td style="border:1px solid {_RP_BDR};padding:8px 8px;">{_fmt_diff(_prev_diff_overall)}</td>'
         _hq2_html += f'<td style="border:1px solid {_RP_BDR};padding:8px 8px;">-</td></tr>'
         _hq2_html += '</table>'
-        st.markdown(f'<div style="{_RP_CARD}">{_hq2_html}</div>', unsafe_allow_html=True)
+        # 표 카드 + 다음 sec-head를 한 markdown으로 출력 (gap 3과 동일한 패턴)
+        # inline margin-top:24px — 클래스 margin이 Streamlit prose CSS에 묻히는 케이스 회피
+        _gap1_html = f'<div style="{_RP_CARD}">{_hq2_html}</div>'
+        _gap1_html += '<p class="sec-head" style="margin-top:24px;">📊 만족도 구간 분포</p>'
+        st.markdown(_gap1_html, unsafe_allow_html=True)
 
         # ════════════════════════════════════════════════════════
         # CS리포트 3번 — 본부 만족도 구간별 비중 (전월대비 포함)
         # ════════════════════════════════════════════════════════
-        st.markdown("<br>", unsafe_allow_html=True)
         _bk_cnt_full = df_f["_점수구간"].value_counts()
         _bk_order_lr = ["50점 미만", "50~70점", "70~90점", "90점 이상"]
         _bk_lbl_lr = ["50점 미만", "50~70점 미만", "70~90점 미만", "90점 이상"]
@@ -3051,14 +3069,14 @@ with tab1:
             _title3 = f'본부 만족도 90점 이상 비중 {_p90:.1f}%로 {compare_label} 대비 {_fmt_diff(_diff_p90)}%p {_delta_word}'
         else:
             _title3 = f'본부 만족도 90점 이상 비중 {_p90:.1f}%로 {compare_label} 대비 (   )%p 감소'
-        st.markdown('<p class="sec-head">📊 만족도 구간 분포</p>', unsafe_allow_html=True)
+        # sec-head는 위 _gap1_html에 합쳐서 이미 출력됨
 
         # ── [도넛 | 표] 2컬럼 — 도넛 컴팩트, 표 메인 ──
         # 카테고리별 색 (톤다운하면서도 의미 명확: 빨/주/연두/진초록)
         _TONED_BUCKET = {"90점 이상": "#4a7c4d", "70~90점": "#7eb37a",
                           "50~70점": "#d97a35", "50점 미만": "#c25151"}
         _bk_colors_lr = [_TONED_BUCKET[b] for b in _bk_order_lr]
-        _bk_donut_col, _bk_tbl_col = st.columns([1, 1.4], gap="small")
+        _bk_donut_col, _bk_tbl_col = st.columns([0.7, 1.6], gap="small")
 
         with _bk_donut_col:
             st.markdown('<span class="bk-row-marker" style="display:none;"></span>', unsafe_allow_html=True)
@@ -3112,14 +3130,14 @@ with tab1:
                 sort=False, direction="clockwise",
                 marker=dict(line=dict(color="#ffffff", width=2)),
                 hovertemplate="%{label}<br>%{percent}<extra></extra>")
-            # 도넛 가운데에 총응답 건수 표시
+            # 도넛 가운데에 총응답 건수 표시 (가운데 정렬 + 두 줄 간격 타이트)
             fig_bp.add_annotation(
                 x=0.5, y=0.56, xref="paper", yref="paper",
                 text="총 응답",
                 showarrow=False,
                 font=dict(size=13, color="#888"))
             fig_bp.add_annotation(
-                x=0.5, y=0.42, xref="paper", yref="paper",
+                x=0.5, y=0.47, xref="paper", yref="paper",
                 text=f"<b>{_bp_total:,}건</b>",
                 showarrow=False,
                 font=dict(size=24, color=C["navy"]))
@@ -3180,7 +3198,6 @@ with tab1:
         # CS리포트 4번 — 사업소별 만족도 (군별 2단 표)
         # ════════════════════════════════════════════════════════
         if M["office"]:
-            st.markdown("<br>", unsafe_allow_html=True)
             _ofc_stats = df_f.groupby(M["office"])["_점수100"].mean().round(1)
             _hq_avg = round(df_f["_점수100"].mean(), 1)
             _prev_ofc_stats = None
@@ -3198,7 +3215,8 @@ with tab1:
             _g2_top = _top_in_group(OFFICE_GROUP_2)
             _g1_name = _g1_top[0].replace("지사", "") if _g1_top else "-"
             _g2_name = _g2_top[0].replace("지사", "") if _g2_top else "-"
-            st.markdown(f'<p class="sec-head">🏢 사업소별 만족도 <span style="font-size:0.85em;color:#666;font-weight:normal;">(군별 상위권: {_g1_name}, {_g2_name})</span></p>', unsafe_allow_html=True)
+            # margin-top:0 — 위 horizontal block(도넛 카드)와 간격 통일 (gap 1·3과 매칭)
+            st.markdown(f'<p class="sec-head" style="margin-top:0;">🏢 사업소별 만족도 <span style="font-size:0.85em;color:#666;font-weight:normal;">(군별 상위권: {_g1_name}, {_g2_name})</span></p>', unsafe_allow_html=True)
 
             _max_len = max(len(OFFICE_GROUP_1), len(OFFICE_GROUP_2))
             _ofc4_html = '<table style="width:100%;border-collapse:collapse;font-size:0.93em;text-align:center;margin:0;">'
@@ -3250,7 +3268,9 @@ with tab1:
     if has_pie:
         # sec-head는 위 사업소별 카드 markdown에 합쳐서 이미 출력됨
         pie_cols = [c for c in [M["age"], M["contract"], M["business"]] if c]
-        pc_list = st.columns(len(pie_cols))
+        # 컬럼 비율: 파이(1.0) 좁게 + 막대(1.5) 넓게 → 휑한 여백 축소
+        _col_ratios = [1.5 if c == M["business"] else 1.0 for c in pie_cols]
+        pc_list = st.columns(_col_ratios)
         titles_map = {}
         if M["age"]: titles_map[M["age"]] = "연령대"
         if M["contract"]: titles_map[M["contract"]] = "계약종별"
@@ -3259,12 +3279,15 @@ with tab1:
             counts = df_f[col_nm].dropna().astype(str).value_counts()
             _total = counts.sum()
             with pc_list[idx]:
-                st.markdown('<span class="dist-card-marker" style="display:none;"></span>', unsafe_allow_html=True)
+                st.markdown('<span class="dist-row-marker" style="display:none;"></span>', unsafe_allow_html=True)
                 _title = titles_map.get(col_nm, col_nm)
                 # 제목은 차트 안 (plotly title)으로 들어가 카드 안에 가운데 정렬
+                # 파이 차트(계약종별/연령대)는 위 여백이 휑해서 제목을 살짝 아래로(y=0.94)
+                # 막대 차트(업무유형)는 막대에 너무 붙지 않게 위에 그대로(y=0.97)
+                _title_y = 0.94 if col_nm != M["business"] else 0.97
                 _chart_title = dict(
                     text=f"<b>{_title} 분포</b>", x=0.5, xanchor="center",
-                    y=0.97, yanchor="top",
+                    y=_title_y, yanchor="top",
                     font=dict(size=15, color=C["navy"]))
                 if col_nm == M["business"]:
                     # 업무유형: 가로 막대그래프, 퍼센트 높은 순 정렬 (상위 3 navy 강조, 나머지 sky)
@@ -3277,11 +3300,11 @@ with tab1:
                                      text=[f"{r:.1f}% ({int(c):,}건)" for r, c in zip(_biz_df["비율(%)"], _biz_df["건수"])],
                                      color_discrete_map={"상위 3": C["navy"], "일반": C["sky"]},
                                      template=PLOTLY_TPL)
-                    fig_biz.update_traces(textposition="outside", textfont_size=14,
+                    fig_biz.update_traces(textposition="outside", textfont_size=13,
                                           hovertemplate="%{y}: %{x:.1f}% (%{customdata[0]:,}건)<extra></extra>",
                                           customdata=_biz_df[["건수"]].values)
-                    _biz_x_max = _biz_df["비율(%)"].max() * 1.45
-                    fig_biz.update_layout(height=500,
+                    _biz_x_max = _biz_df["비율(%)"].max() * 1.30
+                    fig_biz.update_layout(height=460,
                                            margin=dict(t=50, b=15, l=10, r=10), showlegend=False,
                                            paper_bgcolor="white", plot_bgcolor="white",
                                            title=_chart_title,
@@ -3300,10 +3323,10 @@ with tab1:
                         outsidetextfont=dict(color="#333", size=14),
                         insidetextorientation="horizontal",
                         marker=dict(line=dict(color="#ffffff", width=2)),
-                        domain=dict(x=[0.25, 0.75], y=[0.15, 0.85]),
+                        domain=dict(x=[0.15, 0.85], y=[0.16, 0.92]),
                         hovertemplate="%{label}<br>%{percent}<extra></extra>")
                     fig_pie.update_layout(
-                        height=500,
+                        height=460,
                         margin=dict(t=50, b=20, l=20, r=20),
                         showlegend=False,
                         title=_chart_title,
@@ -3430,6 +3453,7 @@ def _render_category_section(df, cat_col, cat_label, office_col, score_col, over
                 unsafe_allow_html=True)
 
     with st.expander(f"📊 {cat_label} 상세 차트 보기", expanded=False):
+        st.markdown('<span class="no-border-expander" style="display:none;"></span>', unsafe_allow_html=True)
         # 막대 그래프 — 제목 가운데 정렬, 하위 3 카드는 미포함
         fig = px.bar(grp, x="평균만족도", y=cat_label, color="구분",
                      color_discrete_map={"하위 3": C["red"], "일반": C["sky"]},
@@ -3452,7 +3476,7 @@ def _render_category_section(df, cat_col, cat_label, office_col, score_col, over
 
     # ── 지사별 × 범주별 점수 테이블/히트맵 ──
     if office_col:
-        st.markdown(f'<p class="sec-head">🏢 지사별 {cat_label} 평균 만족도</p>', unsafe_allow_html=True)
+        st.markdown(f'<p class="sec-head">🏢 {cat_label}별 결과</p>', unsafe_allow_html=True)
         # 점수 pivot
         pivot = df.pivot_table(values=score_col, index=office_col,
                                columns=cat_col, aggfunc="mean").round(1)
@@ -3658,9 +3682,26 @@ with tab3:
     if not M["score"]:
         st.warning("만족도 점수 컬럼이 필요합니다.")
     else:
-        # ── 통합 다운로드 placeholder ──
-        _dl_all_placeholder = st.empty()
+        # 통합 다운로드 버튼은 진단 보고서 직전에 위치 (placeholder 사용 안 함)
         _dl_sheets = {}  # {시트명: DataFrame}
+
+        # ── Chapter 헤더 헬퍼 (메인 섹션 구분용) ──
+        def _chapter_header(num, icon, title, subtitle, top_margin=48):
+            return (
+                f'<div style="display:flex;align-items:center;'
+                f'background:linear-gradient(135deg,#eef4fb 0%,#dbe6f5 100%);'
+                f'border-left:5px solid {C["navy"]};border-radius:12px;'
+                f'padding:18px 26px;margin:{top_margin}px 0 20px 0;'
+                f'box-shadow:0 1px 3px rgba(15,23,42,0.04),0 4px 12px rgba(15,23,42,0.06);">'
+                f'<div style="font-size:2.1rem;font-weight:800;color:{C["blue"]};'
+                f'line-height:1;letter-spacing:-1px;margin-right:22px;min-width:54px;">{num:02d}</div>'
+                f'<div>'
+                f'<div style="font-size:1.25rem;font-weight:700;color:{C["navy"]};'
+                f'margin-bottom:3px;letter-spacing:-0.3px;">{icon} {title}</div>'
+                f'<div style="font-size:0.86rem;color:#5a6577;">{subtitle}</div>'
+                f'</div>'
+                f'</div>'
+            )
 
         # ── ① 항목별 결과 (양식1) ──
         # 모든 값이 0(또는 NaN)인 컬럼은 자동 제외
@@ -3673,7 +3714,9 @@ with tab3:
             if len(_vals) > 0 and (_vals > 0).any():
                 _f1_score_cols.append(_sc)
         if M["office"] and _f1_score_cols and "_점수100" in df_f.columns:
-            st.markdown('<p class="sec-head">📋 사업소별 만족도 조사결과 — 항목별 결과</p>', unsafe_allow_html=True)
+            st.markdown(_chapter_header(1, "📋", "항목별 만족도 분석",
+                                         "본부 · 사업소별 5개 항목 점수 한눈에", top_margin=24),
+                        unsafe_allow_html=True)
             _item_offices = _sort_offices(df_f[M["office"]].dropna().unique().tolist())
             _resp_col = M.get("response")
             _item_rows = []
@@ -3717,7 +3760,8 @@ with tab3:
                        "발송호수": f"{_all_sent:,}" if isinstance(_all_sent, int) else _all_sent,
                        "응답호수": f"{_all_responded:,}" if isinstance(_all_responded, int) else _all_responded,
                        "응답률(%)": _all_resp_rate}
-            for _sc in individual_scores:
+            # 본부 행도 필터된 컬럼(_f1_score_cols)만 — 전체 0/NaN 컬럼(이용편리성 등) 자동 제외
+            for _sc in _f1_score_cols:
                 if _sc in df_f.columns:
                     _val = df_f[_sc].dropna()
                     _hq_row[_sc] = round(_val.mean(), 1) if len(_val) > 0 else ""
@@ -3758,25 +3802,26 @@ with tab3:
             _f1_html += '</div>'
             st.markdown(_f1_html, unsafe_allow_html=True)
             _dl_sheets["항목별"] = _item_df
-            st.markdown("---")
 
         # ── ② 계약종별 분석 ──
         if M["contract"]:
-            st.markdown('<p class="sec-head">📋 계약종별 만족도 분석</p>', unsafe_allow_html=True)
+            st.markdown(_chapter_header(2, "📋", "계약종별별 만족도 분석",
+                                         "현황 요약 · 핵심 KPI · 사업소별 점수 분포"),
+                        unsafe_allow_html=True)
             _ct_dl_df = _render_category_section(df_f, M["contract"], "계약종별",
                                      M["office"], "_점수100", avg_score_100)
             if _ct_dl_df is not None:
                 _dl_sheets["계약종별"] = _ct_dl_df
-            st.markdown("---")
 
         # ── ③ 업무유형별 분석 ──
         if M["business"]:
-            st.markdown('<p class="sec-head">🏢 업무유형별 만족도 분석</p>', unsafe_allow_html=True)
+            st.markdown(_chapter_header(3, "📋", "업무유형별 만족도 분석",
+                                         "현황 요약 · 핵심 KPI · 사분면 진단 · 사업소별 점수 분포"),
+                        unsafe_allow_html=True)
             _bz_dl_df = _render_category_section(df_f, M["business"], "업무유형",
                                      M["office"], "_점수100", avg_score_100)
             if _bz_dl_df is not None:
                 _dl_sheets["업무유형"] = _bz_dl_df
-            st.markdown("---")
 
         # ── 통합 다운로드 버튼 채우기 ──
         if _dl_sheets:
@@ -3832,7 +3877,7 @@ with tab3:
                                                          end_color=f"{_cr:02X}{_cg:02X}{_cb:02X}", fill_type="solid")
                             if _bz_bottom3.get(_ri, {}).get(_cn):
                                 _cell.font = _red_ft
-            _dl_all_placeholder.download_button(
+            st.download_button(
                 label="📥 항목별 · 계약종별 · 업무유형별 통합 다운로드",
                 data=_all_buf.getvalue(),
                 file_name="분석_통합.xlsx",
@@ -3908,10 +3953,10 @@ with tab3:
                         _unreliable_list.append((n, round(v, 1), int(_bdf_cnt.get(n, 0))))
                     _biz_ofc_stats[biz] = {"bottom3": _bot3, "top1": _top1, "unreliable": _unreliable_list}
 
-            # ── AI 자동 분석 트리거 ──
+            # ── AI 분석 트리거 (버튼 클릭 시에만 호출 — API 한도 보호) ──
             _q_ss_key = "_ai_quadrant_result"
-            _refresh = st.button("↻ 보고서 새로 생성", key="ai_quadrant_refresh", type="secondary")
-            if (_q_ss_key not in st.session_state) or _refresh:
+            _refresh = st.button("📊 보고서 생성", key="ai_quadrant_refresh", type="primary")
+            if _refresh:
                 if not GEMINI_AVAILABLE:
                     st.error("Gemini API 키가 설정되지 않았습니다. `.env` 파일에 `GEMINI_API_KEY`를 설정해주세요.")
                 else:
@@ -4470,6 +4515,20 @@ with tab_sol:
         # LEVEL 2 — 지사별 정밀 진단 (Diagnosis)
         # ══════════════════════════════════════════════════════
 
+        # ── Section band 헬퍼 (탭2 chapter 카드와 같은 패턴, 번호 없는 슬림 버전) ──
+        def _sol_band(icon, title, subtitle=""):
+            _sub = (f'<div style="font-size:0.82rem;color:#5a6577;margin-top:3px;'
+                    f'letter-spacing:-0.2px;">{subtitle}</div>') if subtitle else ""
+            return (
+                f'<div style="background:linear-gradient(135deg,#eef4fb 0%,#dbe6f5 100%);'
+                f'border-left:5px solid {C["navy"]};border-radius:10px;'
+                f'padding:14px 22px;margin:36px 0 18px 0;'
+                f'box-shadow:0 1px 2px rgba(15,23,42,0.04);">'
+                f'<div style="font-size:1.15rem;font-weight:700;color:{C["navy"]};'
+                f'letter-spacing:-0.3px;">{icon} {title}</div>'
+                f'{_sub}</div>'
+            )
+
         # ── 평가군 (고정 분류: 1군/2군) ─────────────────────────
         _PEER_1 = {"진주지사", "마산지사", "거제지사", "밀양지사", "사천지사", "통영지사", "함안의령지사", "거창지사", "창녕지사"}
         _PEER_2 = {"합천지사", "진해지사", "하동지사", "고성지사", "산청지사", "남해지사", "함양지사"}
@@ -4547,6 +4606,9 @@ with tab_sol:
 
         # ── 업무별 강점/약점 레이더 + 페르소나 미스매치 ──────────
         if M.get("business"):
+            st.markdown(_sol_band("🎯", "업무 진단",
+                                   "업무별 강점·약점 + 고객군 미스매치"),
+                        unsafe_allow_html=True)
             _sol_mid_l, _sol_mid_r = st.columns([1, 1])
 
             # ── 좌측: 레이더 차트 (3개 탭: 본부/전월/전년) ──────────
@@ -4651,7 +4713,10 @@ with tab_sol:
                     _pm_grp["비중(%)"] = (_pm_grp["건수"] / max(_pm_total, 1) * 100).round(1)
                     if not _pm_grp.empty:
                         _pm_x_mid = _pm_grp["비중(%)"].mean()
-                        _pm_y_mid = avg_score_100
+                        # 차트 가로선·기여도 계산 기준 = 지사 평균(일관성 유지)
+                        _sel_avg_score = float(_df_sel["_점수100"].mean()) if not _df_sel.empty else 0.0
+                        _sel_total = int(len(_df_sel))
+                        _pm_y_mid = _sel_avg_score
                         fig_pm = go.Figure()
                         fig_pm.add_trace(go.Scatter(
                             x=_pm_grp["비중(%)"], y=_pm_grp["만족도"],
@@ -4686,11 +4751,9 @@ with tab_sol:
                             showlegend=False)
                         st.plotly_chart(fig_pm, use_container_width=True, config={'staticPlot': True})
 
-                        # 우하 사분면 경고 + 지사 평균 기여도 계산
+                        # 우하/좌하 사분면 = 지사 평균 이하 카테고리
                         _pm_danger = _pm_grp[(_pm_grp["비중(%)"] >= _pm_x_mid) & (_pm_grp["만족도"] < _pm_y_mid)]
                         _pm_watch  = _pm_grp[(_pm_grp["비중(%)"] < _pm_x_mid) & (_pm_grp["만족도"] < _pm_y_mid)]
-                        _sel_avg_score = float(_df_sel["_점수100"].mean()) if not _df_sel.empty else 0.0
-                        _sel_total = int(len(_df_sel))
 
                         def _calc_impact(_score, _cnt):
                             """카테고리를 지사 평균까지 끌어올렸을 때 전체 평균 상승폭"""
@@ -4702,7 +4765,7 @@ with tab_sol:
                         if not _pm_danger.empty:
                             _d_html = (
                                 '<div style="background:#ffebee;border-radius:8px;padding:10px 14px;'
-                                'font-size:0.85em;line-height:1.65;">'
+                                'font-size:0.88em;">'
                                 '🚨 <b>1순위 개선</b> — 비중 큰 카테고리, 지사 평균 영향 큼<br>'
                             )
                             for _, _r in _pm_danger.iterrows():
@@ -4717,14 +4780,14 @@ with tab_sol:
                         if not _pm_watch.empty:
                             _w_html = (
                                 '<div style="background:#fff8e1;border-radius:8px;padding:10px 14px;'
-                                'font-size:0.85em;line-height:1.65;margin-top:6px;">'
+                                'font-size:0.88em;margin-top:6px;">'
                                 '⚡ <b>특이 리스크</b> — 소수지만 점수 낮음, 개별 민원 위험<br>'
                             )
                             for _, _r in _pm_watch.iterrows():
                                 _imp = _calc_impact(_r["만족도"], _r["건수"])
                                 _w_html += (
                                     f'• <b>{_r["고객군"]}</b> {_r["만족도"]:.1f}점 ({int(_r["건수"])}건) '
-                                    f'→ 평균 영향 <b>+{_imp:.2f}점</b> (작지만 개별 케이스 관리 필요)<br>'
+                                    f'→ 지사 평균까지 끌어올리면 <b>+{_imp:.2f}점</b> 상승 (개별 케이스 관리 필요)<br>'
                                 )
                             _w_html += '</div>'
                             st.markdown(_w_html, unsafe_allow_html=True)
@@ -4733,11 +4796,11 @@ with tab_sol:
                 else:
                     st.info("계약종 컬럼이 설정되지 않았습니다.")
 
-        st.markdown("---")
-
         # ── 업무 × 계약종별 정밀 진단 ──────────────────────
         if M.get("business") and M.get("contract"):
-            st.markdown("##### 🔥 업무 × 계약종별 리스크 히트맵 — " + _sel_off)
+            st.markdown(_sol_band("🔥", f"업무 × 계약종별 리스크 히트맵 — {_sel_off}",
+                                   "업무유형(행) × 계약종별(열) 평균 만족도"),
+                        unsafe_allow_html=True)
             st.caption("업무유형(행) × 계약종별(열)의 평균 만족도입니다. **연라벤더 칸**은 지사 평균 미만으로 우선 관리 대상입니다.")
 
             _sol_pivot = _df_sel.pivot_table(
@@ -4825,11 +4888,14 @@ with tab_sol:
                 _hm_html += '</tr>'
                 _hm_html += '</table></div>'
                 st.markdown(_hm_html, unsafe_allow_html=True)
+                # VOC 액션 인사이트 section band
+                st.markdown(_sol_band("🔍", f"VOC 액션 인사이트 — {_sel_off}",
+                                       "사전케어 대상 · 고객 요청사항"),
+                            unsafe_allow_html=True)
 
                 # ══════════════════════════════════════════
                 # 🔍 VOC 액션 인사이트 (사전케어 + 고객 요청사항 통합)
                 # ══════════════════════════════════════════
-                st.markdown(f'<p class="sec-head">🔍 VOC 액션 인사이트 — {_sel_off}</p>', unsafe_allow_html=True)
                 # ── 사전케어 대상 ──────────────────────────────
                 st.markdown("##### 🚨 사전케어 대상 — 50점 이하")
                 _pc_df = _df_sel[_df_sel["_점수100"] <= 50].copy()
@@ -4903,10 +4969,6 @@ with tab_sol:
                         _, _, _notable = _extract_voc_phrases(_vi_texts, _vi_sc)
 
                         if _notable:
-                            # 사전케어 대상과 시각적 구분 (얇은 선)
-                            st.markdown(
-                                '<div style="border-top:1px solid #e5e7eb;margin:18px 0 0 0;"></div>',
-                                unsafe_allow_html=True)
                             st.markdown(
                                 f"##### 💬 고객 요청사항 — 구체적 개선 요청 ({len(_notable)}건)")
 
@@ -4927,15 +4989,9 @@ with tab_sol:
 
                 # ── 실질적 리스크 카드 (계약종별×업무) ──────────
                 if _real_top3 or _drop_top3:
-                    st.markdown("---")
-                    st.markdown(
-                        '<div style="background:linear-gradient(135deg,#b71c1c,#c62828);'
-                        'border-radius:10px;padding:14px 20px;color:white;margin:8px 0 12px;">'
-                        f'<span style="font-size:1.1em;font-weight:800;">'
-                        f'🚨 리스크 진단 — {_sel_off}</span>'
-                        '<span style="font-size:0.82em;opacity:.8;margin-left:10px;">'
-                        '업무×계약종별 조합별 우선 개선 대상'
-                        '</span></div>', unsafe_allow_html=True)
+                    st.markdown(_sol_band("🚨", f"리스크 진단 — {_sel_off}",
+                                           "업무 × 계약종별 조합별 우선 개선 대상"),
+                                unsafe_allow_html=True)
                 if _real_top3:
                     st.markdown("##### 🚨 실질적 리스크 TOP 3 — 건수 多 & 평균 이하 (우선 개선)")
                     st.caption("카드를 클릭하면 상세 분석이 열립니다.")
