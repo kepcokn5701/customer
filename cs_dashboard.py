@@ -2338,6 +2338,13 @@ def _load_compare_file(_uploaded):
         _f = _raw.copy()
         if "순번" in _f.columns:
             _f.drop(columns=["순번"], inplace=True)
+        # ── 업무유형 이름 매핑 (메인 파일과 동일하게 정규화) ──
+        if M.get("business") and M["business"] in _f.columns:
+            _biz_mask = _f[M["business"]].notna()
+            _f.loc[_biz_mask, M["business"]] = (
+                _f.loc[_biz_mask, M["business"]].astype(str).str.strip()
+                .map(lambda x: _BIZ_RENAME.get(x, x))
+            )
         _avg = None
         if M["score"] and M["score"] in _f.columns:
             _sc = normalize_score_100(_f[M["score"]])
@@ -4520,33 +4527,9 @@ with tab_sol:
             # ── 좌측: 레이더 차트 (3개 탭: 본부/전월/전년) ──────────
             def _render_radar_compare(sel_df, ref_df, ref_label, is_timeseries):
                 """레이더 + 강점/약점(개선/악화) 카드. is_timeseries=True면 시계열 비교."""
-                _biz_sel_full = sel_df.groupby(M["business"])["_점수100"].agg(["mean", "count"])
-                _biz_ref_full = ref_df.groupby(M["business"])["_점수100"].agg(["mean", "count"])
-                # mean이 NaN(모든 값 NaN)인 그룹 제외
-                _biz_sel = _biz_sel_full["mean"].dropna()
-                _biz_ref = _biz_ref_full["mean"].dropna()
+                _biz_sel = sel_df.groupby(M["business"])["_점수100"].mean().dropna()
+                _biz_ref = ref_df.groupby(M["business"])["_점수100"].mean().dropna()
                 _cats = sorted(set(_biz_sel.index) & set(_biz_ref.index))
-
-                # ── 디버그 진단 ──
-                _sel_only = sorted(set(_biz_sel.index) - set(_biz_ref.index))
-                _ref_only = sorted(set(_biz_ref.index) - set(_biz_sel.index))
-                st.caption(f"🔬 진단: 이번 달 {len(_biz_sel)}개 / {ref_label} {len(_biz_ref)}개 / 비교 가능(교집합) {len(_cats)}개")
-                if _sel_only:
-                    _sel_only_info = [f"{c}(이번 {int(_biz_sel_full.loc[c,'count'])}건)" for c in _sel_only]
-                    st.caption(f"이번 달에만 있는 업무유형 {len(_sel_only)}개: {', '.join(_sel_only_info)}")
-                if _ref_only:
-                    _ref_only_info = [f"{c}({ref_label} {int(_biz_ref_full.loc[c,'count'])}건)" for c in _ref_only]
-                    st.caption(f"{ref_label}에만 있는 업무유형 {len(_ref_only)}개: {', '.join(_ref_only_info)}")
-                # 카운트 0건이지만 mean NaN 으로 빠진 케이스 추적
-                _sel_all_idx = set(_biz_sel_full.index)
-                _ref_all_idx = set(_biz_ref_full.index)
-                _sel_nan_only = _sel_all_idx - set(_biz_sel.index)
-                _ref_nan_only = _ref_all_idx - set(_biz_ref.index)
-                if _sel_nan_only:
-                    st.caption(f"⚠ 이번 달 점수 NaN으로 제외된 업무유형: {', '.join(sorted(_sel_nan_only))}")
-                if _ref_nan_only:
-                    st.caption(f"⚠ {ref_label} 점수 NaN으로 제외된 업무유형: {', '.join(sorted(_ref_nan_only))}")
-
                 if len(_cats) < 3:
                     st.info("업무유형이 3개 이상이어야 레이더 차트를 그릴 수 있습니다.")
                     return
