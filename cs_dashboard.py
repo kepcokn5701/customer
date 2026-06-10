@@ -3709,7 +3709,7 @@ with tab3:
             for _ri, (_, _row) in enumerate(_item_df.iterrows()):
                 _is_hq = (_ri == 0)
                 _bg = f"background:#f8fafc;font-weight:700;color:{C['navy']};" if _is_hq else ""
-                _dbl_b = f"border-bottom:2px solid {C['navy']};" if _is_hq else ""
+                _dbl_b = "border-bottom:1px solid #94a3b8;" if _is_hq else ""
                 _f1_html += f'<tr style="{_bg}">'
                 for _col in _item_df.columns:
                     _v = _row[_col]
