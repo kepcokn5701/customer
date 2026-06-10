@@ -4801,8 +4801,12 @@ with tab_sol:
                 _hm_html += '</table></div>'
                 st.markdown(_hm_html, unsafe_allow_html=True)
 
+                # ══════════════════════════════════════════
+                # 🔍 VOC 액션 인사이트 (사전케어 + 고객 요청사항 통합)
+                # ══════════════════════════════════════════
+                st.markdown(f'<p class="sec-head">🔍 VOC 액션 인사이트 — {_sel_off}</p>', unsafe_allow_html=True)
                 # ── 사전케어 대상 ──────────────────────────────
-                st.markdown("##### 🚨 사전케어 대상 — " + _sel_off + " 50점 이하")
+                st.markdown("##### 🚨 사전케어 대상 — 50점 이하")
                 _pc_df = _df_sel[_df_sel["_점수100"] <= 50].copy()
                 if not _pc_df.empty:
                     _pc_df = _pc_df.sort_values("_점수100")
@@ -4874,15 +4878,12 @@ with tab_sol:
                         _, _, _notable = _extract_voc_phrases(_vi_texts, _vi_sc)
 
                         if _notable:
-                            st.markdown("---")
+                            # 사전케어 대상과 시각적 구분 (얇은 선)
                             st.markdown(
-                                '<div style="background:linear-gradient(135deg,#4a148c,#6a1b9a);'
-                                'border-radius:10px;padding:16px 22px;color:white;margin:16px 0 12px;">'
-                                '<span style="font-size:1.15em;font-weight:800;">'
-                                f'💬 고객 요청사항 — {_sel_off}</span>'
-                                '<span style="font-size:0.82em;opacity:.8;margin-left:10px;">'
-                                f'고객이 구체적 개선을 요청한 의견 {len(_notable)}건'
-                                '</span></div>', unsafe_allow_html=True)
+                                '<div style="border-top:1px solid #e5e7eb;margin:18px 0 0 0;"></div>',
+                                unsafe_allow_html=True)
+                            st.markdown(
+                                f"##### 💬 고객 요청사항 — 구체적 개선 요청 ({len(_notable)}건)")
 
                             for _vi_i, (_voc_txt, _voc_sc) in enumerate(_notable[:7]):
                                 _voc_display = _voc_txt[:120] + ('…' if len(_voc_txt) > 120 else '')
