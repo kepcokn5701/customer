@@ -3172,13 +3172,18 @@ with tab1:
                         _ofc4_html += f'<td colspan="4" style="border:1px solid {_RP_BDR};padding:7px 6px;color:#bbb;">-</td>'
                 _ofc4_html += '</tr>'
             _ofc4_html += '</table>'
-            st.markdown(f'<div style="{_RP_CARD}">{_ofc4_html}</div>', unsafe_allow_html=True)
+            # 카드 + 다음 sec-head를 한 markdown으로 출력 (Streamlit element gap 우회)
+            _has_pie_next = any([M["age"], M["contract"], M["business"]])
+            _combined_html = f'<div style="{_RP_CARD}">{_ofc4_html}</div>'
+            if _has_pie_next:
+                _combined_html += '<p class="sec-head" style="margin-top:24px;">🍩 응답 분포 현황</p>'
+            st.markdown(_combined_html, unsafe_allow_html=True)
 
 
     # ── 분포 차트 ──
     has_pie = any([M["age"], M["contract"], M["business"]])
     if has_pie:
-        st.markdown('<p class="sec-head" style="margin-top:40px !important;">🍩 응답 분포 현황</p>', unsafe_allow_html=True)
+        # sec-head는 위 사업소별 카드 markdown에 합쳐서 이미 출력됨
         pie_cols = [c for c in [M["age"], M["contract"], M["business"]] if c]
         pc_list = st.columns(len(pie_cols))
         titles_map = {}
