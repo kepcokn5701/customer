@@ -1845,6 +1845,16 @@ st.markdown(f"""
 
   .sec-head {{ font-size:1.15rem; font-weight:700; color:{C['navy']}; border-left:4px solid {C['blue']}; padding:0.1rem 0 0.1rem 0.85rem; margin:1.5rem 0 0.9rem 0; letter-spacing:-0.2px; }}
 
+  /* 모든 표의 외곽(첫/마지막 셀) 세로 테두리 제거 — 개방감 */
+  [data-testid="stMarkdownContainer"] table tr td:first-child,
+  [data-testid="stMarkdownContainer"] table tr th:first-child {{
+    border-left: none !important;
+  }}
+  [data-testid="stMarkdownContainer"] table tr td:last-child,
+  [data-testid="stMarkdownContainer"] table tr th:last-child {{
+    border-right: none !important;
+  }}
+
   /* 도넛+표 한 흰 카드 안에 묶기 (.bk-row-marker가 있는 horizontalBlock만) */
   [data-testid="stHorizontalBlock"]:has(.bk-row-marker) {{
     background: #ffffff;
