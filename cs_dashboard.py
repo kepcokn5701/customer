@@ -2363,6 +2363,18 @@ def _fmt_diff(val, decimals=1):
         return f"{val:.{decimals}f}"
     return f"△{abs(val):.{decimals}f}"
 
+
+def _fmt_diff_colored(val, decimals=1, blue="#0055a5", red="#c62828"):
+    """차이값 → 색깔 + 화살표 표기.
+    양수: 파란색 + '숫자 ↑' / 음수: 빨간색 + '△숫자' / 0: 0.0 / NaN: -"""
+    if val is None or pd.isna(val):
+        return "-"
+    if val == 0:
+        return f"{0:.{decimals}f}"
+    if val > 0:
+        return f'<span style="color:{blue};font-weight:700;">{val:.{decimals}f} ↑</span>'
+    return f'<span style="color:{red};font-weight:700;">△{abs(val):.{decimals}f}</span>'
+
 # VOC 감성 분석
 voc_texts_all = []
 voc_sentiments = []
@@ -3190,12 +3202,12 @@ with tab1:
                         _score = _ofc_stats.get(_ofc) if _ofc in _ofc_stats.index else None
                         if _score is not None and not pd.isna(_score):
                             _score_str = f"{_score:.1f}"
-                            _diff_hq_str = _fmt_diff(round(_score - _hq_avg, 1))
+                            _diff_hq_str = _fmt_diff_colored(round(_score - _hq_avg, 1))
                             _diff_prev_str = "-"
                             if _prev_ofc_stats is not None and _ofc in _prev_ofc_stats.index:
                                 _prev_s = _prev_ofc_stats.get(_ofc)
                                 if _prev_s is not None and not pd.isna(_prev_s):
-                                    _diff_prev_str = _fmt_diff(round(_score - _prev_s, 1))
+                                    _diff_prev_str = _fmt_diff_colored(round(_score - _prev_s, 1))
                         else:
                             _score_str = "-"
                             _diff_hq_str = "-"
