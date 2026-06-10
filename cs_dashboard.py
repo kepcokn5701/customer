@@ -3657,7 +3657,16 @@ with tab3:
         _dl_sheets = {}  # {시트명: DataFrame}
 
         # ── ① 항목별 결과 (양식1) ──
-        if M["office"] and individual_scores and "_점수100" in df_f.columns:
+        # 모든 값이 0(또는 NaN)인 컬럼은 자동 제외
+        # (작년처럼 이용편리성에 점수 있는 자료는 자동 포함됨)
+        _f1_score_cols = []
+        for _sc in individual_scores:
+            if _sc not in df_f.columns:
+                continue
+            _vals = pd.to_numeric(df_f[_sc], errors="coerce").dropna()
+            if len(_vals) > 0 and (_vals > 0).any():
+                _f1_score_cols.append(_sc)
+        if M["office"] and _f1_score_cols and "_점수100" in df_f.columns:
             st.markdown('<p class="sec-head">📋 사업소별 만족도 조사결과 — 항목별 결과</p>', unsafe_allow_html=True)
             _item_offices = _sort_offices(df_f[M["office"]].dropna().unique().tolist())
             _resp_col = M.get("response")
@@ -3678,7 +3687,7 @@ with tab3:
                         "발송호수": f"{_sent:,}" if isinstance(_sent, int) else _sent,
                         "응답호수": f"{_responded:,}" if isinstance(_responded, int) else _responded,
                         "응답률(%)": _resp_rate}
-                for _sc in individual_scores:
+                for _sc in _f1_score_cols:
                     if _sc in _odf.columns:
                         _val = _odf[_sc].dropna()
                         _row[_sc] = round(_val.mean(), 1) if len(_val) > 0 else ""
