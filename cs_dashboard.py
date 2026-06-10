@@ -2932,7 +2932,7 @@ with tab_weekly:
             with st.spinner("AI가 주간 협조요청 분석 중…"):
                 try:
                     import urllib.request
-                    _models = ["gemini-2.5-flash", "gemini-2.5-pro", "gemini-2.5-flash-lite", "gemma-3-12b-it"]
+                    _models = ["gemini-2.5-flash", "gemini-flash-latest", "gemini-2.5-flash-lite", "gemini-2.5-pro", "gemini-2.0-flash"]
                     _payload = {"contents": [{"parts": [{"text": _ai_weekly_prompt}]}],
                                  "generationConfig": {"temperature": 0.7, "maxOutputTokens": 8192}}
                     _ctx = ssl._create_unverified_context()
@@ -4014,7 +4014,7 @@ with tab3:
                     with st.spinner("AI가 업무유형별 분석 생성 중…"):
                         try:
                             import urllib.request
-                            _models = ["gemini-2.5-flash", "gemini-2.5-pro", "gemini-2.5-flash-lite", "gemma-3-12b-it"]
+                            _models = ["gemini-2.5-flash", "gemini-flash-latest", "gemini-2.5-flash-lite", "gemini-2.5-pro", "gemini-2.0-flash"]
                             _payload = {"contents": [{"parts": [{"text": _ai_q_prompt}]}],
                                          "generationConfig": {"temperature": 0.7, "maxOutputTokens": 8192}}
                             _ctx = ssl._create_unverified_context()
@@ -4381,7 +4381,7 @@ with tab5:
 
                     try:
                         import urllib.request
-                        _models = ["gemini-2.5-flash", "gemini-2.5-pro", "gemini-2.5-flash-lite", "gemma-3-12b-it"]
+                        _models = ["gemini-2.5-flash", "gemini-flash-latest", "gemini-2.5-flash-lite", "gemini-2.5-pro", "gemini-2.0-flash"]
                         _payload = {"contents": [{"parts": [{"text": _unified_prompt}]}],
                                      "generationConfig": {"temperature": 0.7, "maxOutputTokens": 8192}}
                         _ctx = ssl._create_unverified_context()
@@ -5134,7 +5134,7 @@ with tab_sol:
                                 for _v in _voc_sample:
                                     _kw_prompt += f"- {_v}\n"
 
-                                _models = ["gemini-2.5-flash", "gemini-2.5-flash-lite"]
+                                _models = ["gemini-2.5-flash", "gemini-flash-latest", "gemini-2.5-flash-lite", "gemini-2.0-flash"]
                                 _ctx = ssl._create_unverified_context()
                                 for _model in _models:
                                     _api_url = f"https://generativelanguage.googleapis.com/v1beta/models/{_model}:generateContent?key={_GEMINI_KEY}"
@@ -5324,7 +5324,7 @@ with tab_sol:
                             with st.spinner("AI가 종합 처방전 생성 중…"):
                                 try:
                                     import urllib.request
-                                    _models = ["gemini-2.5-flash", "gemini-2.5-pro", "gemini-2.5-flash-lite", "gemma-3-12b-it"]
+                                    _models = ["gemini-2.5-flash", "gemini-flash-latest", "gemini-2.5-flash-lite", "gemini-2.5-pro", "gemini-2.0-flash"]
                                     _sol_pl = {
                                         "contents": [{"parts": [{"text": _sol_prompt}]}],
                                         "generationConfig": {"temperature": 0.7, "maxOutputTokens": 8192}
@@ -5768,7 +5768,7 @@ with tab_letter:
                         import urllib.request
                         # gemini-2.5-pro: 감성적 글쓰기 최적 (무료 100회/일)
                         # gemini-2.5-flash-lite: thinking 없는 빠른 폴백 (무료 1000회/일)
-                        _models = ["gemini-2.5-pro", "gemini-2.5-flash-lite"]
+                        _models = ["gemini-2.5-pro", "gemini-pro-latest", "gemini-2.5-flash", "gemini-2.5-flash-lite"]
                         _payload = {"contents": [{"parts": [{"text": _lt_prompt}]}],
                                      "generationConfig": {"temperature": 0.75, "maxOutputTokens": 2048}}
                         _ctx = ssl._create_unverified_context()
