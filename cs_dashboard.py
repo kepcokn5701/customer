@@ -3025,7 +3025,10 @@ with tab1:
         st.markdown('<p class="sec-head">📊 만족도 구간 분포</p>', unsafe_allow_html=True)
 
         # ── [도넛 | 표] 2컬럼 — 도넛 컴팩트, 표 메인 ──
-        _bk_colors_lr = [BUCKET_COLORS[b] for b in _bk_order_lr]
+        # 톤다운 컬러 (도넛 + 표 헤더 공통)
+        _TONED_BUCKET = {"90점 이상": "#4a7c4d", "70~90점": "#8fb785",
+                          "50~70점": "#d4a13c", "50점 미만": "#a95151"}
+        _bk_colors_lr = [_TONED_BUCKET[b] for b in _bk_order_lr]
         _bk_donut_col, _bk_tbl_col = st.columns([1, 1.8])
 
         with _bk_donut_col:
@@ -3038,7 +3041,7 @@ with tab1:
             })
             _donut_df["라벨"] = _donut_df["구간"].map(_SHORT_BUCKET)
             _ordered_labels = [_SHORT_BUCKET[k] for k in BUCKET_ORDER]
-            _bk_color_map = {_SHORT_BUCKET[k]: v for k, v in BUCKET_COLORS.items()
+            _bk_color_map = {_SHORT_BUCKET[k]: _TONED_BUCKET[k] for k in BUCKET_ORDER
                              if k in _donut_df["구간"].values}
             _bp_total = int(_donut_df["건수"].sum())
             # 큰 조각: 라벨+% 같이, 작은 조각: 라벨만 (plotly auto가 위치 결정)
@@ -3080,16 +3083,14 @@ with tab1:
             st.plotly_chart(fig_bp, use_container_width=True, config={'staticPlot': True})
 
         with _bk_tbl_col:
-            # 표 위에 동적 멘트
+            # 표 위에 동적 멘트 (글씨 크기 키움)
             st.markdown(
-                f'<p style="font-size:0.95rem;font-weight:600;color:{C["navy"]};'
-                f'margin:0 0 12px 0;line-height:1.5;">{_title3}</p>',
+                f'<p style="font-size:1.1rem;font-weight:700;color:{C["navy"]};'
+                f'margin:0 0 14px 0;line-height:1.5;">{_title3}</p>',
                 unsafe_allow_html=True)
 
-            # KPI 카드 제거 — 도넛/sec-head와 정보 중복
-
-            # ── 가로 줄만 있는 클린 표 (세로 테두리 제거) ──
-            _hdr_brd = f'border-top:2px solid {C["navy"]};border-bottom:2px solid {C["navy"]};'
+            # ── 가로 줄만 있는 클린 표 (세로 테두리 제거, 얇은 가로선) ──
+            _hdr_brd = f'border-top:1px solid {_RP_BDR};border-bottom:1px solid {_RP_BDR};'
             _row_brd = f'border-bottom:1px solid {_RP_BDR};'
             _bk3_html = '<table style="width:100%;border-collapse:collapse;font-size:0.93em;text-align:center;">'
             # 헤더
@@ -3116,9 +3117,9 @@ with tab1:
             if _diff_pcts is not None:
                 for d in _diff_pcts:
                     _v = _fmt_diff(d)
-                    # 양수(증가)에만 ↑ + 컬러 포인트, 감소는 그대로
+                    # 양수(증가)에만 ↑ + 컬러 포인트(블루), 감소는 그대로
                     if d is not None and not pd.isna(d) and d > 0:
-                        _v = f'<span style="color:{C["green"]};font-weight:700;">{_v} ↑</span>'
+                        _v = f'<span style="color:{C["blue"]};font-weight:700;">{_v} ↑</span>'
                     _bk3_html += f'<td style="padding:9px 6px;">{_v}</td>'
                 _bk3_html += f'<td style="padding:9px 6px;">-</td></tr>'
             else:
