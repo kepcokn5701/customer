@@ -3386,7 +3386,7 @@ def _render_category_section(df, cat_col, cat_label, office_col, score_col, over
             st.markdown(
                 f'<div style="{_kpi_card_style}">'
                 f'<div style="font-size:0.75em;color:#666;">📉 평균 미달</div>'
-                f'<div style="font-size:1.0rem;font-weight:700;color:{C["navy"]};margin:4px 0 2px;">{len(_below)}개 / {len(grp)}</div>'
+                f'<div style="font-size:1.0rem;font-weight:700;color:{C["navy"]};margin:4px 0 2px;">{len(_below)}개 / {len(grp)}개</div>'
                 f'<div style="font-size:0.8rem;color:#888;">{int(_below_ratio*100)}%</div>'
                 f'</div>',
                 unsafe_allow_html=True)
