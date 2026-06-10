@@ -3080,36 +3080,71 @@ with tab1:
             st.plotly_chart(fig_bp, use_container_width=True, config={'staticPlot': True})
 
         with _bk_tbl_col:
-            # 표 위에 동적 멘트 (이전 sec-head에 있던 텍스트)
+            # 표 위에 동적 멘트
             st.markdown(
                 f'<p style="font-size:0.95rem;font-weight:600;color:{C["navy"]};'
-                f'margin:0 0 14px 0;line-height:1.5;">{_title3}</p>',
+                f'margin:0 0 12px 0;line-height:1.5;">{_title3}</p>',
                 unsafe_allow_html=True)
-            _bk3_html = '<table style="width:96%;margin:0 auto 0 0;border-collapse:collapse;font-size:0.95em;text-align:center;">'
-            _bk3_html += f'<tr style="{_RP_HDR_STYLE}">'
-            _bk3_html += f'<th style="border:1px solid {_RP_BDR};padding:8px 8px;">구분</th>'
+
+            # ── KPI 카드 2개 (총 응답 / 90점 이상 비중) ──
+            _kpi_html = (
+                '<div style="display:flex;gap:10px;margin-bottom:14px;">'
+                # 총 응답 카드
+                f'<div style="flex:1;background:#f0f7ff;border-left:4px solid {C["blue"]};'
+                f'border-radius:8px;padding:10px 14px;">'
+                f'<div style="font-size:0.78em;color:#666;font-weight:600;">총 응답(건)</div>'
+                f'<div style="font-size:1.5em;font-weight:700;color:{C["navy"]};line-height:1.2;">{_bp_total:,}</div>'
+                f'</div>'
+                # 90점 이상 비중 카드
+                f'<div style="flex:1;background:#f0fdf4;border-left:4px solid {C["green"]};'
+                f'border-radius:8px;padding:10px 14px;">'
+                f'<div style="font-size:0.78em;color:#666;font-weight:600;">90점 이상 비중(%)</div>'
+                f'<div style="font-size:1.5em;font-weight:700;color:{C["navy"]};line-height:1.2;">{_p90:.1f}%</div>'
+                f'</div>'
+                '</div>'
+            )
+
+            # ── 가로 줄만 있는 클린 표 (세로 테두리 제거) ──
+            _hdr_brd = f'border-top:2px solid {C["navy"]};border-bottom:2px solid {C["navy"]};'
+            _row_brd = f'border-bottom:1px solid {_RP_BDR};'
+            _bk3_html = '<table style="width:100%;border-collapse:collapse;font-size:0.93em;text-align:center;">'
+            # 헤더
+            _bk3_html += f'<tr style="{_RP_HDR_STYLE}{_hdr_brd}">'
+            _bk3_html += f'<th style="padding:9px 6px;">구분</th>'
             for lbl, col in zip(_bk_lbl_lr, _bk_colors_lr):
-                _bk3_html += f'<th style="border:1px solid {_RP_BDR};padding:8px 8px;color:{col};">{lbl}</th>'
-            _bk3_html += f'<th style="border:1px solid {_RP_BDR};padding:8px 8px;">합계</th></tr>'
-            _bk3_html += f'<tr><td style="border:1px solid {_RP_BDR};padding:8px 8px;font-weight:700;background:{_RP_SUB_BG};color:{C["navy"]};">응답수(건)</td>'
+                _bk3_html += f'<th style="padding:9px 6px;color:{col};">{lbl}</th>'
+            _bk3_html += f'<th style="padding:9px 6px;">합계</th></tr>'
+            # 응답수(건)
+            _bk3_html += f'<tr style="{_row_brd}">'
+            _bk3_html += f'<td style="padding:9px 6px;font-weight:700;background:{_RP_SUB_BG};color:{C["navy"]};">응답수(건)</td>'
             for c in _bk_cnts_lr:
-                _bk3_html += f'<td style="border:1px solid {_RP_BDR};padding:8px 8px;">{c:,}</td>'
-            _bk3_html += f'<td style="border:1px solid {_RP_BDR};padding:8px 8px;font-weight:700;color:{C["navy"]};">{_bk_total_lr:,}</td></tr>'
-            _bk3_html += f'<tr><td style="border:1px solid {_RP_BDR};padding:8px 8px;font-weight:700;background:{_RP_SUB_BG};color:{C["navy"]};">비중(%)</td>'
+                _bk3_html += f'<td style="padding:9px 6px;">{c:,}</td>'
+            _bk3_html += f'<td style="padding:9px 6px;font-weight:700;color:{C["navy"]};">{_bk_total_lr:,}</td></tr>'
+            # 비중(%)
+            _bk3_html += f'<tr style="{_row_brd}">'
+            _bk3_html += f'<td style="padding:9px 6px;font-weight:700;background:{_RP_SUB_BG};color:{C["navy"]};">비중(%)</td>'
             for p in _bk_pcts_lr:
-                _bk3_html += f'<td style="border:1px solid {_RP_BDR};padding:8px 8px;">{p:.1f}</td>'
-            _bk3_html += f'<td style="border:1px solid {_RP_BDR};padding:8px 8px;font-weight:700;color:{C["navy"]};">100.0</td></tr>'
-            _bk3_html += f'<tr><td style="border:1px solid {_RP_BDR};padding:8px 8px;font-weight:700;background:{_RP_SUB_BG};color:{C["navy"]};">{compare_label}대비(%p)</td>'
+                _bk3_html += f'<td style="padding:9px 6px;">{p:.1f}</td>'
+            _bk3_html += f'<td style="padding:9px 6px;font-weight:700;color:{C["navy"]};">100.0</td></tr>'
+            # 전월대비(%p) — 화살표 추가
+            _bk3_html += f'<tr style="{_row_brd}">'
+            _bk3_html += f'<td style="padding:9px 6px;font-weight:700;background:{_RP_SUB_BG};color:{C["navy"]};">{compare_label}대비(%p)</td>'
             if _diff_pcts is not None:
                 for d in _diff_pcts:
-                    _bk3_html += f'<td style="border:1px solid {_RP_BDR};padding:8px 8px;">{_fmt_diff(d)}</td>'
-                _bk3_html += f'<td style="border:1px solid {_RP_BDR};padding:8px 8px;">-</td></tr>'
+                    _v = _fmt_diff(d)
+                    if d is not None and not pd.isna(d):
+                        if d > 0:
+                            _v = f'<span style="color:{C["red"]}">{_v} ↑</span>'
+                        elif d < 0:
+                            _v = f'<span style="color:{C["blue"]}">{_v} ↓</span>'
+                    _bk3_html += f'<td style="padding:9px 6px;">{_v}</td>'
+                _bk3_html += f'<td style="padding:9px 6px;">-</td></tr>'
             else:
                 for _ in range(5):
-                    _bk3_html += f'<td style="border:1px solid {_RP_BDR};padding:8px 8px;">-</td>'
+                    _bk3_html += f'<td style="padding:9px 6px;">-</td>'
                 _bk3_html += '</tr>'
             _bk3_html += '</table>'
-            st.markdown(_bk3_html, unsafe_allow_html=True)
+            st.markdown(_kpi_html + _bk3_html, unsafe_allow_html=True)
 
         # ════════════════════════════════════════════════════════
         # CS리포트 4번 — 사업소별 만족도 (군별 2단 표)
