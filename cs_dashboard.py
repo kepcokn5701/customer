@@ -3073,10 +3073,10 @@ with tab1:
             _bk_color_map = {_SHORT_BUCKET[k]: _TONED_BUCKET[k] for k in BUCKET_ORDER
                              if k in _donut_df["구간"].values}
             _bp_total = int(_donut_df["건수"].sum())
-            # 큰 조각(>=50%): 안쪽 / 그 외: outside leader line 강제
-            # 라벨 글자 색을 카테고리 색과 매칭
+            # 큰 조각(>=50%)만 도넛 안쪽 표시 / 작은 조각은 도넛 위 가로 legend로 표시
             _bp_text = []
             _bp_pos = []
+            _small_items = []  # 차트 위 가로 legend용
             for _bi in range(len(_donut_df)):
                 _bc = int(_donut_df["건수"].iloc[_bi])
                 _bp = (_bc / max(_bp_total, 1)) * 100
@@ -3084,13 +3084,23 @@ with tab1:
                 _lbl = _donut_df["라벨"].iloc[_bi]
                 _color = _TONED_BUCKET[_구간]
                 if _bp >= 50:
-                    # 큰 조각: 안쪽 흰글씨
                     _bp_text.append(f"{_lbl}<br>{_bp:.1f}%")
                     _bp_pos.append("inside")
                 else:
-                    # 작은 조각: 바깥 leader line, 글자색=카테고리 색
-                    _bp_text.append(f'<span style="color:{_color};font-weight:600;">{_lbl}<br>{_bp:.1f}%</span>')
-                    _bp_pos.append("outside")
+                    _bp_text.append("")  # 도넛 외곽 라벨 숨김 (leader line 문제 회피)
+                    _bp_pos.append("inside")
+                    _small_items.append((_lbl, _bp, _color))
+
+            # 도넛 위에 작은 카테고리 가로 legend (색칩 + 라벨 + %)
+            if _small_items:
+                _legend_html = ' &nbsp; '.join([
+                    f'<span style="color:{c};font-weight:600;">● {l} {p:.1f}%</span>'
+                    for l, p, c in _small_items
+                ])
+                st.markdown(
+                    f'<div style="text-align:center;font-size:0.85em;'
+                    f'margin:0 0 4px 0;line-height:1.6;">{_legend_html}</div>',
+                    unsafe_allow_html=True)
             fig_bp = px.pie(_donut_df, names="라벨", values="건수", color="라벨",
                             color_discrete_map=_bk_color_map, hole=0.5, template=PLOTLY_TPL,
                             category_orders={"라벨": _ordered_labels})
@@ -3114,7 +3124,7 @@ with tab1:
                 showarrow=False,
                 font=dict(size=24, color=C["navy"]))
             fig_bp.update_layout(
-                height=320, margin=dict(t=20, b=20, l=20, r=20),
+                height=290, margin=dict(t=10, b=10, l=10, r=10),
                 paper_bgcolor="white", plot_bgcolor="white",
                 showlegend=False)
             st.plotly_chart(fig_bp, use_container_width=True, config={'staticPlot': True})
