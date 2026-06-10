@@ -3035,11 +3035,11 @@ with tab1:
         st.markdown('<p class="sec-head">📊 만족도 구간 분포</p>', unsafe_allow_html=True)
 
         # ── [도넛 | 표] 2컬럼 — 도넛 컴팩트, 표 메인 ──
-        # 톤다운 컬러 (도넛 + 표 헤더 공통)
-        _TONED_BUCKET = {"90점 이상": "#4a7c4d", "70~90점": "#8fb785",
-                          "50~70점": "#d4a13c", "50점 미만": "#a95151"}
+        # 카테고리별 색 (톤다운하면서도 의미 명확: 빨/주/연두/진초록)
+        _TONED_BUCKET = {"90점 이상": "#4a7c4d", "70~90점": "#7eb37a",
+                          "50~70점": "#d97a35", "50점 미만": "#c25151"}
         _bk_colors_lr = [_TONED_BUCKET[b] for b in _bk_order_lr]
-        _bk_donut_col, _bk_tbl_col = st.columns([1, 1.8])
+        _bk_donut_col, _bk_tbl_col = st.columns([1, 1.4], gap="small")
 
         with _bk_donut_col:
             st.markdown('<span class="bk-row-marker" style="display:none;"></span>', unsafe_allow_html=True)
@@ -3054,23 +3054,31 @@ with tab1:
             _bk_color_map = {_SHORT_BUCKET[k]: _TONED_BUCKET[k] for k in BUCKET_ORDER
                              if k in _donut_df["구간"].values}
             _bp_total = int(_donut_df["건수"].sum())
-            # 큰 조각: 라벨+% 같이, 작은 조각: 라벨만 (plotly auto가 위치 결정)
+            # 큰 조각(>=50%): 안쪽 / 그 외: outside leader line 강제
+            # 라벨 글자 색을 카테고리 색과 매칭
             _bp_text = []
+            _bp_pos = []
             for _bi in range(len(_donut_df)):
                 _bc = int(_donut_df["건수"].iloc[_bi])
                 _bp = (_bc / max(_bp_total, 1)) * 100
+                _구간 = _donut_df["구간"].iloc[_bi]
                 _lbl = _donut_df["라벨"].iloc[_bi]
-                if _bp >= 5:
-                    _bp_text.append(f"{_lbl}<br>{_bp:.1f}%")  # 라벨 + %
+                _color = _TONED_BUCKET[_구간]
+                if _bp >= 50:
+                    # 큰 조각: 안쪽 흰글씨
+                    _bp_text.append(f"{_lbl}<br>{_bp:.1f}%")
+                    _bp_pos.append("inside")
                 else:
-                    _bp_text.append(f"{_lbl}")  # 라벨만
+                    # 작은 조각: 바깥 leader line, 글자색=카테고리 색
+                    _bp_text.append(f'<span style="color:{_color};font-weight:600;">{_lbl}<br>{_bp:.1f}%</span>')
+                    _bp_pos.append("outside")
             fig_bp = px.pie(_donut_df, names="라벨", values="건수", color="라벨",
                             color_discrete_map=_bk_color_map, hole=0.5, template=PLOTLY_TPL,
                             category_orders={"라벨": _ordered_labels})
             fig_bp.update_traces(
-                text=_bp_text, textposition="auto", textinfo="text",
+                text=_bp_text, textposition=_bp_pos, textinfo="text",
                 insidetextfont=dict(color="white", size=14),
-                outsidetextfont=dict(color="#333", size=14),
+                outsidetextfont=dict(size=13),
                 insidetextorientation="horizontal",
                 sort=False, direction="clockwise",
                 marker=dict(line=dict(color="#ffffff", width=2)),
@@ -3087,7 +3095,7 @@ with tab1:
                 showarrow=False,
                 font=dict(size=24, color=C["navy"]))
             fig_bp.update_layout(
-                height=320, margin=dict(t=20, b=20, l=60, r=60),
+                height=320, margin=dict(t=20, b=20, l=20, r=20),
                 paper_bgcolor="white", plot_bgcolor="white",
                 showlegend=False)
             st.plotly_chart(fig_bp, use_container_width=True, config={'staticPlot': True})
