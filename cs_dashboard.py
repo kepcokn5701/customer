@@ -3024,9 +3024,9 @@ with tab1:
             _title3 = f'본부 만족도 90점 이상 비중 {_p90:.1f}%로 {compare_label} 대비 (   )%p 감소'
         st.markdown('<p class="sec-head">📊 만족도 구간 분포</p>', unsafe_allow_html=True)
 
-        # ── [도넛 | 표] 2컬럼 — 표 쪽 살짝 넓게 ──
+        # ── [도넛 | 표] 2컬럼 — 도넛 컴팩트, 표 메인 ──
         _bk_colors_lr = [BUCKET_COLORS[b] for b in _bk_order_lr]
-        _bk_donut_col, _bk_tbl_col = st.columns([1, 1.3])
+        _bk_donut_col, _bk_tbl_col = st.columns([1, 1.8])
 
         with _bk_donut_col:
             st.markdown('<span class="bk-row-marker" style="display:none;"></span>', unsafe_allow_html=True)
@@ -3074,7 +3074,7 @@ with tab1:
                 showarrow=False,
                 font=dict(size=24, color=C["navy"]))
             fig_bp.update_layout(
-                height=320, margin=dict(t=20, b=20, l=100, r=100),
+                height=320, margin=dict(t=20, b=20, l=60, r=60),
                 paper_bgcolor="white", plot_bgcolor="white",
                 showlegend=False)
             st.plotly_chart(fig_bp, use_container_width=True, config={'staticPlot': True})
@@ -3086,21 +3086,7 @@ with tab1:
                 f'margin:0 0 12px 0;line-height:1.5;">{_title3}</p>',
                 unsafe_allow_html=True)
 
-            # ── KPI 카드 2개 (총 응답 / 90점 이상 비중) — 톤다운 ──
-            _kpi_html = (
-                '<div style="display:flex;gap:10px;margin-bottom:14px;">'
-                f'<div style="flex:1;background:#f8fafc;border-left:3px solid {C["navy"]};'
-                f'border-radius:8px;padding:10px 14px;">'
-                f'<div style="font-size:0.78em;color:#666;font-weight:600;">총 응답(건)</div>'
-                f'<div style="font-size:1.5em;font-weight:700;color:{C["navy"]};line-height:1.2;">{_bp_total:,}</div>'
-                f'</div>'
-                f'<div style="flex:1;background:#f8fafc;border-left:3px solid {C["green"]};'
-                f'border-radius:8px;padding:10px 14px;">'
-                f'<div style="font-size:0.78em;color:#666;font-weight:600;">90점 이상 비중(%)</div>'
-                f'<div style="font-size:1.5em;font-weight:700;color:{C["navy"]};line-height:1.2;">{_p90:.1f}%</div>'
-                f'</div>'
-                '</div>'
-            )
+            # KPI 카드 제거 — 도넛/sec-head와 정보 중복
 
             # ── 가로 줄만 있는 클린 표 (세로 테두리 제거) ──
             _hdr_brd = f'border-top:2px solid {C["navy"]};border-bottom:2px solid {C["navy"]};'
@@ -3140,7 +3126,7 @@ with tab1:
                     _bk3_html += f'<td style="padding:9px 6px;">-</td>'
                 _bk3_html += '</tr>'
             _bk3_html += '</table>'
-            st.markdown(_kpi_html + _bk3_html, unsafe_allow_html=True)
+            st.markdown(_bk3_html, unsafe_allow_html=True)
 
         # ════════════════════════════════════════════════════════
         # CS리포트 4번 — 사업소별 만족도 (군별 2단 표)
