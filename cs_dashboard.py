@@ -3086,17 +3086,15 @@ with tab1:
                 f'margin:0 0 12px 0;line-height:1.5;">{_title3}</p>',
                 unsafe_allow_html=True)
 
-            # ── KPI 카드 2개 (총 응답 / 90점 이상 비중) ──
+            # ── KPI 카드 2개 (총 응답 / 90점 이상 비중) — 톤다운 ──
             _kpi_html = (
                 '<div style="display:flex;gap:10px;margin-bottom:14px;">'
-                # 총 응답 카드
-                f'<div style="flex:1;background:#f0f7ff;border-left:4px solid {C["blue"]};'
+                f'<div style="flex:1;background:#f8fafc;border-left:3px solid {C["navy"]};'
                 f'border-radius:8px;padding:10px 14px;">'
                 f'<div style="font-size:0.78em;color:#666;font-weight:600;">총 응답(건)</div>'
                 f'<div style="font-size:1.5em;font-weight:700;color:{C["navy"]};line-height:1.2;">{_bp_total:,}</div>'
                 f'</div>'
-                # 90점 이상 비중 카드
-                f'<div style="flex:1;background:#f0fdf4;border-left:4px solid {C["green"]};'
+                f'<div style="flex:1;background:#f8fafc;border-left:3px solid {C["green"]};'
                 f'border-radius:8px;padding:10px 14px;">'
                 f'<div style="font-size:0.78em;color:#666;font-weight:600;">90점 이상 비중(%)</div>'
                 f'<div style="font-size:1.5em;font-weight:700;color:{C["navy"]};line-height:1.2;">{_p90:.1f}%</div>'
@@ -3132,11 +3130,9 @@ with tab1:
             if _diff_pcts is not None:
                 for d in _diff_pcts:
                     _v = _fmt_diff(d)
-                    if d is not None and not pd.isna(d):
-                        if d > 0:
-                            _v = f'<span style="color:{C["red"]}">{_v} ↑</span>'
-                        elif d < 0:
-                            _v = f'<span style="color:{C["blue"]}">{_v} ↓</span>'
+                    # 양수(증가)에만 ↑ + 컬러 포인트, 감소는 그대로
+                    if d is not None and not pd.isna(d) and d > 0:
+                        _v = f'<span style="color:{C["green"]};font-weight:700;">{_v} ↑</span>'
                     _bk3_html += f'<td style="padding:9px 6px;">{_v}</td>'
                 _bk3_html += f'<td style="padding:9px 6px;">-</td></tr>'
             else:
