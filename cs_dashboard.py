@@ -4610,6 +4610,15 @@ with tab_sol:
                 _ct_col = M.get("contract")
                 if _ct_col and _ct_col in _df_sel.columns:
                     st.markdown("##### 🎯 고객군별 미스매치 — 건수 비중 × 만족도")
+                    # 차트 보는 법 안내 (좌측 탭 영역과 시각적 대칭)
+                    st.markdown(
+                        '<div style="font-size:0.82em;color:#666;line-height:1.55;'
+                        'background:#f8fafc;border-left:3px solid #cbd5e1;border-radius:6px;'
+                        'padding:10px 14px;margin-bottom:10px;">'
+                        '가로축: <b>건수 비중(%)</b> · 세로축: <b>평균 만족도(점)</b> · 버블 크기: 응답 수<br>'
+                        '비중이 큰 카테고리일수록 지사 평균에 미치는 영향이 커서 우선 개선 대상입니다.'
+                        '</div>',
+                        unsafe_allow_html=True)
                     _pm_grp = _df_sel.groupby(_ct_col)["_점수100"].agg(["mean", "count"]).reset_index()
                     _pm_grp.columns = ["고객군", "만족도", "건수"]
                     _pm_grp = _pm_grp[_pm_grp["건수"] >= 2]
@@ -4652,21 +4661,48 @@ with tab_sol:
                             showlegend=False)
                         st.plotly_chart(fig_pm, use_container_width=True, config={'staticPlot': True})
 
-                        # 우하 사분면 경고
+                        # 우하 사분면 경고 + 지사 평균 기여도 계산
                         _pm_danger = _pm_grp[(_pm_grp["비중(%)"] >= _pm_x_mid) & (_pm_grp["만족도"] < _pm_y_mid)]
                         _pm_watch  = _pm_grp[(_pm_grp["비중(%)"] < _pm_x_mid) & (_pm_grp["만족도"] < _pm_y_mid)]
+                        _sel_avg_score = float(_df_sel["_점수100"].mean()) if not _df_sel.empty else 0.0
+                        _sel_total = int(len(_df_sel))
+
+                        def _calc_impact(_score, _cnt):
+                            """카테고리를 지사 평균까지 끌어올렸을 때 전체 평균 상승폭"""
+                            _gap = _sel_avg_score - _score
+                            if _gap <= 0 or _sel_total == 0:
+                                return 0.0
+                            return (_cnt * _gap) / _sel_total
+
                         if not _pm_danger.empty:
-                            _d_names = ", ".join(_pm_danger["고객군"].tolist())
-                            st.markdown(
-                                f'<div style="background:#ffebee;border-radius:8px;padding:8px 12px;font-size:0.85em;">'
-                                f'🚨 <b>1순위 개선:</b> {_d_names} — 비중이 높은데 만족도가 낮습니다.</div>',
-                                unsafe_allow_html=True)
+                            _d_html = (
+                                '<div style="background:#ffebee;border-radius:8px;padding:10px 14px;'
+                                'font-size:0.85em;line-height:1.65;">'
+                                '🚨 <b>1순위 개선</b> — 비중 큰 카테고리, 지사 평균 영향 큼<br>'
+                            )
+                            for _, _r in _pm_danger.iterrows():
+                                _imp = _calc_impact(_r["만족도"], _r["건수"])
+                                _d_html += (
+                                    f'• <b>{_r["고객군"]}</b> {_r["만족도"]:.1f}점 ({int(_r["건수"])}건) '
+                                    f'→ 지사 평균까지 끌어올리면 <b>+{_imp:.2f}점</b> 상승<br>'
+                                )
+                            _d_html += '</div>'
+                            st.markdown(_d_html, unsafe_allow_html=True)
+
                         if not _pm_watch.empty:
-                            _w_names = ", ".join(_pm_watch["고객군"].tolist())
-                            st.markdown(
-                                f'<div style="background:#fff8e1;border-radius:8px;padding:8px 12px;font-size:0.85em;">'
-                                f'⚡ <b>특이 리스크:</b> {_w_names} — 소수이지만 점수가 극도로 낮아 민원 위험</div>',
-                                unsafe_allow_html=True)
+                            _w_html = (
+                                '<div style="background:#fff8e1;border-radius:8px;padding:10px 14px;'
+                                'font-size:0.85em;line-height:1.65;margin-top:6px;">'
+                                '⚡ <b>특이 리스크</b> — 소수지만 점수 낮음, 개별 민원 위험<br>'
+                            )
+                            for _, _r in _pm_watch.iterrows():
+                                _imp = _calc_impact(_r["만족도"], _r["건수"])
+                                _w_html += (
+                                    f'• <b>{_r["고객군"]}</b> {_r["만족도"]:.1f}점 ({int(_r["건수"])}건) '
+                                    f'→ 평균 영향 <b>+{_imp:.2f}점</b> (작지만 개별 케이스 관리 필요)<br>'
+                                )
+                            _w_html += '</div>'
+                            st.markdown(_w_html, unsafe_allow_html=True)
                     else:
                         st.info("계약종별 데이터가 부족합니다.")
                 else:
