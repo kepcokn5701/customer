@@ -3365,17 +3365,23 @@ def _render_category_section(df, cat_col, cat_label, office_col, score_col, over
     _fact_md = "<br>".join(_fact_lines)
     _insight_md = "<br>".join(_insight_lines)
 
-    # ── [좌: 줄글] [우: KPI 2x2] — 높이 균형 ──
+    # ── [좌: 줄글 2박스] [우: KPI 2x2] — 높이 균형 ──
+    # 좌측 현황/인사이트 각각의 높이 = 우측 KPI 한 줄(2개)과 동일
     _smry_col, _kpi_col = st.columns([1.3, 1])
     _SMRY_MIN_H = 240  # 좌우 박스 균형용 최소 높이
+    _BOX_H = (_SMRY_MIN_H - 8) // 2  # = 116 (각 박스 높이)
+    _smry_box_style = (
+        f'background:#f8fafc;border-left:4px solid {C["navy"]};border-radius:8px;'
+        f'padding:12px 18px;font-size:0.9em;line-height:1.65;box-sizing:border-box;'
+        f'height:{_BOX_H}px;overflow:hidden;'
+    )
     with _smry_col:
         st.markdown(
-            f'<div style="background:#f8fafc;border-left:4px solid {C["navy"]};border-radius:8px;'
-            f'padding:14px 18px;margin-bottom:8px;font-size:0.92em;line-height:1.7;'
-            f'min-height:{_SMRY_MIN_H}px;box-sizing:border-box;">'
+            f'<div style="{_smry_box_style}margin-bottom:8px;">'
             f'<div style="font-weight:700;color:{C["navy"]};font-size:0.85em;margin-bottom:4px;">📋 현황</div>'
             f'{_fact_md}'
-            f'<div style="border-top:1px solid #e5e7eb;margin:10px 0;"></div>'
+            f'</div>'
+            f'<div style="{_smry_box_style}">'
             f'<div style="font-weight:700;color:{C["navy"]};font-size:0.85em;margin-bottom:4px;">💡 인사이트</div>'
             f'{_insight_md}'
             f'</div>',
