@@ -4612,9 +4612,9 @@ with tab_sol:
                     st.markdown("##### 🎯 고객군별 미스매치 — 건수 비중 × 만족도")
                     # 차트 보는 법 안내 (좌측 탭 영역과 시각적 대칭)
                     st.markdown(
-                        '<div style="font-size:0.82em;color:#666;line-height:1.55;'
+                        '<div style="font-size:0.82em;color:#666;line-height:1.4;'
                         'background:#f8fafc;border-left:3px solid #cbd5e1;border-radius:6px;'
-                        'padding:10px 14px;margin-bottom:10px;">'
+                        'padding:6px 12px;margin-bottom:4px;">'
                         '가로축: <b>건수 비중(%)</b> · 세로축: <b>평균 만족도(점)</b> · 버블 크기: 응답 수<br>'
                         '비중이 큰 카테고리일수록 지사 평균에 미치는 영향이 커서 우선 개선 대상입니다.'
                         '</div>',
