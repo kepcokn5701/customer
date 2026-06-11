@@ -1918,12 +1918,30 @@ st.markdown(f"""
     border-color: rgba(198, 40, 40, 0.30);
   }}
 
+  /* Tab2 현황/인사이트/KPI 카드 hover — 더 subtle한 -2px (그라데이션 X) */
+  .kpi-hover-card {{
+    transition: transform 0.25s ease, box-shadow 0.25s ease;
+  }}
+  .kpi-hover-card:hover {{
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(15, 23, 42, 0.10) !important;
+  }}
+
+  /* STEP 카드 + Tab2 chapter 카드 hover — 살짝 떠오름 */
+  .sol-step-card, .tab2-chapter-card {{
+    transition: transform 0.25s ease, box-shadow 0.25s ease;
+  }}
+  .sol-step-card:hover, .tab2-chapter-card:hover {{
+    transform: translateY(-3px);
+    box-shadow: 0 10px 28px rgba(15, 23, 42, 0.12), 0 4px 12px rgba(15, 23, 42, 0.08) !important;
+  }}
+
   /* Tab SOL Sticky STEP 인디케이터 */
   html {{ scroll-behavior: smooth; }}
   .sol-sticky-nav {{
     position: sticky;
     top: 0;
-    z-index: 99;
+    z-index: 999;
     background: rgba(255,255,255,0.96);
     backdrop-filter: blur(10px);
     -webkit-backdrop-filter: blur(10px);
@@ -2063,7 +2081,6 @@ st.markdown("""
   <span class="dash-badge">📡 항목별 · 계약종별 · 업무유형별 분석</span>
   <span class="dash-badge">🏢 지사 맞춤형 CS 솔루션</span>
   <span class="dash-badge">🎯 민원 조기 경보 시스템</span>
-  <span class="dash-badge">💌 경험고객 서한문 생성</span>
 </div>
 """, unsafe_allow_html=True)
 
@@ -2083,7 +2100,6 @@ if uploaded_file is None:
 5. **📡 항목별 · 계약종별 · 업무유형별 분석** — 교차 분석 및 사분면 비교
 6. **🏢 지사 맞춤형 CS 솔루션** — 지사 선택 후 단계별 정밀 진단
 7. **🎯 민원 조기 경보 시스템** — 잠재 민원고객 사전케어 리스트
-8. **💌 경험고객 서한문 생성** — 지사별 맞춤 서한문 생성 및 기념품 추천
         """)
     with c_r:
         st.markdown('<span class="onboard-marker" style="display:none;"></span>', unsafe_allow_html=True)
@@ -2610,13 +2626,12 @@ if M["date"]:
 # ══════════════════════════════════════════════════════════════
 #  13. 탭 구성
 # ══════════════════════════════════════════════════════════════
-tab1, tab3, tab_sol, tab_weekly, tab5, tab_letter = st.tabs([
+tab1, tab3, tab_sol, tab_weekly, tab5 = st.tabs([
     "📊  종합 현황",
     "📡  항목별 · 계약종별 · 업무유형별 분석",
     "🏢  지사 맞춤형 CS 솔루션",
     "📋  주간 리포트",
     "🎯  민원 조기 경보 시스템",
-    "💌  경험고객 서한문 생성",
 ])
 
 # ─────────────────────────────────────────────────────────────
@@ -2677,8 +2692,17 @@ with tab_weekly:
         st.markdown('<p class="sec-head">1. 주간 조사 결과</p>', unsafe_allow_html=True)
 
         if _wr_office and _wr_score:
-            _hdr = "#d6e4f0"
-            _bdr = "#b0b0b0"
+            # 다른 탭(Tab1·Tab2 CS 리포트)과 동일 라이트 톤 통일
+            _hdr = "#f1f5f9"      # 헤더 배경 (옅은 회색)
+            _bdr = "#e5e7eb"      # 테두리 (옅은 회색)
+            _sub_bg = "#fafbfc"   # 행 라벨 배경 (거의 흰색)
+            _sum_bg = "#f8fafc"   # 합계 행 배경
+            _wr_hdr_style = f'background:{_hdr};font-weight:700;color:{C["navy"]};'
+            _wr_card = (
+                'background:#ffffff;border-radius:12px;padding:16px 20px;'
+                'box-shadow:0 1px 3px rgba(15,23,42,0.04),0 4px 12px rgba(15,23,42,0.06);'
+                'margin-bottom:14px;overflow-x:auto;'
+            )
 
             if _wr_sel_view == "전체 (본부 종합)":
                 # ── 전체: 지사별 행 ──
@@ -2729,9 +2753,9 @@ with tab_weekly:
             _mo_all_s = _wr_mo_view["_점수100"].mean() if "_점수100" in _wr_mo_view.columns and not _wr_mo_view["_점수100"].dropna().empty else None
 
             _row_label = "구분" if _wr_sel_view == "전체 (본부 종합)" else "업무유형"
-            html_s1 = '<div style="overflow-x:auto;"><table style="border-collapse:collapse;width:100%;font-size:0.85em;text-align:center;">'
+            html_s1 = (f'<div style="{_wr_card}"><table style="border-collapse:collapse;width:100%;font-size:0.88em;text-align:center;">')
             # 1단 헤더: 조사결과 colspan=2
-            html_s1 += f'<tr style="background:{_hdr};font-weight:bold;">'
+            html_s1 += f'<tr style="{_wr_hdr_style}">'
             html_s1 += f'<th rowspan="2" style="border:1px solid {_bdr};padding:6px 8px;">{_row_label}</th>'
             html_s1 += f'<th rowspan="2" style="border:1px solid {_bdr};padding:6px 8px;">업무처리<br>건수</th>'
             html_s1 += f'<th rowspan="2" style="border:1px solid {_bdr};padding:6px 8px;">응답<br>호수</th>'
@@ -2740,24 +2764,24 @@ with tab_weekly:
             html_s1 += f'<th rowspan="2" style="border:1px solid {_bdr};padding:6px 8px;">비고</th>'
             html_s1 += '</tr>'
             # 2단 헤더: 금주 / 전주
-            html_s1 += f'<tr style="background:{_hdr};font-weight:bold;font-size:0.92em;">'
+            html_s1 += f'<tr style="{_wr_hdr_style}font-size:0.92em;">'
             html_s1 += f'<th style="border:1px solid {_bdr};padding:4px 6px;">금주</th>'
             html_s1 += f'<th style="border:1px solid {_bdr};padding:4px 6px;">전주</th>'
             html_s1 += '</tr>'
 
             for name, tt, tr, tw_s, lw_s, mo_s, rank_str in _s1_rows:
                 html_s1 += '<tr>'
-                html_s1 += f'<td style="border:1px solid {_bdr};padding:5px 8px;font-weight:bold;background:#f9f9f9;">{name}</td>'
-                html_s1 += f'<td style="border:1px solid {_bdr};padding:5px;">{tt:,}</td>'
-                html_s1 += f'<td style="border:1px solid {_bdr};padding:5px;">{tr:,}</td>'
-                html_s1 += f'<td style="border:1px solid {_bdr};padding:5px;font-weight:bold;">{_fv_delta(tw_s, lw_s)}</td>'
+                html_s1 += f'<td style="border:1px solid {_bdr};padding:6px 8px;font-weight:700;background:{_sub_bg};color:{C["navy"]};">{name}</td>'
+                html_s1 += f'<td style="border:1px solid {_bdr};padding:6px;">{tt:,}</td>'
+                html_s1 += f'<td style="border:1px solid {_bdr};padding:6px;">{tr:,}</td>'
+                html_s1 += f'<td style="border:1px solid {_bdr};padding:6px;font-weight:700;">{_fv_delta(tw_s, lw_s)}</td>'
                 html_s1 += f'<td style="border:1px solid {_bdr};padding:5px;">{_fv(lw_s)}</td>'
                 html_s1 += f'<td style="border:1px solid {_bdr};padding:5px;">{_fv(mo_s)}</td>'
                 html_s1 += f'<td style="border:1px solid {_bdr};padding:5px;">{rank_str}</td>'
                 html_s1 += '</tr>'
 
             # 합계
-            html_s1 += f'<tr style="background:#f0f4f8;font-weight:bold;">'
+            html_s1 += f'<tr style="background:{_sum_bg};font-weight:700;color:{C["navy"]};">'
             html_s1 += f'<td style="border:1px solid {_bdr};padding:5px 8px;">합계</td>'
             html_s1 += f'<td style="border:1px solid {_bdr};padding:5px;">{_tw_all_t:,}</td>'
             html_s1 += f'<td style="border:1px solid {_bdr};padding:5px;">{_tw_all_r:,}</td>'
@@ -2765,7 +2789,7 @@ with tab_weekly:
             html_s1 += f'<td style="border:1px solid {_bdr};padding:5px;">{_fv(_lw_all_s)}</td>'
             html_s1 += f'<td style="border:1px solid {_bdr};padding:5px;">{_fv(_mo_all_s)}</td>'
             html_s1 += f'<td style="border:1px solid {_bdr};padding:5px;">-</td>'
-            html_s1 += '</tr></table>'
+            html_s1 += '</tr></table></div>'
             html_s1 += '<div style="text-align:right;font-size:0.8em;margin-top:4px;color:#555;">(단위 : 건, 점)</div></div>'
             st.markdown(html_s1, unsafe_allow_html=True)
 
@@ -2807,27 +2831,27 @@ with tab_weekly:
                 _s2_data[bt] = (_tw_cnt, _tw_bs, _lw_bs, _mo_bs)
 
             # 가로형 테이블: 열=업무유형, 행=응답건수/금주(증감)/전주/월누계
-            html_s2 = '<div style="overflow-x:auto;"><table style="border-collapse:collapse;width:100%;font-size:0.85em;text-align:center;">'
-            html_s2 += f'<tr style="background:{_hdr};font-weight:bold;">'
-            html_s2 += f'<th style="border:1px solid {_bdr};padding:6px 10px;min-width:90px;">구분</th>'
+            html_s2 = (f'<div style="{_wr_card}"><table style="border-collapse:collapse;width:100%;font-size:0.88em;text-align:center;">')
+            html_s2 += f'<tr style="{_wr_hdr_style}">'
+            html_s2 += f'<th style="border:1px solid {_bdr};padding:7px 10px;min-width:90px;">구분</th>'
             for bt in _biz_types:
-                html_s2 += f'<th style="border:1px solid {_bdr};padding:6px 6px;">{bt}</th>'
+                html_s2 += f'<th style="border:1px solid {_bdr};padding:7px 6px;">{bt}</th>'
             html_s2 += '</tr>'
 
             # 행: 응답건수(금주)
-            html_s2 += f'<tr><td style="border:1px solid {_bdr};padding:5px 8px;font-weight:bold;background:#f9f9f9;">응답건수(금주)</td>'
+            html_s2 += f'<tr><td style="border:1px solid {_bdr};padding:6px 8px;font-weight:700;background:{_sub_bg};color:{C["navy"]};">응답건수(금주)</td>'
             for bt in _biz_types:
-                html_s2 += f'<td style="border:1px solid {_bdr};padding:5px;">{_s2_data[bt][0]:,}</td>'
+                html_s2 += f'<td style="border:1px solid {_bdr};padding:6px;">{_s2_data[bt][0]:,}</td>'
             html_s2 += '</tr>'
 
             # 행: 금주 점수
-            html_s2 += f'<tr><td style="border:1px solid {_bdr};padding:5px 8px;font-weight:bold;background:#f9f9f9;">금주</td>'
+            html_s2 += f'<tr><td style="border:1px solid {_bdr};padding:6px 8px;font-weight:700;background:{_sub_bg};color:{C["navy"]};">금주</td>'
             for bt in _biz_types:
-                html_s2 += f'<td style="border:1px solid {_bdr};padding:5px;font-weight:bold;">{_fv(_s2_data[bt][1])}</td>'
+                html_s2 += f'<td style="border:1px solid {_bdr};padding:6px;font-weight:700;">{_fv(_s2_data[bt][1])}</td>'
             html_s2 += '</tr>'
 
             html_s2 += '</table>'
-            html_s2 += '<div style="text-align:right;font-size:0.8em;margin-top:4px;color:#555;">(단위 : 건, 점)</div></div>'
+            html_s2 += '<div style="text-align:right;font-size:0.8em;margin-top:6px;color:#888;">(단위 : 건, 점)</div></div>'
             st.markdown(html_s2, unsafe_allow_html=True)
 
             # 엑셀 다운로드
@@ -2854,24 +2878,24 @@ with tab_weekly:
                             break
                 if _ha_ui_col:
                     st.markdown(f'<p style="font-size:0.95em;font-weight:bold;margin:16px 0 6px;">📍 함안의령지사 상세</p>', unsafe_allow_html=True)
-                    _ha_ui_html = '<div style="overflow-x:auto;"><table style="border-collapse:collapse;width:100%;font-size:0.85em;text-align:center;">'
-                    _ha_ui_html += f'<tr style="background:{_hdr};font-weight:bold;">'
-                    _ha_ui_html += f'<th style="border:1px solid {_bdr};padding:6px 10px;min-width:90px;">구분</th>'
+                    _ha_ui_html = (f'<div style="{_wr_card}"><table style="border-collapse:collapse;width:100%;font-size:0.88em;text-align:center;">')
+                    _ha_ui_html += f'<tr style="{_wr_hdr_style}">'
+                    _ha_ui_html += f'<th style="border:1px solid {_bdr};padding:7px 10px;min-width:90px;">구분</th>'
                     for bt in _biz_types:
-                        _ha_ui_html += f'<th style="border:1px solid {_bdr};padding:6px 6px;">{bt}</th>'
-                    _ha_ui_html += f'<th style="border:1px solid {_bdr};padding:6px 6px;">평균</th>'
+                        _ha_ui_html += f'<th style="border:1px solid {_bdr};padding:7px 6px;">{bt}</th>'
+                    _ha_ui_html += f'<th style="border:1px solid {_bdr};padding:7px 6px;">평균</th>'
                     _ha_ui_html += '</tr>'
                     for _region in ["함안", "의령"]:
                         _rg_data = _ha_ui_data[_ha_ui_data[_ha_ui_col].astype(str).str.strip() == _region]
                         _rg_avg = _rg_data["_점수100"].mean() if "_점수100" in _rg_data.columns and not _rg_data["_점수100"].dropna().empty else None
                         _rg_avg_str = f"({_rg_avg:.1f})" if _rg_avg is not None else ""
                         _ha_ui_html += '<tr>'
-                        _ha_ui_html += f'<td style="border:1px solid {_bdr};padding:5px 8px;font-weight:bold;background:#f9f9f9;">{_region}<br><span style="font-size:0.8em;color:#888;">{_rg_avg_str}</span></td>'
+                        _ha_ui_html += f'<td style="border:1px solid {_bdr};padding:6px 8px;font-weight:700;background:{_sub_bg};color:{C["navy"]};">{_region}<br><span style="font-size:0.8em;color:#888;font-weight:normal;">{_rg_avg_str}</span></td>'
                         for bt in _biz_types:
                             _rg_bt = _rg_data[_rg_data[_wr_biz] == bt]
                             _rg_bt_s = _rg_bt["_점수100"].mean() if "_점수100" in _rg_bt.columns and not _rg_bt["_점수100"].dropna().empty else None
-                            _ha_ui_html += f'<td style="border:1px solid {_bdr};padding:5px;">{_fv(_rg_bt_s)}</td>'
-                        _ha_ui_html += f'<td style="border:1px solid {_bdr};padding:5px;font-weight:bold;">{_fv(_rg_avg)}</td>'
+                            _ha_ui_html += f'<td style="border:1px solid {_bdr};padding:6px;">{_fv(_rg_bt_s)}</td>'
+                        _ha_ui_html += f'<td style="border:1px solid {_bdr};padding:6px;font-weight:700;">{_fv(_rg_avg)}</td>'
                         _ha_ui_html += '</tr>'
                     _ha_ui_html += '</table></div>'
                     st.markdown(_ha_ui_html, unsafe_allow_html=True)
@@ -2922,10 +2946,13 @@ with tab_weekly:
             _fb_show = _fb_df[_fb_cols].rename(columns=_fb_rename).reset_index(drop=True)
 
             # HTML 테이블 (부정 행 빨간 배경 강조)
-            _fb_html = '<div style="overflow-x:auto;max-height:420px;overflow-y:auto;"><table style="border-collapse:collapse;width:100%;font-size:0.84em;text-align:left;">'
-            _fb_html += f'<tr style="background:#d6e4f0;font-weight:bold;position:sticky;top:0;">'
+            _fb_html = (f'<div style="background:#ffffff;border-radius:12px;padding:16px 20px;'
+                        f'box-shadow:0 1px 3px rgba(15,23,42,0.04),0 4px 12px rgba(15,23,42,0.06);'
+                        f'margin-bottom:14px;overflow-x:auto;max-height:420px;overflow-y:auto;">'
+                        f'<table style="border-collapse:collapse;width:100%;font-size:0.87em;text-align:left;">')
+            _fb_html += f'<tr style="{_wr_hdr_style}position:sticky;top:0;">'
             for col in _fb_show.columns:
-                _fb_html += f'<th style="border:1px solid #b0b0b0;padding:6px 8px;">{col}</th>'
+                _fb_html += f'<th style="border:1px solid {_bdr};padding:7px 8px;">{col}</th>'
             _fb_html += '</tr>'
             for _, row in _fb_show.iterrows():
                 _sent = row.get("감성분류", "")
@@ -2942,11 +2969,11 @@ with tab_weekly:
                 for col in _fb_show.columns:
                     v = row[col]
                     if col == "감성분류":
-                        _fb_html += f'<td style="border:1px solid #b0b0b0;padding:5px 8px;text-align:center;">{_badge}</td>'
+                        _fb_html += f'<td style="border:1px solid {_bdr};padding:6px 8px;text-align:center;">{_badge}</td>'
                     elif col == "종합점수":
-                        _fb_html += f'<td style="border:1px solid #b0b0b0;padding:5px 8px;text-align:center;">{_fv(v)}</td>'
+                        _fb_html += f'<td style="border:1px solid {_bdr};padding:6px 8px;text-align:center;">{_fv(v)}</td>'
                     else:
-                        _fb_html += f'<td style="border:1px solid #b0b0b0;padding:5px 8px;">{v}</td>'
+                        _fb_html += f'<td style="border:1px solid {_bdr};padding:6px 8px;">{v}</td>'
                 _fb_html += '</tr>'
             _fb_html += '</table></div>'
             st.markdown(_fb_html, unsafe_allow_html=True)
@@ -3507,11 +3534,11 @@ def _render_category_section(df, cat_col, cat_label, office_col, score_col, over
     )
     with _smry_col:
         st.markdown(
-            f'<div style="{_smry_box_style}margin-bottom:8px;">'
+            f'<div class="kpi-hover-card" style="{_smry_box_style}margin-bottom:8px;">'
             f'<div style="font-weight:700;color:{C["navy"]};font-size:0.85em;margin-bottom:4px;">📋 현황</div>'
             f'{_fact_md}'
             f'</div>'
-            f'<div style="{_smry_box_style}">'
+            f'<div class="kpi-hover-card" style="{_smry_box_style}">'
             f'<div style="font-weight:700;color:{C["navy"]};font-size:0.85em;margin-bottom:4px;">💡 인사이트</div>'
             f'{_insight_md}'
             f'</div>',
@@ -3530,14 +3557,14 @@ def _render_category_section(df, cat_col, cat_label, office_col, score_col, over
         _kpi_a, _kpi_b = st.columns(2)
         with _kpi_a:
             st.markdown(
-                f'<div style="{_kpi_card_style}margin-bottom:8px;">'
+                f'<div class="kpi-hover-card" style="{_kpi_card_style}margin-bottom:8px;">'
                 f'<div style="font-size:0.75em;color:#666;">🏆 최고</div>'
                 f'<div style="font-size:1.0rem;font-weight:700;color:{C["navy"]};margin:4px 0 2px;">{_top[cat_label]}</div>'
                 f'<div style="font-size:0.95rem;font-weight:700;color:{C["green"]};">{_top["평균만족도"]:.1f}점</div>'
                 f'</div>',
                 unsafe_allow_html=True)
             st.markdown(
-                f'<div style="{_kpi_card_style}">'
+                f'<div class="kpi-hover-card" style="{_kpi_card_style}">'
                 f'<div style="font-size:0.75em;color:#666;">📉 평균 미달</div>'
                 f'<div style="font-size:1.0rem;font-weight:700;color:{C["navy"]};margin:4px 0 2px;">{len(_below)}개 / {len(grp)}개</div>'
                 f'<div style="font-size:0.8rem;color:#888;">{int(_below_ratio*100)}%</div>'
@@ -3545,14 +3572,14 @@ def _render_category_section(df, cat_col, cat_label, office_col, score_col, over
                 unsafe_allow_html=True)
         with _kpi_b:
             st.markdown(
-                f'<div style="{_kpi_card_style}margin-bottom:8px;">'
+                f'<div class="kpi-hover-card" style="{_kpi_card_style}margin-bottom:8px;">'
                 f'<div style="font-size:0.75em;color:#666;">⚠️ 최저</div>'
                 f'<div style="font-size:1.0rem;font-weight:700;color:{C["navy"]};margin:4px 0 2px;">{_bot[cat_label]}</div>'
                 f'<div style="font-size:0.95rem;font-weight:700;color:{C["red"]};">{_bot["평균만족도"]:.1f}점</div>'
                 f'</div>',
                 unsafe_allow_html=True)
             st.markdown(
-                f'<div style="{_kpi_card_style}">'
+                f'<div class="kpi-hover-card" style="{_kpi_card_style}">'
                 f'<div style="font-size:0.75em;color:#666;">📊 본부 평균</div>'
                 f'<div style="font-size:1.0rem;font-weight:700;color:{C["navy"]};margin:4px 0 2px;">{overall_avg:.1f}점</div>'
                 f'<div style="font-size:0.8rem;color:#888;">총 {_total_resp:,}건</div>'
@@ -3795,7 +3822,7 @@ with tab3:
         # ── Chapter 헤더 헬퍼 (메인 섹션 구분용) ──
         def _chapter_header(num, icon, title, subtitle, top_margin=48):
             return (
-                f'<div style="display:flex;align-items:center;'
+                f'<div class="tab2-chapter-card" style="display:flex;align-items:center;'
                 f'background:linear-gradient(135deg,#eef4fb 0%,#dbe6f5 100%);'
                 f'border-left:5px solid {C["navy"]};border-radius:12px;'
                 f'padding:18px 26px;margin:{top_margin}px 0 20px 0;'
@@ -4881,7 +4908,8 @@ with tab_sol:
                     margin=dict(t=30, b=30, l=60, r=60),
                     legend=dict(orientation="h", yanchor="bottom", y=-0.15),
                     showlegend=True)
-                st.plotly_chart(_fig, use_container_width=True, config={'staticPlot': True})
+                st.plotly_chart(_fig, use_container_width=True,
+                                config={'displayModeBar': False, 'displaylogo': False})
                 _gap = pd.DataFrame({cat_label: _cats, "지사": _r_sel, "기준": _r_ref})
                 _gap["편차"] = _gap["지사"] - _gap["기준"]
                 _good = _gap.sort_values("편차", ascending=False).head(3)
@@ -5150,7 +5178,7 @@ with tab_sol:
                         with _rt_cols[_ri]:
                             _voc_line = f'<div style="font-size:0.75em;color:#888;margin-top:4px;">"{_rk["voc"]}…"</div>' if _rk["voc"] else ""
                             st.markdown(
-                                f'<div style="background:{_bg};border:2px solid {_bd};'
+                                f'<div class="sol-tt-card sol-tt-bad" style="background:{_bg};border:2px solid {_bd};'
                                 'border-radius:10px;padding:12px;margin-bottom:8px;">'
                                 f'<div style="font-size:0.78em;color:#c62828;font-weight:700;">리스크 {_badge}</div>'
                                 f'<div style="font-size:1em;font-weight:800;margin:4px 0;">{_rk["계약종별"]} × {_rk["업무"]}</div>'
@@ -5222,13 +5250,43 @@ with tab_sol:
                     _sel_biz = _cell["업무"]
 
                     st.markdown("---")
+                    # ── 심층 진단 헤더 ───────────────────────────
                     st.markdown(
                         '<div style="background:linear-gradient(90deg,#4a148c,#6a1b9a);'
-                        'border-radius:10px;padding:14px 20px;color:white;margin:16px 0 12px;">'
-                        f'<span style="font-size:1.1em;font-weight:800;">'
-                        f'🔬 심층 진단 — {_sel_off} · {_sel_ct} × {_sel_biz}</span>'
-                        '<span style="font-size:0.82em;opacity:.8;margin-left:10px;">범인 특정 → VOC → AI 처방전</span>'
+                        'border-radius:10px;padding:16px 22px;color:white;margin:16px 0 8px;">'
+                        f'<div style="font-size:1.12em;font-weight:800;">'
+                        f'🔍 심층 진단 — {_sel_off} ▸ {_sel_ct} × {_sel_biz}</div>'
+                        '<div style="font-size:0.84em;opacity:.85;margin-top:4px;">'
+                        '6개 만족도 항목 중 가장 낮은 항목을 찾고, 끌어올렸을 때의 영향 추정</div>'
                         '</div>', unsafe_allow_html=True)
+
+                    # ── Breadcrumb (3단계 drill-down 시각화) ──────
+                    st.markdown(
+                        '<div style="display:flex;align-items:center;gap:10px;margin:6px 0 14px;'
+                        'font-size:0.88em;color:#475569;">'
+                        # Step 1: 지사별
+                        '<span style="display:inline-flex;align-items:center;gap:6px;'
+                        'background:#e2e8f0;padding:5px 12px;border-radius:14px;">'
+                        f'<span style="width:8px;height:8px;border-radius:50%;background:#475569;display:inline-block;"></span>'
+                        f'<b>지사별</b></span>'
+                        # 화살표
+                        '<span style="color:#cbd5e1;">━━</span>'
+                        # Step 2: 계약종별 × 업무별
+                        '<span style="display:inline-flex;align-items:center;gap:6px;'
+                        'background:#e2e8f0;padding:5px 12px;border-radius:14px;">'
+                        '<span style="width:8px;height:8px;border-radius:50%;background:#475569;display:inline-block;"></span>'
+                        f'<b>계약종별 × 업무별</b></span>'
+                        # 화살표
+                        '<span style="color:#cbd5e1;">━━</span>'
+                        # Step 3: 항목별 분석 (지금 단계, 보라 강조)
+                        '<span style="display:inline-flex;align-items:center;gap:6px;'
+                        'background:#f3e5f5;color:#4a148c;padding:5px 12px;border-radius:14px;'
+                        'border:1.5px solid #ce93d8;">'
+                        '<span style="width:8px;height:8px;border-radius:50%;background:#6a1b9a;display:inline-block;'
+                        'box-shadow:0 0 0 3px rgba(106,27,154,0.20);"></span>'
+                        '<b>항목별 분석</b> (지금)</span>'
+                        '</div>',
+                        unsafe_allow_html=True)
 
                     _c3_df = _df_sel[
                         (_df_sel[M["contract"]] == _sel_ct) &
@@ -5239,96 +5297,194 @@ with tab_sol:
                     if _c3_n == 0:
                         st.info(f"[{_sel_ct}] × [{_sel_biz}] 조합의 데이터가 없습니다.")
                     elif _c3_n > 0:
-
-                        st.markdown(f"**타겟**: [{_sel_ct}] 고객의 [{_sel_biz}] — **{_c3_n}건**")
+                        # 타겟 + 신뢰도
                         if _c3_n < 10:
                             st.warning(
-                                f"⚠️ 데이터 수가 적어(**{_c3_n}건**) 특정 사례에 의한 "
-                                "왜곡 가능성이 있으니 **VOC 원문을 중심으로** 판단하세요.")
+                                f"⚠️ **타겟: [{_sel_ct}] 고객의 [{_sel_biz}] — {_c3_n}건** · "
+                                f"데이터 수가 적어 특정 사례에 의한 왜곡 가능성이 있으니 "
+                                f"**VOC 원문을 중심으로** 판단하세요.")
+                        else:
+                            st.markdown(f"**타겟**: [{_sel_ct}] 고객의 [{_sel_biz}] — **{_c3_n}건**")
 
-                        # ── 세부항목 점수 + VOC (2컬럼) ──────────────
+                        # ── 세부항목 점수 (전부 0/NaN 컬럼은 자동 제외) ──────────────
                         _item_scores = {}
                         for _sc in _sol_score_cols:
                             _vals = pd.to_numeric(_c3_df[_sc], errors="coerce").dropna()
-                            if len(_vals) > 0:
+                            # 양수 값이 하나라도 있어야 포함 (이용편리성처럼 작년만 채워진 컬럼 제외)
+                            if len(_vals) > 0 and (_vals > 0).any():
                                 _item_scores[_sc] = round(float(_vals.mean()), 1)
 
                         if _item_scores:
                             _worst_item_name = min(_item_scores, key=_item_scores.get)
                             _worst_score = _item_scores[_worst_item_name]
 
+                            # ── 임팩트 계산 (지사 평균 기준) ──
+                            # 지사 전체에서 해당 항목 평균 → 끌어올림 target
+                            _wv = pd.to_numeric(_df_sel[_worst_item_name], errors="coerce").dropna()
+                            _branch_item_avg = round(float(_wv.mean()), 1) if len(_wv) > 0 else _sel_avg
+                            _item_gap = round(_branch_item_avg - _worst_score, 1)
+                            # 6개 항목 균등 가중 가정 → 조합 종합점수 변화
+                            _n_items = len(_item_scores)
+                            _combo_lift_est = round(_item_gap / _n_items, 2) if _item_gap > 0 else 0.0
+                            # 지사 평균 임팩트 = 조합 상승 × 조합건수 / 지사 전체건수
+                            _branch_impact = round(_combo_lift_est * _c3_n / max(len(_df_sel), 1), 3) if _combo_lift_est > 0 else 0.0
+
+                            # ── 좌우 박스 높이 동기화용 공통 패널 높이 ──
+                            _panel_h = max(220, _n_items * 30 + 50)
+                            # 좌(카드)와 우(차트) 균형 50:50
                             _c3_l, _c3_r = st.columns([1, 1])
 
                             with _c3_l:
-                                st.markdown("**📊 세부항목별 만족도 — 범인 특정**")
-                                _c3_colors = [
-                                    "#d32f2f" if k == _worst_item_name
-                                    else "#f57c00" if v < avg_score_100
-                                    else "#388e3c"
-                                    for k, v in _item_scores.items()
-                                ]
-                                fig_c3 = go.Figure(go.Bar(
-                                    y=list(_item_scores.keys()),
-                                    x=list(_item_scores.values()),
-                                    orientation="h", marker_color=_c3_colors,
-                                    text=[f"{v:.1f}" for v in _item_scores.values()],
-                                    textposition="outside",
-                                    hovertemplate="%{y}<br>%{x:.1f}점<extra></extra>"))
-                                fig_c3.add_vline(
-                                    x=avg_score_100, line_dash="dash", line_color=C["navy"],
-                                    annotation_text=f"본부 {avg_score_100:.1f}",
-                                    annotation_position="top right")
-                                _c3_x_min = max(0, min(_item_scores.values()) - 10)
-                                fig_c3.update_layout(
-                                    template=PLOTLY_TPL, height=max(250, len(_item_scores) * 45 + 60),
-                                    margin=dict(t=10, b=10, l=10, r=90),
-                                    xaxis=dict(range=[_c3_x_min, 110]))
-                                st.plotly_chart(fig_c3, use_container_width=True, config={'staticPlot': True})
-
-                                st.error(
-                                    f"🎯 **범인 확정**: {_sel_ct} 계약종별 · {_sel_biz} 업무에서 "
-                                    f"**{_worst_item_name}** 항목이 **{_worst_score}점** "
-                                    f"(본부 대비 {_worst_score - avg_score_100:+.1f}점)")
-
-                                _bm_best_txt = ""
+                                # 주요 의심 항목 카드 (높이 = _panel_h, flex 분배)
+                                _gap_to_branch = _worst_score - _branch_item_avg
+                                _impact_block = ""
+                                if _combo_lift_est > 0:
+                                    _impact_block = (
+                                        '<div style="background:white;border-radius:8px;padding:10px 14px;'
+                                        'margin-top:auto;border:1px solid #fbe9e7;">'
+                                        '<div style="font-size:0.78em;color:#666;margin-bottom:3px;font-weight:700;">'
+                                        '💡 끌어올렸을 때 영향 (추정)</div>'
+                                        f'<div style="font-size:0.85em;color:#333;line-height:1.65;">'
+                                        f'지사 평균({_branch_item_avg:.1f}점)까지 회복 시 — '
+                                        f'조합 종합 <b style="color:#c62828;">+{_combo_lift_est:.2f}점</b>, '
+                                        f'지사 평균 <b style="color:#c62828;">+{_branch_impact:.3f}점</b> 상승'
+                                        f'<span style="color:#888;font-size:0.88em;"> (6개 항목 균등 가중 가정)</span>'
+                                        f'</div></div>'
+                                    )
+                                else:
+                                    # 격차가 없거나 음수일 때는 안내 박스로 자리 메움 (높이 일관)
+                                    _impact_block = (
+                                        '<div style="background:white;border-radius:8px;padding:10px 14px;'
+                                        'margin-top:auto;border:1px solid #fbe9e7;">'
+                                        f'<div style="font-size:0.85em;color:#666;line-height:1.65;">'
+                                        f'이 항목은 지사 평균 항목 점수 이상으로 관리되고 있음. '
+                                        f'다른 항목 또는 VOC 원문을 함께 검토하세요.</div></div>'
+                                    )
+                                st.markdown(
+                                    f'<div style="background:linear-gradient(135deg,#ffebee 0%,#ffcdd2 100%);'
+                                    f'border:1px solid #ef9a9a;border-left:5px solid #c62828;'
+                                    f'border-radius:10px;padding:14px 18px;'
+                                    f'box-shadow:0 2px 8px rgba(198,40,40,0.10);'
+                                    f'min-height:{_panel_h}px;display:flex;flex-direction:column;">'
+                                    # 라벨
+                                    '<div style="font-size:0.76em;font-weight:800;color:#8b0000;'
+                                    'letter-spacing:1.5px;margin-bottom:4px;">🚨 주요 의심 항목</div>'
+                                    # 항목명
+                                    f'<div style="font-size:1.18em;font-weight:800;color:#3a0a0a;'
+                                    f'margin-bottom:6px;">{_worst_item_name}</div>'
+                                    # 점수 (큰 폰트)
+                                    f'<div style="display:flex;align-items:baseline;gap:10px;">'
+                                    f'<span style="font-size:2.3em;font-weight:900;color:#c62828;line-height:1;">'
+                                    f'{_worst_score:.1f}</span>'
+                                    f'<span style="font-size:0.95em;color:#666;font-weight:600;">점</span></div>'
+                                    # 격차 (지사 항목평균 대비)
+                                    f'<div style="font-size:0.85em;color:#555;margin-top:5px;">'
+                                    f'지사 평균 항목 점수({_branch_item_avg:.1f}점) 대비 '
+                                    f'<b style="color:#c62828;">{_gap_to_branch:+.1f}점</b></div>'
+                                    f'<div style="font-size:0.78em;color:#888;margin-top:2px;">'
+                                    f'※ 타겟 {_c3_n}건의 평균</div>'
+                                    # 임팩트 박스 (margin-top:auto로 카드 하단 고정)
+                                    f'{_impact_block}'
+                                    '</div>', unsafe_allow_html=True)
 
                             with _c3_r:
-                                st.markdown("**📝 실제 VOC 원문**")
+                                st.markdown(
+                                    '<p style="font-size:0.92em;font-weight:700;color:#0a2540;'
+                                    'margin:0 0 6px 0;">📊 항목별 점수 비교</p>',
+                                    unsafe_allow_html=True)
+                                # 점수 낮은 순으로 정렬 → 범인이 맨 위
+                                _sorted_items = sorted(_item_scores.items(), key=lambda x: x[1])
+                                _sorted_keys = [k for k, _ in _sorted_items]
+                                _sorted_vals = [v for _, v in _sorted_items]
+                                _sorted_colors = [
+                                    "#c62828" if k == _worst_item_name
+                                    else "#f57c00" if v < _sel_avg
+                                    else "#90a4ae"
+                                    for k, v in _sorted_items
+                                ]
+                                fig_c3 = go.Figure(go.Bar(
+                                    y=_sorted_keys, x=_sorted_vals,
+                                    orientation="h", marker_color=_sorted_colors,
+                                    text=[f"{v:.1f}" for v in _sorted_vals],
+                                    textposition="outside",
+                                    textfont=dict(size=11),
+                                    hovertemplate="%{y}<br>%{x:.1f}점<extra></extra>"))
+                                fig_c3.add_vline(
+                                    x=_sel_avg, line_dash="dash", line_color="#475569", line_width=1.5,
+                                    annotation_text=f"지사 {_sel_avg:.1f}",
+                                    annotation_position="top",
+                                    annotation_font_size=10)
+                                _c3_x_min = max(0, min(_sorted_vals) - 5)
+                                # 차트 높이 = 카드 높이 동기 / x축 최대 100 (점수 만점) / 우측 마진 축소
+                                fig_c3.update_layout(
+                                    template=PLOTLY_TPL,
+                                    height=_panel_h,
+                                    margin=dict(t=20, b=10, l=10, r=30),
+                                    xaxis=dict(range=[_c3_x_min, 100], tickfont=dict(size=10)),
+                                    yaxis=dict(tickfont=dict(size=11)))
+                                st.plotly_chart(fig_c3, use_container_width=True,
+                                                config={'displayModeBar': False, 'displaylogo': False})
+
+                            # ── VOC 원문 (전체 폭) ────────────────────
+                            if M.get("voc") and not _c3_df.empty:
+                                _c3_voc_valid_idx = (
+                                    _c3_df[M["voc"]].dropna()
+                                    .apply(lambda x: str(x).strip())
+                                    .loc[lambda s: (s.str.len() > 2) & (~s.isin(["응답없음", "nan", ""]))])
+                                _c3_vocs_idx = _c3_voc_valid_idx.head(10)
                                 _c3_voc_lines = ""
-                                if M.get("voc") and not _c3_df.empty:
-                                    _c3_voc_valid_idx = (
-                                        _c3_df[M["voc"]].dropna()
-                                        .apply(lambda x: str(x).strip())
-                                        .loc[lambda s: (s.str.len() > 2) & (~s.isin(["응답없음", "nan", ""]))])
-                                    _c3_vocs_idx = _c3_voc_valid_idx.head(10)
-                                    if not _c3_vocs_idx.empty:
-                                        _has_receipt = bool(M.get("receipt_no") and M["receipt_no"] in _c3_df.columns)
-                                        with st.expander(f"VOC {len(_c3_vocs_idx)}건 보기", expanded=True):
-                                            for _idx, _cv in _c3_vocs_idx.items():
-                                                _cv_hl = str(_cv)
-                                                for _nkw in VOC_HIGHLIGHT_KW:
-                                                    if _nkw in _cv_hl:
-                                                        _cv_hl = _cv_hl.replace(
-                                                            _nkw,
-                                                            '<mark style="background:#ffeb3b">'
-                                                            + _nkw + "</mark>")
-                                                _receipt_html = ""
-                                                if _has_receipt:
-                                                    _rn = str(_c3_df.at[_idx, M["receipt_no"]]).strip()
-                                                    if _rn and _rn not in ("nan", ""):
-                                                        _receipt_html = (
-                                                            f'<span style="color:{C["blue"]};font-weight:600;'
-                                                            f'font-size:0.8em;">[{_rn}]</span> ')
-                                                st.markdown(
-                                                    '<div style="border-left:3px solid #ef9a9a;'
-                                                    'padding:4px 10px;margin-bottom:4px;font-size:0.87em;">'
-                                                    + _receipt_html + _cv_hl + "</div>",
-                                                    unsafe_allow_html=True)
-                                        _c3_voc_lines = "\n".join(f"  - {v}" for v in _c3_vocs_idx)
-                                    else:
-                                        st.info("70점 미만 VOC가 없습니다.")
+                                if not _c3_vocs_idx.empty:
+                                    # 범인 항목명에서 한 단어 추출 → VOC에서도 강조
+                                    # 예: "이용 편리성" → "편리"
+                                    _wi_short = _worst_item_name.replace(" ", "").replace("도", "").replace("성", "")
+                                    _wi_keywords = [_wi_short[i:i+2] for i in range(len(_wi_short)-1)]
+                                    _wi_keywords = [k for k in _wi_keywords if len(k) == 2]
+
+                                    st.markdown(
+                                        f'<p style="font-size:0.95em;font-weight:700;color:#0a2540;'
+                                        f'margin:18px 0 8px 0;">📝 실제 VOC 원문 ({len(_c3_vocs_idx)}건)</p>',
+                                        unsafe_allow_html=True)
+                                    _has_receipt = bool(M.get("receipt_no") and M["receipt_no"] in _c3_df.columns)
+                                    with st.expander(f"VOC {len(_c3_vocs_idx)}건 펼쳐 보기", expanded=True):
+                                        for _idx, _cv in _c3_vocs_idx.items():
+                                            _cv_hl = str(_cv)
+                                            # 부정 키워드 하이라이트 (노랑)
+                                            for _nkw in VOC_HIGHLIGHT_KW:
+                                                if _nkw in _cv_hl:
+                                                    _cv_hl = _cv_hl.replace(
+                                                        _nkw,
+                                                        '<mark style="background:#ffeb3b">'
+                                                        + _nkw + "</mark>")
+                                            # 범인 항목 관련 단어 하이라이트 (보라 → "이 항목과 관련된 단서")
+                                            for _wkw in _wi_keywords:
+                                                if _wkw in _cv_hl and f'<mark style="background:#ffeb3b">{_wkw}' not in _cv_hl:
+                                                    _cv_hl = _cv_hl.replace(
+                                                        _wkw,
+                                                        f'<mark style="background:#e1bee7;color:#4a148c;font-weight:700;">'
+                                                        + _wkw + "</mark>")
+                                            _receipt_html = ""
+                                            if _has_receipt:
+                                                _rn = str(_c3_df.at[_idx, M["receipt_no"]]).strip()
+                                                if _rn and _rn not in ("nan", ""):
+                                                    _receipt_html = (
+                                                        f'<span style="color:{C["blue"]};font-weight:600;'
+                                                        f'font-size:0.8em;">[{_rn}]</span> ')
+                                            st.markdown(
+                                                '<div style="border-left:3px solid #ef9a9a;'
+                                                'padding:6px 12px;margin-bottom:4px;font-size:0.9em;line-height:1.6;">'
+                                                + _receipt_html + _cv_hl + "</div>",
+                                                unsafe_allow_html=True)
+                                    _c3_voc_lines = "\n".join(f"  - {v}" for v in _c3_vocs_idx)
                                 else:
-                                    st.info("VOC 컬럼이 설정되지 않았습니다.")
+                                    st.info("이 조합에 유효한 VOC 원문이 없습니다.")
+
+                            # ── 다음 단계 안내 ──────────────────────
+                            st.markdown(
+                                '<div style="background:linear-gradient(135deg,#e8f5e9 0%,#c8e6c9 100%);'
+                                'border-left:4px solid #2e7d32;border-radius:8px;padding:10px 16px;'
+                                'margin:14px 0 6px;font-size:0.9em;color:#1b5e20;">'
+                                '💊 종합 처방이 필요하면 → <b>STEP 4의 [AI 종합 처방전 생성]</b> 버튼을 누르세요'
+                                '</div>', unsafe_allow_html=True)
 
                         else:
                             st.info("세부항목 점수 데이터가 없습니다.")
@@ -5349,46 +5505,50 @@ with tab_sol:
                                      if v.strip() not in ("", "nan", "응답없음", "없음", "의견없음", "빈문서", "빈항목") and len(v.strip()) > 2]
                         if _voc_list:
                             _voc_sample = _voc_list[:40]
-                            try:
-                                import urllib.request
-                                _kw_prompt = (
-                                    f"아래는 {_sel_off}의 고객 VOC {len(_voc_sample)}건입니다.\n\n"
-                                    "아래 형식으로만 출력하세요. 다른 말 금지.\n\n"
-                                    "부정: (불만 키워드 3개, 쉼표 구분)\n"
-                                    "특이: (이 지사 고유 이슈 1개. 없으면 '없음')\n\n"
-                                    "규칙:\n"
-                                    "- 키워드는 구체적 명사형 2~5자 (예: 처리지연, 전화불통, 하청태도)\n"
-                                    "- '불만', '불편', '개선필요' 같은 포괄적 단어 금지\n"
-                                    "- 설명·인사·미사여구 금지. 형식만 출력.\n\n"
-                                    "VOC:\n"
-                                )
-                                for _v in _voc_sample:
-                                    _kw_prompt += f"- {_v}\n"
+                            with st.spinner(f"🤖 {_sel_off} VOC 키워드 분석 중..."):
+                                try:
+                                    import urllib.request
+                                    _kw_prompt = (
+                                        f"아래는 {_sel_off}의 고객 VOC {len(_voc_sample)}건입니다.\n\n"
+                                        "아래 형식으로만 출력하세요. 다른 말 금지.\n\n"
+                                        "부정: (불만 키워드 3개, 쉼표 구분)\n"
+                                        "특이: (이 지사 VOC에 자주 등장하는 고유한 패턴/이슈 1~2개, 쉼표 구분)\n\n"
+                                        "규칙:\n"
+                                        "- 키워드는 구체적 명사형 2~5자 (예: 처리지연, 전화불통, 하청태도)\n"
+                                        "- '불만', '불편', '개선필요' 같은 포괄적 단어 금지\n"
+                                        "- 부정/특이는 서로 겹치지 않게 다른 단어를 추출\n"
+                                        "- 특이는 진짜로 아무 고유 패턴이 안 보일 때만 '없음'. "
+                                        "  지역명, 시설명, 시간대, 상황(주말/새벽 등), 특정 절차나 인물 언급도 특이로 추출 가능\n"
+                                        "- 설명·인사·미사여구 금지. 형식만 출력.\n\n"
+                                        "VOC:\n"
+                                    )
+                                    for _v in _voc_sample:
+                                        _kw_prompt += f"- {_v}\n"
 
-                                _models = ["gemini-2.5-flash", "gemini-flash-latest", "gemini-2.5-flash-lite", "gemini-2.0-flash"]
-                                _ctx = ssl._create_unverified_context()
-                                for _model in _models:
-                                    _api_url = f"https://generativelanguage.googleapis.com/v1beta/models/{_model}:generateContent?key={_GEMINI_KEY}"
-                                    _payload = {"contents": [{"parts": [{"text": _kw_prompt}]}],
-                                                 "generationConfig": {"temperature": 0.2, "maxOutputTokens": 512}}
-                                    _req = urllib.request.Request(_api_url, data=json.dumps(_payload).encode("utf-8"),
-                                                                   headers={"Content-Type": "application/json"}, method="POST")
-                                    try:
-                                        with urllib.request.urlopen(_req, context=_ctx, timeout=15) as _resp:
-                                            _rbody = json.loads(_resp.read().decode("utf-8"))
-                                            _kw_text = _rbody["candidates"][0]["content"]["parts"][0]["text"].strip()
-                                            import re as _re_kw2
-                                            _neg_m = _re_kw2.search(r'부정[:：]\s*(.+)', _kw_text)
-                                            _spec_m = _re_kw2.search(r'특이[:：]\s*(.+)', _kw_text)
-                                            st.session_state[_voc_kw_key] = {
-                                                "부정": _neg_m.group(1).strip() if _neg_m else "",
-                                                "특이": _spec_m.group(1).strip() if _spec_m else "없음"
-                                            }
-                                            break
-                                    except Exception:
-                                        continue
-                            except Exception:
-                                pass
+                                    _models = ["gemini-2.5-flash", "gemini-flash-latest", "gemini-2.5-flash-lite", "gemini-2.0-flash"]
+                                    _ctx = ssl._create_unverified_context()
+                                    for _model in _models:
+                                        _api_url = f"https://generativelanguage.googleapis.com/v1beta/models/{_model}:generateContent?key={_GEMINI_KEY}"
+                                        _payload = {"contents": [{"parts": [{"text": _kw_prompt}]}],
+                                                     "generationConfig": {"temperature": 0.2, "maxOutputTokens": 512}}
+                                        _req = urllib.request.Request(_api_url, data=json.dumps(_payload).encode("utf-8"),
+                                                                       headers={"Content-Type": "application/json"}, method="POST")
+                                        try:
+                                            with urllib.request.urlopen(_req, context=_ctx, timeout=15) as _resp:
+                                                _rbody = json.loads(_resp.read().decode("utf-8"))
+                                                _kw_text = _rbody["candidates"][0]["content"]["parts"][0]["text"].strip()
+                                                import re as _re_kw2
+                                                _neg_m = _re_kw2.search(r'부정[:：]\s*(.+)', _kw_text)
+                                                _spec_m = _re_kw2.search(r'특이[:：]\s*(.+)', _kw_text)
+                                                st.session_state[_voc_kw_key] = {
+                                                    "부정": _neg_m.group(1).strip() if _neg_m else "",
+                                                    "특이": _spec_m.group(1).strip() if _spec_m else "없음"
+                                                }
+                                                break
+                                        except Exception:
+                                            continue
+                                except Exception:
+                                    pass
 
                     _kw_data = st.session_state.get(_voc_kw_key)
                     if _kw_data and isinstance(_kw_data, dict) and _kw_data.get("부정"):
@@ -5517,8 +5677,8 @@ with tab_sol:
                                            f'font-size:0.7em;font-weight:700;color:rgba(0,0,0,0.5);">'
                                            f'{_voc_sc:.0f}점</div>' if _voc_sc else '')
                                 _grid_html += (
-                                    f'<div style="position:relative;aspect-ratio:1/1;'
-                                    f'padding:24px 16px 18px;'
+                                    f'<div style="position:relative;aspect-ratio:5/4;'
+                                    f'padding:18px 16px 14px;'
                                     f'background:{_palette["bg"]};'
                                     f'box-shadow:2px 5px 12px rgba(0,0,0,0.14),'
                                     f'inset 0 -2px 3px rgba(0,0,0,0.04);'
@@ -5533,15 +5693,27 @@ with tab_sol:
                                     f'width:54px;height:14px;'
                                     f'background:rgba(255,255,255,0.6);'
                                     f'box-shadow:0 2px 3px rgba(0,0,0,0.10);"></div>'
-                                    # 본문 — 폰트 키움
-                                    f'<div style="font-size:1.08em;line-height:1.55;'
-                                    f'color:{_palette["text"]};font-weight:600;text-align:center;">'
+                                    # 본문 — 한국어 어미 보호(word-break:keep-all) + 행간 조정
+                                    f'<div style="font-size:1.05em;line-height:1.75;'
+                                    f'color:{_palette["text"]};font-weight:600;text-align:center;'
+                                    f'word-break:keep-all;line-break:strict;'
+                                    f'overflow-wrap:break-word;">'
                                     f'{_voc_display}</div>'
                                     f'{_sc_tag}</div>'
                                 )
                             _grid_html += '</div>'
                             st.markdown(_grid_html, unsafe_allow_html=True)
                             st.caption("※ '~해주세요', '~하면 좋겠다' 등 고객이 구체적 행동을 요청한 의견입니다. 즉시 조치 가능 여부를 검토하세요.")
+                        else:
+                            # 추출된 요청사항 0건 — 헤더 + 안내 메시지로 자리 유지
+                            st.markdown(_sol_sub("💬 고객 요청사항 — 구체적 개선 요청 (0건)", margin_top=28),
+                                        unsafe_allow_html=True)
+                            st.info("이번 분석에서 '~해주세요', '~하면 좋겠다' 형태의 구체적 요청 의견이 추출되지 않았습니다.")
+                    else:
+                        # 유효한 VOC 자체가 없음 — 헤더 + 안내
+                        st.markdown(_sol_sub("💬 고객 요청사항 — 구체적 개선 요청 (0건)", margin_top=28),
+                                    unsafe_allow_html=True)
+                        st.info("유효한 VOC 응답이 없어 요청사항을 추출할 수 없습니다.")
 
                 # ══════════════════════════════════════════════════
                 # STEP 4 — 처방: 어떻게 고칠까? (AI 종합 처방전)
@@ -5747,514 +5919,4 @@ with tab_sol:
 
 
 
-
-# ─────────────────────────────────────────────────────────────
-#  TAB LETTER  경험고객 서한문 생성
-# ─────────────────────────────────────────────────────────────
-with tab_letter:
-    st.markdown('<p class="sec-head">💌 경험고객 서한문 생성 — 지사 맞춤형 문구 · 시각화 미리보기 · 기념품 추천</p>',
-                unsafe_allow_html=True)
-
-    # ── 계절 테마 정의 (인제지사 스타일 참고) ──────────────────
-    _SEASON_THEMES = {
-        "봄 (3~5월)": {
-            "bg": "#fff8f0", "accent": "#e91e63", "sub": "#f8bbd0",
-            "border": "#f48fb1", "title_color": "#ad1457",
-            "greeting": "설레는 봄이 되시기를 바랍니다.",
-            "closing": "새싹이 움트는 봄날입니다.\n항상 건강 유의하시고 고객님의 가정과 일터에 사랑과 행복이 넘쳐나길 기원드립니다.",
-            "icon": "🌸", "season_name": "봄",
-        },
-        "여름 (6~8월)": {
-            "bg": "#e8f5e9", "accent": "#2e7d32", "sub": "#a5d6a7",
-            "border": "#66bb6a", "title_color": "#1b5e20",
-            "greeting": "활기찬 여름이 되시기를 바랍니다.",
-            "closing": "유난히 무더운 여름날입니다.\n항상 건강 유의하시고 고객님의 가정과 일터에 사랑과 행복이 넘쳐나길 기원드립니다.",
-            "icon": "🍉", "season_name": "여름",
-        },
-        "가을 (9~11월)": {
-            "bg": "#fff3e0", "accent": "#e65100", "sub": "#ffcc80",
-            "border": "#ff9800", "title_color": "#bf360c",
-            "greeting": "풍성한 가을 되시기를 바랍니다.",
-            "closing": "일교차가 심한 가을날입니다.\n항상 건강 유의하시고 고객님의 가정과 일터에 사랑과 행복이 넘쳐나길 기원드립니다.",
-            "icon": "🍂", "season_name": "가을",
-        },
-        "겨울 (12~2월)": {
-            "bg": "#e3f2fd", "accent": "#1565c0", "sub": "#90caf9",
-            "border": "#42a5f5", "title_color": "#0d47a1",
-            "greeting": "따뜻한 겨울 되시기를 바랍니다.",
-            "closing": "바람이 매서운 겨울날입니다.\n항상 건강 유의하시고 고객님의 가정과 일터에 사랑과 행복이 넘쳐나길 기원드립니다.",
-            "icon": "❄️", "season_name": "겨울",
-        },
-    }
-
-    # ── 기념품 추천 DB (계절×지역유형) ────────────────────────
-    _GIFT_DB = {
-        "봄": {
-            "공통": [
-                ("종량제 봉투 세트 (20L×10매)", "2,000원", "실용도 1위, 누구나 필요한 생필품"),
-                ("미니 손소독제 + 물티슈 세트", "2,500원", "외출 필수품, 봄나들이 시즌 활용"),
-                ("다용도 장바구니 (접이식)", "2,800원", "에코백 대용, 한전 로고 인쇄 가능"),
-                ("국화차/캐모마일 티백 세트", "2,500원", "봄철 환절기 건강 관리"),
-            ],
-            "농촌형": [("원예용 면장갑 세트 (3켤레)", "2,000원", "영농기 앞두고 실용적")],
-            "해안형": [("자외선 차단 쿨토시", "2,500원", "야외 작업 필수품")],
-            "도심형": [("텀블러 (350ml 미니)", "3,000원", "직장인 필수템, 다회용 실천")],
-        },
-        "여름": {
-            "공통": [
-                ("종량제 봉투 세트 (20L×10매)", "2,000원", "실용도 1위, 누구나 필요한 생필품"),
-                ("쿨링 넥밴드 (아이스타올)", "2,500원", "폭염 대비 필수품"),
-                ("휴대용 미니 선풍기 (USB 충전)", "3,000원", "여름 필수 아이템"),
-                ("모기 기피 팔찌 + 패치 세트", "2,000원", "여름 야외활동 실용품"),
-            ],
-            "농촌형": [("쿨링 아이스조끼 (간이형)", "3,000원", "영농기 폭염 대비")],
-            "해안형": [("방수 파우치", "2,500원", "해양 레저 시즌 활용")],
-            "도심형": [("아이스 텀블러 (콜드컵)", "3,000원", "사무실 필수템")],
-        },
-        "가을": {
-            "공통": [
-                ("종량제 봉투 세트 (20L×10매)", "2,000원", "실용도 1위, 누구나 필요한 생필품"),
-                ("고급 양말 세트 (3켤레)", "2,500원", "환절기 보온, 남녀노소 실용"),
-                ("핫초코/곡물차 티백 세트", "2,500원", "가을 환절기 따뜻한 음료"),
-                ("다용도 극세사 행주 세트", "2,000원", "주방 필수품, 실용성 최고"),
-            ],
-            "농촌형": [("LED 미니 손전등", "2,500원", "일몰 빠른 가을철 야외 활동")],
-            "해안형": [("방풍 넥워머", "2,800원", "해풍 대비 가을 필수품")],
-            "도심형": [("보온 머그컵 (뚜껑형)", "3,000원", "사무실 가을겨울 필수템")],
-        },
-        "겨울": {
-            "공통": [
-                ("종량제 봉투 세트 (20L×10매)", "2,000원", "실용도 1위, 누구나 필요한 생필품"),
-                ("핫팩 세트 (10개입)", "2,000원", "겨울 필수 보온용품"),
-                ("기모 장갑 (터치스크린 호환)", "2,800원", "방한 + 스마트폰 사용 가능"),
-                ("보온 텀블러 (350ml)", "3,000원", "따뜻한 음료 휴대, 실용성 높음"),
-            ],
-            "농촌형": [("방한 귀마개 + 핫팩", "2,500원", "겨울 야외 작업 보온 세트")],
-            "해안형": [("방풍 비니 모자", "3,000원", "해풍 방한 필수품")],
-            "도심형": [("USB 보온 컵받침", "3,000원", "사무실 데스크 보온 아이템")],
-        },
-    }
-
-    # ── 불만 키워드 → 약속 문장 매핑 (서한문 프롬프트용) ──
-    _COMPLAINT_TO_PROMISE = {
-        "정전": "안정적인 전력공급에 더욱 만전을 기하겠습니다",
-        "단전": "안정적인 전력공급에 더욱 만전을 기하겠습니다",
-        "지연": "신속한 업무 처리로 고객님의 시간을 소중히 여기겠습니다",
-        "오래": "대기 시간 단축을 위해 지속적으로 개선하겠습니다",
-        "기다림": "대기 시간 단축을 위해 지속적으로 개선하겠습니다",
-        "지체": "대기 시간 단축을 위해 지속적으로 개선하겠습니다",
-        "불친절": "친절하고 정중한 응대를 최우선으로 하겠습니다",
-        "무시": "고객님 한 분 한 분의 목소리에 귀 기울이겠습니다",
-        "냉담": "고객님 한 분 한 분의 목소리에 귀 기울이겠습니다",
-        "요금": "투명하고 정확한 요금 안내에 힘쓰겠습니다",
-        "과금": "투명하고 정확한 요금 안내에 힘쓰겠습니다",
-        "과다": "투명하고 정확한 요금 안내에 힘쓰겠습니다",
-        "고장": "설비 점검과 유지보수에 더욱 힘쓰겠습니다",
-        "불량": "설비 점검과 유지보수에 더욱 힘쓰겠습니다",
-        "오류": "정확한 업무 처리를 위해 꼼꼼히 점검하겠습니다",
-        "실수": "정확한 업무 처리를 위해 꼼꼼히 점검하겠습니다",
-        "착오": "정확한 업무 처리를 위해 꼼꼼히 점검하겠습니다",
-        "반복": "같은 불편이 되풀이되지 않도록 근본적으로 개선하겠습니다",
-        "여전히": "같은 불편이 되풀이되지 않도록 근본적으로 개선하겠습니다",
-        "위험": "안전한 전기 사용 환경을 만들기 위해 최선을 다하겠습니다",
-        "안전": "안전한 전기 사용 환경을 만들기 위해 최선을 다하겠습니다",
-    }
-
-    # ── 불만 키워드 → 기념품 매핑 (VOC 맞춤 추천용) ──
-    _COMPLAINT_GIFT = {
-        "정전": [("LED 비상 랜턴", "3,000원", "정전 시 즉시 활용 가능한 실용 아이템")],
-        "단전": [("LED 비상 랜턴", "3,000원", "정전 시 즉시 활용 가능한 실용 아이템")],
-        "요금": [("에너지 절약 멀티탭", "3,500원", "대기전력 차단으로 요금 절감 도움")],
-        "과금": [("에너지 절약 멀티탭", "3,500원", "대기전력 차단으로 요금 절감 도움")],
-        "고장": [("휴대용 멀티 충전케이블", "2,500원", "전기 관련 실용 아이템으로 호감 형성")],
-        "불친절": [("프리미엄 보온텀블러", "3,500원", "정성이 담긴 사과의 의미 전달")],
-        "위험": [("가정용 소화기 (미니)", "3,500원", "전기 안전 관련 실용 아이템")],
-        "안전": [("가정용 소화기 (미니)", "3,500원", "전기 안전 관련 실용 아이템")],
-    }
-
-    # ── 계약종별 → 톤 가이드 매핑 ──
-    _CONTRACT_TONE = {
-        "주택용": "가정과 일상을 중심으로 편안하고 따뜻한 톤",
-        "농사용": "농번기의 수고를 격려하고 계절 변화에 공감하는 톤",
-        "산업용": "사업 번창을 기원하며 안정적 전력공급의 신뢰를 강조하는 톤",
-        "일반용": "사업 운영을 응원하며 효율적 서비스를 강조하는 톤",
-        "교육용": "교육 현장의 가치를 존중하며 안정적 학습환경을 약속하는 톤",
-    }
-
-    # ── 지역유형 → 톤 가이드 매핑 ──
-    _REGION_TONE = {
-        "농촌형": "소박하고 정감 있는 톤, 자연·계절 묘사를 살짝 더",
-        "해안형": "바다·포구 등 해안 정서를 은은히, 중간 톤",
-        "도심형": "간결하고 신뢰감 있는 톤, 효율·서비스 품질 강조",
-        "공통": "보편적이고 따뜻한 톤",
-    }
-
-    def _get_region_type(kb_context: str) -> str:
-        """KB context에서 지역유형 추출"""
-        if not kb_context:
-            return "공통"
-        if "농촌" in kb_context:
-            return "농촌형"
-        if "해안" in kb_context:
-            return "해안형"
-        if "도심" in kb_context or "공단" in kb_context:
-            return "도심형"
-        return "공통"
-
-    # ── 서한문 시각화 (matplotlib, 인제 스타일) ────────────────
-    def _render_letter_preview(office_name, season_key, body_text, theme):
-        """matplotlib로 인제지사 스타일 서한문 미리보기 이미지 생성"""
-        fig, ax = plt.subplots(1, 1, figsize=(8, 11))
-        ax.set_xlim(0, 100)
-        ax.set_ylim(0, 140)
-        ax.axis("off")
-        fig.patch.set_facecolor(theme["bg"])
-
-        _fp_title = fm.FontProperties(fname=FONT_PATH, size=14, weight="bold") if FONT_PATH else fm.FontProperties(size=14, weight="bold")
-        _fp_body = fm.FontProperties(fname=FONT_PATH, size=9.5) if FONT_PATH else fm.FontProperties(size=9.5)
-        _fp_body_bold = fm.FontProperties(fname=FONT_PATH, size=9.5, weight="bold") if FONT_PATH else fm.FontProperties(size=9.5, weight="bold")
-        _fp_head = fm.FontProperties(fname=FONT_PATH, size=18, weight="bold") if FONT_PATH else fm.FontProperties(size=18, weight="bold")
-        _fp_footer = fm.FontProperties(fname=FONT_PATH, size=10, weight="bold") if FONT_PATH else fm.FontProperties(size=10, weight="bold")
-        _fp_small = fm.FontProperties(fname=FONT_PATH, size=8) if FONT_PATH else fm.FontProperties(size=8)
-
-        # 상단 헤더 영역 (컬러 배경)
-        from matplotlib.patches import FancyBboxPatch, Rectangle
-        header_bg = FancyBboxPatch((0, 118), 100, 22, boxstyle="round,pad=0",
-                                    facecolor=theme["accent"], alpha=0.12, edgecolor="none")
-        ax.add_patch(header_bg)
-
-        # KEPCO 로고 텍스트
-        ax.text(5, 136, "KEPCO", fontsize=11, fontweight="bold", color=theme["accent"],
-                fontproperties=_fp_title, va="top")
-
-        # 타이틀
-        ax.text(50, 131, f"세상에 빛을, 이웃에 사랑을", ha="center", va="top",
-                fontproperties=_fp_head, color=theme["title_color"])
-        ax.text(50, 124, f"한국전력공사입니다.", ha="center", va="top",
-                fontproperties=_fp_head, color=theme["title_color"])
-
-        # 계절 텍스트 (matplotlib은 이모지 렌더링 불가하므로 한글로 표시)
-        _season_label = {"봄": "春", "여름": "夏", "가을": "秋", "겨울": "冬"}.get(
-            theme.get("season_name", ""), "")
-        ax.text(92, 135, _season_label, fontsize=22, ha="center", va="top",
-                fontproperties=_fp_head, color=theme["accent"], alpha=0.4)
-
-        # 본문 영역 테두리
-        body_box = FancyBboxPatch((6, 18), 88, 96, boxstyle="round,pad=1",
-                                   facecolor="white", edgecolor=theme["border"],
-                                   linewidth=1.5, alpha=0.9)
-        ax.add_patch(body_box)
-
-        # 본문 텍스트 줄바꿈 처리
-        _lines = []
-        for paragraph in body_text.split("\n"):
-            if paragraph.strip() == "":
-                _lines.append("")
-            else:
-                wrapped = textwrap.wrap(paragraph, width=38)
-                _lines.extend(wrapped if wrapped else [""])
-
-        # 줄 수에 따라 간격 동적 조절 (텍스트 잘림 방지)
-        _total_lines = len(_lines)
-        _available_height = 88  # y=110 ~ y=22
-        _line_gap = min(4.5, max(3.0, _available_height / max(_total_lines, 1)))
-
-        y_pos = 110
-        for _line in _lines:
-            if y_pos < 22:
-                break
-            _fp_use = _fp_body_bold if _line.startswith("한국전력") else _fp_body
-            _fs = min(9.5, 9.5 * (4.5 / max(_line_gap, 3.0)))
-            ax.text(10, y_pos, _line, fontproperties=_fp_use, fontsize=_fs,
-                    color="#333333", va="top")
-            y_pos -= _line_gap
-
-        # 날짜 + 지사명 (본문 아래)
-        from datetime import datetime as _dt
-        _now = _dt.now()
-        _date_str = f"{_now.year}년 {_now.month}월"
-        if y_pos >= 26:
-            ax.text(50, y_pos - 2, _date_str, ha="center", va="top",
-                    fontproperties=_fp_body, color="#555555")
-            ax.text(50, y_pos - 7, f"한국전력공사 {office_name}", ha="center", va="top",
-                    fontproperties=_fp_body_bold, color=theme["accent"])
-
-        # 하단 연락처 바
-        footer_bg = Rectangle((0, 0), 100, 16, facecolor=theme["accent"], alpha=0.85)
-        ax.add_patch(footer_bg)
-        ax.text(50, 11, "365일 24시간 전기상담 / 고장신고 : 국번없이 123", ha="center", va="center",
-                fontproperties=_fp_footer, color="white", fontsize=10)
-        ax.text(50, 5, "모바일·인터넷 업무신청 : 한전ON(online.kepco.co.kr)", ha="center", va="center",
-                fontproperties=_fp_small, color="white", fontsize=8)
-
-        plt.tight_layout(pad=0.5)
-        buf = io.BytesIO()
-        fig.savefig(buf, format="png", dpi=150, bbox_inches="tight",
-                    facecolor=fig.get_facecolor())
-        plt.close(fig)
-        buf.seek(0)
-        return buf
-
-    # ── UI 레이아웃 ──────────────────────────────────────────
-    st.markdown("""<div class="card-blue">
-    <b>💡 사용법</b><br>
-    ① 지사·계절 선택 → ② AI 서한문 생성 → ③ 미리보기 확인 & 문구 복사 → ④ 기념품 세트 확인<br>
-    생성된 문구를 <a href="https://gamma.app/" target="_blank" style="color:#1a73e8;font-weight:bold;">감마AI</a> · <a href="https://www.miricanvas.com/" target="_blank" style="color:#1a73e8;font-weight:bold;">미리캔버스</a> 등 디자인 도구에 붙여넣어 완성하세요.
-    </div>""", unsafe_allow_html=True)
-
-    _lt_c1, _lt_c2 = st.columns([1, 1])
-
-    with _lt_c1:
-        # 지사 선택
-        _lt_offices = list(FULL_OFFICE_KB.keys())
-        _lt_office_display = []
-        for _k in _lt_offices:
-            # 복합 키에서 대표명 추출
-            _lt_office_display.append(_k.split("/")[0] if "/" in _k else _k)
-        _lt_sel_idx = st.selectbox("지사 선택", range(len(_lt_offices)),
-                                    format_func=lambda i: _lt_office_display[i],
-                                    key="letter_office")
-        _lt_sel_key = _lt_offices[_lt_sel_idx]
-        _lt_sel_name = _lt_office_display[_lt_sel_idx]
-        _lt_kb = FULL_OFFICE_KB[_lt_sel_key]
-
-    with _lt_c2:
-        # 계절 선택
-        _lt_season = st.selectbox("계절 선택", list(_SEASON_THEMES.keys()), key="letter_season")
-        _lt_theme = _SEASON_THEMES[_lt_season]
-
-    st.markdown("---")
-
-    # ── 지사별 데이터 집계 (서한문 톤·기념품 반영용) ──────────
-    _lt_region_type = _get_region_type(_lt_kb.get("context", ""))
-
-    # (a) 상위 불만 키워드 (top 3) — 사전 계산된 _pre_neg_res 재활용
-    _lt_top_complaints = []
-    _lt_branch_df = df_f[df_f[M["office"]] == _lt_sel_name] if M.get("office") else df_f
-    if M.get("voc") and len(_lt_branch_df) > 0:
-        try:
-            _lt_neg_kws = _pre_neg_res.loc[_lt_branch_df.index].apply(lambda x: x[1])
-            _lt_kw_counter = Counter([kw for kws in _lt_neg_kws for kw in kws])
-            _lt_top_complaints = [kw for kw, _ in _lt_kw_counter.most_common(3)]
-        except Exception:
-            pass
-
-    # (b) 주요 계약종별
-    _lt_dominant_contract = ""
-    _lt_contract_pct = ""
-    if M.get("contract") and M["contract"] in _lt_branch_df.columns and len(_lt_branch_df) > 0:
-        try:
-            _vc = _lt_branch_df[M["contract"]].value_counts()
-            _lt_dominant_contract = _vc.index[0]
-            _lt_contract_pct = f"{_vc.iloc[0] / len(_lt_branch_df) * 100:.0f}%"
-        except Exception:
-            pass
-
-    # ── 기본 템플릿 문구 (인제 스타일 기반) ──────────────────
-    _region_desc = _lt_kb.get("context", "").split("/")[0].strip().replace("[", "").replace("]", "") if _lt_kb.get("context") else ""
-    _lt_region_name = _lt_sel_key.replace("지사", "").replace("/", "·")
-    # 지사명에서 관할 지역 추출
-    _lt_area = _lt_sel_name.replace("지사", "")
-
-    from datetime import datetime as _dt_now
-    _lt_now = _dt_now.now()
-    _lt_date_str = f"{_lt_now.year}년 {_lt_now.month}월"
-
-    _lt_default_body = (
-        f"고객님, 안녕하십니까. 한국전력 {_lt_sel_name}입니다.\n"
-        f"항상 한국전력에 보내주시는 성원에 진심으로 감사드리며\n"
-        f"{_lt_theme['greeting']}\n"
-        f"\n"
-        f"한국전력 {_lt_sel_name}는 {_lt_area} 일원을 관할하며\n"
-        f"안정적인 전력공급과 최상의 서비스 제공을 제1의 목표로 삼아 늘 고민하고 있습니다.\n"
-        f"또한 {_lt_sel_name}에서는 언제나 고객님의 목소리에 귀 기울이기 위해 노력하고 있으며,\n"
-        f"친절·정확·신속한 서비스로 고객님께서 \"매우만족\" 하실 수 있도록 항상 노력하겠습니다.\n"
-        f"\n"
-        f"전기 사용과 관련하여 미흡하거나 궁금하신 사항이 있으실 경우\n"
-        f"한전 고객센터(국번없이 123) 또는 한전ON으로 언제든지 연락주시기 바랍니다.\n"
-        f"\n"
-        f"{_lt_theme['closing']}\n"
-        f"\n"
-        f"{_lt_date_str}\n"
-        f"한국전력공사 {_lt_sel_name}"
-    )
-
-    # ── AI 서한문 생성 or 기본 템플릿 ────────────────────────
-    _lt_body_key = f"letter_body_{_lt_sel_key}_{_lt_season}"
-    _lt_ta_key = f"letter_textarea_{_lt_sel_key}_{_lt_season}"
-
-    if _lt_body_key not in st.session_state:
-        st.session_state[_lt_body_key] = _lt_default_body
-
-    _lt_col_preview, _lt_col_text = st.columns([1, 1])
-
-    with _lt_col_text:
-        st.markdown(f"### {_lt_theme['icon']} {_lt_sel_name} · {_lt_theme['season_name']} 서한문")
-
-        # 데이터 반영 상태 캡션
-        _lt_caption_parts = []
-        if _lt_dominant_contract:
-            _lt_caption_parts.append(f"주요 고객: {_lt_dominant_contract}({_lt_contract_pct})")
-        if _lt_top_complaints:
-            _lt_caption_parts.append(f"주요 개선 요청: {', '.join(_lt_top_complaints)}")
-        if _lt_caption_parts:
-            st.caption(f"📊 {' │ '.join(_lt_caption_parts)}")
-
-        if st.button("🤖 AI 맞춤 문구 생성", key="letter_ai_btn", type="primary", use_container_width=True):
-            if not GEMINI_AVAILABLE:
-                st.error("Gemini API 키가 설정되지 않았습니다. `.env` 파일에 `GEMINI_API_KEY`를 설정해주세요.")
-            else:
-                # 불만 키워드 → 약속 문장 힌트 (중복 제거)
-                _lt_promises = list(dict.fromkeys(
-                    _COMPLAINT_TO_PROMISE[kw] for kw in _lt_top_complaints if kw in _COMPLAINT_TO_PROMISE))
-                _lt_promise_hint = ("특히 다음 약속을 자연스럽게 녹여주세요: " + " / ".join(_lt_promises)) if _lt_promises else ""
-                _lt_prompt = (
-                    f"당신은 따뜻하고 진심 어린 편지를 쓰는 작가입니다. "
-                    f"한국전력공사 {_lt_sel_name}에서 경험고객에게 보내는 {_lt_theme['season_name']} 서한문(감사 편지)을 작성하세요.\n\n"
-                    f"[작성 대상]\n"
-                    f"- 지사: 한국전력 {_lt_sel_name} (관할: {_lt_area})\n"
-                    f"- 계절: {_lt_theme['season_name']}\n"
-                    f"- 날짜: {_lt_date_str}\n\n"
-                    f"[서한문 구조 — 반드시 5개 문단 모두 포함, 문단 사이 빈 줄]\n"
-                    f"1문단) 인사 + 계절감: '고객님, 안녕하십니까. 한국전력 {_lt_sel_name}입니다.'로 시작. "
-                    f"{_lt_theme['season_name']}의 정취를 담은 서정적 인사 1~2문장 (해당 지역의 자연·풍경을 은은히 녹여주세요)\n"
-                    f"2문단) 감사: 변함없이 한국전력을 믿고 이용해주시는 고객 여러분께 진심 어린 감사 표현 2~3문장. "
-                    f"고객 한 분 한 분의 소중함을 느낄 수 있는 따뜻한 문장으로 작성\n"
-                    f"3문단) 약속: {_lt_sel_name}는 {_lt_area} 일원을 관할하며 안정적 전력공급과 최상의 서비스를 약속. "
-                    f"친절·정확·신속한 서비스로 고객님께서 '매우만족' 하실 수 있도록 늘 노력하겠다는 다짐 2~3문장. "
-                    f"{_lt_promise_hint}\n"
-                    f"4문단) 안내: 전기 사용 관련 미흡하거나 궁금하신 사항은 "
-                    f"한전 고객센터(국번없이 123) 또는 한전ON(online.kepco.co.kr)으로 연락 안내\n"
-                    f"5문단) 마무리: {_lt_theme['season_name']}에 맞는 건강·행복 기원 인사 + '감사합니다.'\n\n"
-                    f"[형식]\n"
-                    f"- 마지막에 반드시 '{_lt_date_str}' 과 '한국전력공사 {_lt_sel_name}'을 넣으세요\n"
-                    f"- 전체 분량: 12~18줄 (충분히 정성스럽게)\n"
-                    f"- 본문 텍스트만 출력 (제목, 번호, 이모지, 영어, 마크다운 서식 금지)\n\n"
-                    f"[문체 지침]\n"
-                    f"- 담백하고 격식 있는 공공기관 서한문 톤. 따뜻하되 절제된 표현\n"
-                    f"- 계절감은 첫 인사에서 한두 문장 정도만 간결하게\n"
-                    f"- 지역 자연환경은 1곳만 짧게 언급하거나 생략해도 무방\n"
-                    f"- 대등한 위치에서 감사를 전하는 어조 (저자세·과잉 겸손 금지)\n"
-                    f"- 고객층 톤: {_CONTRACT_TONE.get(_lt_dominant_contract, '보편적이고 따뜻한 톤')}\n"
-                    f"- 지역 톤: {_REGION_TONE.get(_lt_region_type, '보편적이고 따뜻한 톤')}\n\n"
-                    f"[절대 금지]\n"
-                    f"- '국민기업', '국민 기업', '국민과 함께' 표현 금지\n"
-                    f"- '감사할 따름', '송구', '부족하나마', '미력하나마' 등 과잉 겸손 표현 금지\n"
-                    f"- '빛이 되어드리겠습니다', '든든한 에너지' 등 과도한 비유 금지\n"
-                    f"- 발전소, 에너지 산업, 인구 구성 언급 금지\n"
-                )
-                with st.spinner("AI가 맞춤 문구를 작성하고 있습니다..."):
-                    try:
-                        import urllib.request
-                        # gemini-2.5-pro: 감성적 글쓰기 최적 (무료 100회/일)
-                        # gemini-2.5-flash-lite: thinking 없는 빠른 폴백 (무료 1000회/일)
-                        _models = ["gemini-2.5-pro", "gemini-pro-latest", "gemini-2.5-flash", "gemini-2.5-flash-lite"]
-                        _payload = {"contents": [{"parts": [{"text": _lt_prompt}]}],
-                                     "generationConfig": {"temperature": 0.75, "maxOutputTokens": 2048}}
-                        _ctx = ssl._create_unverified_context()
-                        _body = None
-                        for _model in _models:
-                            _api_url = f"https://generativelanguage.googleapis.com/v1beta/models/{_model}:generateContent?key={_GEMINI_KEY}"
-                            _req = urllib.request.Request(_api_url, data=json.dumps(_payload).encode("utf-8"),
-                                                           headers={"Content-Type": "application/json"}, method="POST")
-                            try:
-                                with urllib.request.urlopen(_req, context=_ctx, timeout=90) as _resp:
-                                    _body = json.loads(_resp.read().decode("utf-8"))
-                                break
-                            except urllib.error.HTTPError as _http_err:
-                                if _http_err.code in (429, 503):
-                                    continue
-                                raise
-                        if _body is None:
-                            st.error("모든 AI 모델의 일일 한도가 소진되었습니다. 내일 다시 시도해주세요.")
-                        else:
-                            _ai_letter = _body["candidates"][0]["content"]["parts"][0]["text"].strip()
-                            # 마크다운 코드블럭 제거
-                            _ai_letter = re.sub(r"^```[a-z]*\n?", "", _ai_letter)
-                            _ai_letter = re.sub(r"\n?```$", "", _ai_letter.strip())
-                            st.session_state[_lt_body_key] = _ai_letter
-                            # text_area 위젯 키도 동기화 (Streamlit 위젯 키 우선 문제 방지)
-                            if _lt_ta_key in st.session_state:
-                                del st.session_state[_lt_ta_key]
-                            st.rerun()
-                    except Exception as e:
-                        st.error(f"AI 서한문 생성 중 오류: {e}")
-
-        if st.button("🔄 기본 템플릿으로 초기화", key="letter_reset_btn", use_container_width=True):
-            st.session_state[_lt_body_key] = _lt_default_body
-            if _lt_ta_key in st.session_state:
-                del st.session_state[_lt_ta_key]
-            st.rerun()
-
-        # 편집 가능한 텍스트 영역
-        _lt_edited = st.text_area(
-            "서한문 내용 (직접 수정 가능)",
-            value=st.session_state[_lt_body_key],
-            height=350,
-            key=f"letter_textarea_{_lt_sel_key}_{_lt_season}")
-        st.session_state[_lt_body_key] = _lt_edited
-
-        # 복사용 텍스트 출력
-        st.markdown("**📋 복사용 텍스트**")
-        st.code(_lt_edited, language=None)
-        st.caption("위 텍스트 박스 우측 상단 복사 버튼(📋)을 눌러 복사하세요.")
-
-    with _lt_col_preview:
-        st.markdown(f"### 👁️ 미리보기")
-        _lt_buf = _render_letter_preview(_lt_sel_name, _lt_season, _lt_edited, _lt_theme)
-        st.image(_lt_buf, use_container_width=True,
-                 caption=f"{_lt_sel_name} · {_lt_theme['season_name']} 서한문 레이아웃 미리보기")
-        st.markdown("※ 실제 서한문은 <a href='https://gamma.app/' target='_blank' style='color:#1a73e8;'>감마AI</a> / <a href='https://www.miricanvas.com/' target='_blank' style='color:#1a73e8;'>미리캔버스</a>에서 계절 일러스트를 추가하여 완성하세요.", unsafe_allow_html=True)
-
-    # ── 기념품 세트 추천 ─────────────────────────────────────
-    st.markdown("---")
-    st.markdown(f"### 🎁 {_lt_theme['season_name']} 추천 기념품 세트 — {_lt_sel_name}")
-
-    _lt_season_name = _lt_theme["season_name"]
-    _lt_gifts_common = _GIFT_DB.get(_lt_season_name, {}).get("공통", [])
-    _lt_gifts_region = _GIFT_DB.get(_lt_season_name, {}).get(_lt_region_type, [])
-
-    st.markdown(f'<div class="card-teal">'
-                f'<b>📍 {_lt_sel_name} 지역유형:</b> {_lt_region_type} '
-                f'({_lt_kb.get("context", "").split(".")[0] if _lt_kb.get("context") else "정보 없음"})'
-                f'</div>', unsafe_allow_html=True)
-
-    _gc_list = st.columns(2)
-
-    with _gc_list[0]:
-        st.markdown("**공통 추천 (어떤 지사든 인기 보장)**")
-        _gift_table = []
-        for _gname, _gprice, _gdesc in _lt_gifts_common:
-            _gift_table.append({"기념품": _gname, "예상 단가": _gprice, "추천 이유": _gdesc})
-        if _gift_table:
-            st.dataframe(pd.DataFrame(_gift_table), use_container_width=True, hide_index=True)
-
-    with _gc_list[1]:
-        st.markdown(f"**{_lt_region_type} 특화 추천**")
-        _gift_region_table = []
-        for _gname, _gprice, _gdesc in _lt_gifts_region:
-            _gift_region_table.append({"기념품": _gname, "예상 단가": _gprice, "추천 이유": _gdesc})
-        if _gift_region_table:
-            st.dataframe(pd.DataFrame(_gift_region_table), use_container_width=True, hide_index=True)
-        else:
-            st.info("공통 추천을 활용하세요.")
-
-    # 추천 조합 카드
-    st.markdown("**💡 추천 조합 (2~3천원 예산)**")
-    _combo_items = []
-    if _lt_gifts_common:
-        _combo_items.append(_lt_gifts_common[0][0])  # 종량제 봉투
-    if _lt_gifts_region:
-        _combo_items.append(_lt_gifts_region[0][0])
-    elif len(_lt_gifts_common) > 1:
-        _combo_items.append(_lt_gifts_common[1][0])
-
-    st.markdown(
-        f'<div style="background:linear-gradient(135deg,{_lt_theme["bg"]},{_lt_theme["sub"]}30);'
-        f'border:2px solid {_lt_theme["border"]};border-radius:12px;padding:20px;'
-        f'text-align:center;font-size:1.1em;">'
-        f'{_lt_theme["icon"]} <b>{_lt_theme["season_name"]} 베스트 조합</b><br><br>'
-        f'<span style="font-size:1.3em;">{"  +  ".join(_combo_items)}</span><br><br>'
-        f'<span style="color:{_lt_theme["accent"]};font-weight:bold;">서한문과 함께 동봉 시 고객 감동 효과 극대화!</span>'
-        f'</div>', unsafe_allow_html=True)
 
