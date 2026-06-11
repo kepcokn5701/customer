@@ -596,9 +596,9 @@ VOC_HIGHLIGHT_KW = [
     # 요금·제도
     "과금","과다","요금","청구","납부","감면","할인","연체","체납",
     "계약","해지","이전","명의변경","폐전","신증설",
-    # 절차·처리
+    # 절차·처리 — '처리'는 너무 일반적이라 제외
     "재방문","지연","지체","방치","미처리","미흡","누락","중복",
-    "민원","접수","처리","답변","회신","약속",
+    "민원","접수","답변","회신","약속",
     # 안전·사고
     "위험","안전","사고","화재","폭발","합선",
 ]
@@ -1880,6 +1880,95 @@ st.markdown(f"""
     background: transparent !important;
     box-shadow: none !important;
   }}
+
+  /* STEP 1 강점/약점 TOP3 카드 — hover 시 살짝 떠오름 (ppainfo 스타일) */
+  .sol-tt-card {{
+    position: relative;
+    transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
+    overflow: hidden;
+    border: 1px solid transparent;
+  }}
+  .sol-tt-card:hover {{
+    transform: translateY(-3px);
+    box-shadow: 0 8px 24px rgba(15, 23, 42, 0.10);
+  }}
+  .sol-tt-card::before {{
+    content: "";
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+    opacity: 0;
+    transition: opacity 0.25s;
+  }}
+  .sol-tt-card:hover::before {{
+    opacity: 1;
+  }}
+  /* 강점 카드: 초록 액센트 바 */
+  .sol-tt-card.sol-tt-good::before {{
+    background: linear-gradient(90deg, transparent, #2e7d32, transparent);
+  }}
+  .sol-tt-card.sol-tt-good:hover {{
+    border-color: rgba(46, 125, 50, 0.30);
+  }}
+  /* 약점 카드: 빨강 액센트 바 */
+  .sol-tt-card.sol-tt-bad::before {{
+    background: linear-gradient(90deg, transparent, #c62828, transparent);
+  }}
+  .sol-tt-card.sol-tt-bad:hover {{
+    border-color: rgba(198, 40, 40, 0.30);
+  }}
+
+  /* Tab SOL Sticky STEP 인디케이터 */
+  html {{ scroll-behavior: smooth; }}
+  .sol-sticky-nav {{
+    position: sticky;
+    top: 0;
+    z-index: 99;
+    background: rgba(255,255,255,0.96);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border-bottom: 1px solid #e2e8f0;
+    padding: 10px 16px;
+    margin: 0 -16px 18px -16px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 8px;
+    box-shadow: 0 2px 8px rgba(15,23,42,0.04);
+  }}
+  .sol-sticky-nav a {{
+    text-decoration: none;
+    color: #5a6577;
+    font-weight: 700;
+    font-size: 0.88rem;
+    padding: 6px 14px;
+    border-radius: 20px;
+    transition: all 0.2s;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }}
+  .sol-sticky-nav a:hover {{
+    background: #f1f5f9;
+    color: #0a2540;
+  }}
+  .sol-sticky-nav .step-divider {{
+    width: 20px;
+    height: 2px;
+    background: #cbd5e1;
+    border-radius: 1px;
+  }}
+  .sol-sticky-nav .step-num {{
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    font-size: 0.75rem;
+    font-weight: 800;
+    color: white;
+  }}
   [data-testid="stExpander"]:has(.no-border-expander) summary {{
     border: none !important;
     background: transparent !important;
@@ -2360,6 +2449,16 @@ def _load_compare_file(_uploaded):
                 _f.loc[_biz_mask, M["business"]].astype(str).str.strip()
                 .map(lambda x: _BIZ_RENAME.get(x, x))
             )
+        # ── 계약종별 그룹핑 (메인이 _계약종별 가상 컬럼 사용 중이면 동일하게 적용) ──
+        if M.get("contract") == "_계약종별":
+            # 메인에서 원본 계약종 컬럼을 _계약종별로 그룹핑했으므로 비교 파일도 동일하게
+            # 메인의 _group_contract을 적용하려면 원본 컬럼명이 필요한데, 비교 파일도 보통 같은 raw 컬럼명 사용
+            # 가능한 원본 컬럼명 후보 — 비교 파일 컬럼 중 _계약종별이 없으면 raw 후보를 시도
+            if "_계약종별" not in _f.columns:
+                for _cand in ["계약종별", "계약종", "계약종류"]:
+                    if _cand in _f.columns:
+                        _f["_계약종별"] = _f[_cand].apply(_group_contract)
+                        break
         _avg = None
         if M["score"] and M["score"] in _f.columns:
             _sc = normalize_score_100(_f[M["score"]])
@@ -3204,9 +3303,15 @@ with tab1:
             if prev_df_f is not None and "_점수100" in prev_df_f.columns and M["office"] in prev_df_f.columns:
                 _prev_ofc_stats = prev_df_f.groupby(M["office"])["_점수100"].mean().round(1)
 
-            # 군별 최고 점수 지사 찾기
+            # 표시명 ↔ 엑셀 실제 지사명 매핑 (직할 표시지만 엑셀엔 "경남본부"로 들어옴)
+            _OFC_DATA_KEY = {"직할": "경남본부"}
+            def _data_key(o):
+                return _OFC_DATA_KEY.get(o, o)
+
+            # 군별 최고 점수 지사 찾기 (매핑된 키로 조회)
             def _top_in_group(group_list):
-                _candidates = [(o, _ofc_stats.get(o)) for o in group_list if o in _ofc_stats.index]
+                _candidates = [(o, _ofc_stats.get(_data_key(o)))
+                               for o in group_list if _data_key(o) in _ofc_stats.index]
                 _candidates = [(o, s) for o, s in _candidates if s is not None and not pd.isna(s)]
                 if not _candidates:
                     return None
@@ -3234,13 +3339,15 @@ with tab1:
                     if i < len(grp):
                         _ofc = grp[i]
                         _disp_name = _ofc.replace("지사", "")
-                        _score = _ofc_stats.get(_ofc) if _ofc in _ofc_stats.index else None
+                        # 데이터 조회는 매핑된 키로 (직할 → 경남본부)
+                        _ofc_data = _data_key(_ofc)
+                        _score = _ofc_stats.get(_ofc_data) if _ofc_data in _ofc_stats.index else None
                         if _score is not None and not pd.isna(_score):
                             _score_str = f"{_score:.1f}"
                             _diff_hq_str = _fmt_diff_colored(round(_score - _hq_avg, 1))
                             _diff_prev_str = "-"
-                            if _prev_ofc_stats is not None and _ofc in _prev_ofc_stats.index:
-                                _prev_s = _prev_ofc_stats.get(_ofc)
+                            if _prev_ofc_stats is not None and _ofc_data in _prev_ofc_stats.index:
+                                _prev_s = _prev_ofc_stats.get(_ofc_data)
                                 if _prev_s is not None and not pd.isna(_prev_s):
                                     _diff_prev_str = _fmt_diff_colored(round(_score - _prev_s, 1))
                         else:
@@ -4511,22 +4618,104 @@ with tab_sol:
             st.warning(f"{_sel_off}의 데이터가 없습니다.")
             st.stop()
 
+        # ── Sticky STEP 인디케이터 (스크롤 따라 상단 고정) ──
+        st.markdown(
+            '<div class="sol-sticky-nav">'
+            '<a href="#sol-step-1"><span class="step-num" style="background:linear-gradient(135deg,#1565c0 0%,#0d47a1 100%);">1</span> 진단</a>'
+            '<span class="step-divider"></span>'
+            '<a href="#sol-step-2"><span class="step-num" style="background:linear-gradient(135deg,#c62828 0%,#8b0000 100%);">2</span> 우선순위</a>'
+            '<span class="step-divider"></span>'
+            '<a href="#sol-step-3"><span class="step-num" style="background:linear-gradient(135deg,#6a1b9a 0%,#4a148c 100%);">3</span> 단서</a>'
+            '<span class="step-divider"></span>'
+            '<a href="#sol-step-4"><span class="step-num" style="background:linear-gradient(135deg,#2e7d32 0%,#1b5e20 100%);">4</span> 처방</a>'
+            '</div>',
+            unsafe_allow_html=True)
+
         # ══════════════════════════════════════════════════════
         # LEVEL 2 — 지사별 정밀 진단 (Diagnosis)
         # ══════════════════════════════════════════════════════
 
-        # ── Section band 헬퍼 (탭2 chapter 카드와 같은 패턴, 번호 없는 슬림 버전) ──
-        def _sol_band(icon, title, subtitle=""):
-            _sub = (f'<div style="font-size:0.82rem;color:#5a6577;margin-top:3px;'
+        # ── STEP 카드 헬퍼 (스크롤 진입 시 살짝 반짝이는 애니메이션 포함) ──
+        def _sol_step(step_no, icon, title, subtitle=""):
+            # STEP별 컬러 차별화 — 단계 흐름 시각적으로 인지
+            _step_palette = {
+                1: {"badge_bg": "linear-gradient(135deg,#1565c0 0%,#0d47a1 100%)", "shadow": "rgba(21,101,192,0.30)"},  # 파랑
+                2: {"badge_bg": "linear-gradient(135deg,#c62828 0%,#8b0000 100%)", "shadow": "rgba(198,40,40,0.30)"},  # 빨강(긴급)
+                3: {"badge_bg": "linear-gradient(135deg,#6a1b9a 0%,#4a148c 100%)", "shadow": "rgba(106,27,154,0.30)"},  # 보라
+                4: {"badge_bg": "linear-gradient(135deg,#2e7d32 0%,#1b5e20 100%)", "shadow": "rgba(46,125,50,0.30)"},   # 초록(처방)
+            }
+            _pal = _step_palette.get(step_no, _step_palette[1])
+            _sub = (f'<div style="font-size:0.83rem;color:#5a6577;margin-top:4px;'
                     f'letter-spacing:-0.2px;">{subtitle}</div>') if subtitle else ""
             return (
-                f'<div style="background:linear-gradient(135deg,#eef4fb 0%,#dbe6f5 100%);'
-                f'border-left:5px solid {C["navy"]};border-radius:10px;'
-                f'padding:14px 22px;margin:36px 0 18px 0;'
-                f'box-shadow:0 1px 2px rgba(15,23,42,0.04);">'
-                f'<div style="font-size:1.15rem;font-weight:700;color:{C["navy"]};'
+                f'<div id="sol-step-{step_no}" class="sol-step-card" '
+                f'style="display:flex;align-items:center;scroll-margin-top:70px;'
+                f'background:linear-gradient(135deg,#eef4fb 0%,#dbe6f5 100%);'
+                f'border-left:5px solid {C["navy"]};border-radius:12px;'
+                f'padding:16px 26px;margin:40px 0 18px 0;'
+                f'box-shadow:0 1px 3px rgba(15,23,42,0.04),0 4px 12px rgba(15,23,42,0.06);">'
+                # STEP 뱃지 — 컬러 박스 + 큰 숫자
+                f'<div style="background:{_pal["badge_bg"]};color:white;'
+                f'border-radius:10px;padding:8px 16px;margin-right:22px;'
+                f'min-width:88px;text-align:center;'
+                f'box-shadow:0 4px 12px {_pal["shadow"]};">'
+                f'<div style="font-size:0.62rem;letter-spacing:2px;font-weight:700;'
+                f'opacity:0.85;margin-bottom:-2px;">STEP</div>'
+                f'<div style="font-size:1.85rem;font-weight:900;line-height:1;'
+                f'letter-spacing:-1px;">{step_no}</div>'
+                f'</div>'
+                # 제목 + 부제
+                f'<div style="flex:1;">'
+                f'<div style="font-size:1.2rem;font-weight:700;color:{C["navy"]};'
                 f'letter-spacing:-0.3px;">{icon} {title}</div>'
-                f'{_sub}</div>'
+                f'{_sub}</div></div>'
+            )
+
+        # ── Sub-header 통일 헬퍼 (STEP 카드 안의 작은 제목들) ──
+        def _sol_sub(text, margin_top=24):
+            return (
+                f'<p style="font-size:1.02rem;font-weight:700;color:{C["navy"]};'
+                f'margin:{margin_top}px 0 10px 0;letter-spacing:-0.2px;'
+                f'line-height:1.3;">{text}</p>'
+            )
+
+        # ── 신호등 박스 (3-column: 잘함 / 시급 / 주시) ──
+        def _signal_box(strengths, urgents, watches):
+            """strengths/urgents/watches: list of (label, score, delta_or_cnt)"""
+            def _items(items, color):
+                if not items:
+                    return f'<div style="color:#999;font-size:0.85em;">해당 없음</div>'
+                _h = ""
+                for label, score, meta in items:
+                    _h += (f'<div style="font-size:0.88em;line-height:1.85;">'
+                           f'• <b>{label}</b> {score:.1f}점 '
+                           f'<span style="color:{color};font-size:0.92em;">({meta})</span></div>')
+                return _h
+            return (
+                '<div style="margin:18px 0 8px 0;display:grid;'
+                'grid-template-columns:repeat(3,1fr);gap:14px;">'
+                # 잘함
+                f'<div style="background:linear-gradient(135deg,#e8f5e9 0%,#c8e6c9 100%);'
+                f'border-left:5px solid #2e7d32;border-radius:10px;padding:14px 18px;'
+                f'box-shadow:0 1px 3px rgba(15,23,42,0.04),0 2px 8px rgba(15,23,42,0.05);">'
+                f'<div style="font-size:0.95em;font-weight:800;color:#2e7d32;margin-bottom:6px;">'
+                f'🟢 잘하고 있는 영역</div>'
+                f'{_items(strengths, "#2e7d32")}</div>'
+                # 시급
+                f'<div style="background:linear-gradient(135deg,#ffebee 0%,#ffcdd2 100%);'
+                f'border-left:5px solid #c62828;border-radius:10px;padding:14px 18px;'
+                f'box-shadow:0 1px 3px rgba(15,23,42,0.04),0 2px 8px rgba(15,23,42,0.05);">'
+                f'<div style="font-size:0.95em;font-weight:800;color:#c62828;margin-bottom:6px;">'
+                f'🔴 시급 개선 영역</div>'
+                f'{_items(urgents, "#c62828")}</div>'
+                # 주시
+                f'<div style="background:linear-gradient(135deg,#fffde7 0%,#fff59d 100%);'
+                f'border-left:5px solid #f57f17;border-radius:10px;padding:14px 18px;'
+                f'box-shadow:0 1px 3px rgba(15,23,42,0.04),0 2px 8px rgba(15,23,42,0.05);">'
+                f'<div style="font-size:0.95em;font-weight:800;color:#f57f17;margin-bottom:6px;">'
+                f'🟡 주시 영역</div>'
+                f'{_items(watches, "#f57f17")}</div>'
+                '</div>'
             )
 
         # ── 평가군 (고정 분류: 1군/2군) ─────────────────────────
@@ -4571,54 +4760,105 @@ with tab_sol:
         else:
             _diag = f"본부 평균 {'상회' if _sel_gap >= 0 else '하회'}({_sel_gap:+.1f}점)."
 
+        # ── 강점/약점 TOP 1 사전 계산 (Hero 카드 KPI에 사용) ──
+        _top_str_label, _top_str_score, _top_str_dev = None, None, None
+        _top_weak_label, _top_weak_score, _top_weak_dev = None, None, None
+        if M.get("business"):
+            _hero_biz = _df_sel.groupby(M["business"])["_점수100"].agg(["mean", "count"]).reset_index()
+            _hero_biz.columns = ["업무", "평균", "건수"]
+            _hero_biz_hq = df_f.groupby(M["business"])["_점수100"].mean()
+            _hero_biz["본부평균"] = _hero_biz["업무"].map(_hero_biz_hq)
+            _hero_biz["편차"] = (_hero_biz["평균"] - _hero_biz["본부평균"]).round(1)
+            _hero_biz_v = _hero_biz[(_hero_biz["건수"] >= 2) & _hero_biz["편차"].notna()]
+            if not _hero_biz_v.empty:
+                _r_top = _hero_biz_v.sort_values("편차", ascending=False).iloc[0]
+                _r_bot = _hero_biz_v.sort_values("편차").iloc[0]
+                _top_str_label = _r_top["업무"]
+                _top_str_score = float(_r_top["평균"])
+                _top_str_dev = float(_r_top["편차"])
+                _top_weak_label = _r_bot["업무"]
+                _top_weak_score = float(_r_bot["평균"])
+                _top_weak_dev = float(_r_bot["편차"])
+
         # ── 헤더 카드 ─────────────────────────────────────────
         _gap_color = "#80cbc4" if _sel_gap >= 0 else "#ef9a9a"
+
+        # 강점 카드 컨텐츠
+        if _top_str_label is not None:
+            _str_html = (
+                f'<div style="font-size:1.0em;font-weight:800;margin:2px 0;line-height:1.15;">{_top_str_label}</div>'
+                f'<div style="font-size:1.35em;font-weight:900;line-height:1.1;">{_top_str_score:.1f}<span style="font-size:0.55em;">점</span></div>'
+                f'<div style="font-size:0.74em;color:#a5d6a7;">본부 대비 +{_top_str_dev:.1f}점</div>'
+            )
+        else:
+            _str_html = '<div style="font-size:0.85em;opacity:0.7;margin-top:14px;">데이터 부족</div>'
+
+        # 약점 카드 컨텐츠
+        if _top_weak_label is not None:
+            _weak_dev_color = "#ef9a9a" if _top_weak_dev < 0 else "#a5d6a7"
+            _weak_dev_sign = f"{_top_weak_dev:+.1f}"
+            _weak_html = (
+                f'<div style="font-size:1.0em;font-weight:800;margin:2px 0;line-height:1.15;">{_top_weak_label}</div>'
+                f'<div style="font-size:1.35em;font-weight:900;line-height:1.1;">{_top_weak_score:.1f}<span style="font-size:0.55em;">점</span></div>'
+                f'<div style="font-size:0.74em;color:{_weak_dev_color};">본부 대비 {_weak_dev_sign}점</div>'
+            )
+        else:
+            _weak_html = '<div style="font-size:0.85em;opacity:0.7;margin-top:14px;">데이터 부족</div>'
+
         st.markdown(
             '<div style="background:linear-gradient(135deg,#1a237e 0%,#283593 60%,#1565c0 100%);'
             'border-radius:12px;padding:20px 24px;color:white;margin-bottom:20px;">'
             f'<div style="font-size:1.25em;font-weight:800;margin-bottom:14px;">📍 {_sel_off} · 종합 컨디션 리포트</div>'
             '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:14px;">'
+            # 1. 종합 만족도
             '<div style="background:rgba(255,255,255,0.13);border-radius:8px;padding:12px;text-align:center;">'
             '<div style="font-size:0.72em;opacity:0.8;margin-bottom:4px;">종합 만족도</div>'
             f'<div style="font-size:1.9em;font-weight:900;">{_sel_avg:.1f}<span style="font-size:0.45em;">점</span></div>'
             f'<div style="font-size:0.78em;color:{_gap_color};">{_sel_gap:+.1f}점 (본부 {avg_score_100:.1f})</div>'
             '</div>'
-            '<div style="background:rgba(255,255,255,0.13);border-radius:8px;padding:12px;text-align:center;">'
-            '<div style="font-size:0.72em;opacity:0.8;margin-bottom:4px;">본부 랭킹</div>'
-            f'<div style="font-size:1.9em;font-weight:900;">{_rank}<span style="font-size:0.45em;">위</span></div>'
-            f'<div style="font-size:0.78em;opacity:0.75;">/ {_total_offs}개 지사</div>'
-            '</div>'
+            # 2. 평가군 랭킹
             '<div style="background:rgba(255,255,255,0.13);border-radius:8px;padding:12px;text-align:center;">'
             f'<div style="font-size:0.72em;opacity:0.8;margin-bottom:4px;">평가군 랭킹 ({_peer_label})</div>'
             f'<div style="font-size:1.9em;font-weight:900;">{_peer_rank}<span style="font-size:0.45em;">위</span></div>'
             f'<div style="font-size:0.78em;opacity:0.75;">/ {len(_peer_offs)}개 · 평가군평균 {_peer_avg:.1f}점</div>'
             '</div>'
-            '<div style="background:rgba(255,255,255,0.13);border-radius:8px;padding:12px;text-align:center;">'
-            '<div style="font-size:0.72em;opacity:0.8;margin-bottom:4px;">데이터 신뢰도</div>'
-            f'<div style="font-size:1.2em;font-weight:700;margin:4px 0;">{_reliability}</div>'
-            f'<div style="font-size:0.78em;opacity:0.75;">응답 {_sel_cnt:,}건</div>'
-            '</div></div>'
+            # 3. 💪 강점 영역
+            '<div style="background:rgba(46,125,50,0.20);border-radius:8px;padding:12px;text-align:center;border:1px solid rgba(165,214,167,0.25);">'
+            '<div style="font-size:0.72em;opacity:0.85;margin-bottom:4px;">💪 강점 영역</div>'
+            f'{_str_html}'
+            '</div>'
+            # 4. 🩹 약점 영역
+            '<div style="background:rgba(198,40,40,0.20);border-radius:8px;padding:12px;text-align:center;border:1px solid rgba(239,154,154,0.25);">'
+            '<div style="font-size:0.72em;opacity:0.85;margin-bottom:4px;">🩹 약점 영역</div>'
+            f'{_weak_html}'
+            '</div>'
+            '</div>'
             '<div style="background:rgba(255,255,255,0.1);border-radius:8px;padding:10px 14px;'
             'font-size:0.9em;border-left:4px solid #80cbc4;">'
             f'💡 핵심 진단: "{_diag}"'
             '</div></div>',
             unsafe_allow_html=True)
 
-        # ── 업무별 강점/약점 레이더 + 페르소나 미스매치 ──────────
+        # ══════════════════════════════════════════════════════
+        # STEP 1 — 진단: 어디가 강하고 어디가 약한가?
+        # ══════════════════════════════════════════════════════
         if M.get("business"):
-            st.markdown(_sol_band("🎯", "업무 진단",
-                                   "업무별 강점·약점 + 고객군 미스매치"),
+            st.markdown(_sol_step(1, "📊", "진단 — 어디가 강하고 어디가 약한가?",
+                                   "업무별 강점·약점 + 계약종별 강점·약점 + 업무×계약종별 교차분석"),
                         unsafe_allow_html=True)
             _sol_mid_l, _sol_mid_r = st.columns([1, 1])
 
-            # ── 좌측: 레이더 차트 (3개 탭: 본부/전월/전년) ──────────
-            def _render_radar_compare(sel_df, ref_df, ref_label, is_timeseries):
-                """레이더 + 강점/약점(개선/악화) 카드. is_timeseries=True면 시계열 비교."""
-                _biz_sel = sel_df.groupby(M["business"])["_점수100"].mean().dropna()
-                _biz_ref = ref_df.groupby(M["business"])["_점수100"].mean().dropna()
+            # ── 레이더 차트 + 강점/약점 카드 (업무·계약종 공용) ──────────
+            def _render_radar_compare(sel_df, ref_df, ref_label, is_timeseries,
+                                       cat_col=None, cat_label="업무"):
+                """레이더 + 강점/약점(개선/악화) 카드. cat_col 미지정시 업무유형 기준."""
+                if cat_col is None:
+                    cat_col = M["business"]
+                _biz_sel = sel_df.groupby(cat_col)["_점수100"].mean().dropna()
+                _biz_ref = ref_df.groupby(cat_col)["_점수100"].mean().dropna()
                 _cats = sorted(set(_biz_sel.index) & set(_biz_ref.index))
                 if len(_cats) < 3:
-                    st.info("업무유형이 3개 이상이어야 레이더 차트를 그릴 수 있습니다.")
+                    st.info(f"{cat_label}이 3개 이상이어야 레이더 차트를 그릴 수 있습니다.")
                     return
                 _r_sel = [round(_biz_sel.get(c, 0), 1) for c in _cats]
                 _r_ref = [round(_biz_ref.get(c, 0), 1) for c in _cats]
@@ -4642,7 +4882,7 @@ with tab_sol:
                     legend=dict(orientation="h", yanchor="bottom", y=-0.15),
                     showlegend=True)
                 st.plotly_chart(_fig, use_container_width=True, config={'staticPlot': True})
-                _gap = pd.DataFrame({"업무": _cats, "지사": _r_sel, "기준": _r_ref})
+                _gap = pd.DataFrame({cat_label: _cats, "지사": _r_sel, "기준": _r_ref})
                 _gap["편차"] = _gap["지사"] - _gap["기준"]
                 _good = _gap.sort_values("편차", ascending=False).head(3)
                 _bad = _gap.sort_values("편차").head(3)
@@ -4654,18 +4894,18 @@ with tab_sol:
                     _good_icon, _bad_icon = "🟢", "🔴"
                 _gl, _gr = st.columns(2)
                 with _gl:
-                    _h = f'<div style="background:#e8f5e9;border-radius:8px;padding:10px 14px;font-size:0.88em;"><b>{_good_label}</b><br>'
+                    _h = f'<div class="sol-tt-card sol-tt-good" style="background:#e8f5e9;border-radius:8px;padding:10px 14px;font-size:0.88em;"><b>{_good_label}</b><br>'
                     for _, r in _good.iterrows():
-                        _h += f'{_good_icon} {r["업무"]} — {r["지사"]:.1f}점 ({ref_label} 대비 <b>{r["편차"]:+.1f}</b>점)<br>'
+                        _h += f'{_good_icon} {r[cat_label]} — {r["지사"]:.1f}점 ({ref_label} 대비 <b>{r["편차"]:+.1f}</b>점)<br>'
                     st.markdown(_h + '</div>', unsafe_allow_html=True)
                 with _gr:
-                    _h = f'<div style="background:#ffebee;border-radius:8px;padding:10px 14px;font-size:0.88em;"><b>{_bad_label}</b><br>'
+                    _h = f'<div class="sol-tt-card sol-tt-bad" style="background:#ffebee;border-radius:8px;padding:10px 14px;font-size:0.88em;"><b>{_bad_label}</b><br>'
                     for _, r in _bad.iterrows():
-                        _h += f'{_bad_icon} {r["업무"]} — {r["지사"]:.1f}점 ({ref_label} 대비 <b style="color:#c62828">{r["편차"]:+.1f}</b>점)<br>'
+                        _h += f'{_bad_icon} {r[cat_label]} — {r["지사"]:.1f}점 ({ref_label} 대비 <b style="color:#c62828">{r["편차"]:+.1f}</b>점)<br>'
                     st.markdown(_h + '</div>', unsafe_allow_html=True)
 
             with _sol_mid_l:
-                st.markdown("##### 🎯 업무별 강점 / 약점")
+                st.markdown(_sol_sub("🎯 업무별 강점 / 약점", margin_top=8), unsafe_allow_html=True)
                 _tab_hq, _tab_m, _tab_y = st.tabs(["본부 대비", "전월 대비", "전년 동월 대비"])
                 with _tab_hq:
                     _render_radar_compare(_df_sel, df_f, "본부 평균", is_timeseries=False)
@@ -4692,116 +4932,59 @@ with tab_sol:
                         else:
                             st.info(f"전년 동월 비교 파일에 '{_sel_off}' 데이터가 없거나 점수 컬럼이 누락됐습니다.")
 
-            # ── 우측: 페르소나별 미스매치 매트릭스 ──────────────
+            # ── 우측: 계약종별 강점/약점 (좌측과 동일한 3-tab 패턴) ──────
             with _sol_mid_r:
                 _ct_col = M.get("contract")
                 if _ct_col and _ct_col in _df_sel.columns:
-                    st.markdown("##### 🎯 고객군별 미스매치 — 건수 비중 × 만족도")
-                    # 차트 보는 법 안내 (좌측 탭 영역과 시각적 대칭)
-                    st.markdown(
-                        '<div style="font-size:0.82em;color:#666;line-height:1.4;'
-                        'background:#f8fafc;border-left:3px solid #cbd5e1;border-radius:6px;'
-                        'padding:6px 12px;margin-bottom:4px;">'
-                        '가로축: <b>건수 비중(%)</b> · 세로축: <b>평균 만족도(점)</b> · 버블 크기: 응답 수<br>'
-                        '비중이 큰 카테고리일수록 지사 평균에 미치는 영향이 커서 우선 개선 대상입니다.'
-                        '</div>',
-                        unsafe_allow_html=True)
-                    _pm_grp = _df_sel.groupby(_ct_col)["_점수100"].agg(["mean", "count"]).reset_index()
-                    _pm_grp.columns = ["고객군", "만족도", "건수"]
-                    _pm_grp = _pm_grp[_pm_grp["건수"] >= 2]
-                    _pm_total = _pm_grp["건수"].sum()
-                    _pm_grp["비중(%)"] = (_pm_grp["건수"] / max(_pm_total, 1) * 100).round(1)
-                    if not _pm_grp.empty:
-                        _pm_x_mid = _pm_grp["비중(%)"].mean()
-                        # 차트 가로선·기여도 계산 기준 = 지사 평균(일관성 유지)
-                        _sel_avg_score = float(_df_sel["_점수100"].mean()) if not _df_sel.empty else 0.0
-                        _sel_total = int(len(_df_sel))
-                        _pm_y_mid = _sel_avg_score
-                        fig_pm = go.Figure()
-                        fig_pm.add_trace(go.Scatter(
-                            x=_pm_grp["비중(%)"], y=_pm_grp["만족도"],
-                            mode="markers+text",
-                            marker=dict(
-                                size=(_pm_grp["건수"] / max(_pm_grp["건수"].max(), 1) * 40 + 12).tolist(),
-                                color=_pm_grp["만족도"].tolist(),
-                                colorscale="RdYlGn", cmin=max(60, _pm_grp["만족도"].min() - 3),
-                                cmax=min(100, _pm_grp["만족도"].max() + 3),
-                                showscale=True, colorbar=dict(title="만족도", len=0.6),
-                                line=dict(width=1, color="white")),
-                            text=_pm_grp["고객군"],
-                            textposition="top center", textfont_size=10,
-                            customdata=list(zip(_pm_grp["만족도"].round(1), _pm_grp["건수"], _pm_grp["비중(%)"])),
-                            hovertemplate="%{text}<br>만족도: %{customdata[0]:.1f}점<br>건수: %{customdata[1]}건<br>비중: %{customdata[2]:.1f}%<extra></extra>"))
-                        fig_pm.add_vline(x=_pm_x_mid, line_dash="dash", line_color="#bdbdbd", line_width=1)
-                        fig_pm.add_hline(y=_pm_y_mid, line_dash="dash", line_color="#bdbdbd", line_width=1)
-                        # 사분면 라벨
-                        _pm_x_range = [0, max(_pm_grp["비중(%)"].max() * 1.3, _pm_x_mid * 2)]
-                        _pm_y_range = [max(55, _pm_grp["만족도"].min() - 5), min(108, _pm_grp["만족도"].max() + 8)]
-                        fig_pm.add_annotation(x=_pm_x_range[1] * 0.85, y=_pm_y_range[0] + 2,
-                                              text="⚠️ 1순위 개선", showarrow=False,
-                                              font=dict(size=10, color="#c62828"))
-                        fig_pm.add_annotation(x=1, y=_pm_y_range[0] + 2,
-                                              text="🔍 특이 리스크", showarrow=False,
-                                              font=dict(size=10, color="#e65100"))
-                        fig_pm.update_layout(
-                            template=PLOTLY_TPL, height=340,
-                            margin=dict(t=40, b=50, l=50, r=20),
-                            xaxis=dict(title="건수 비중(%)", range=_pm_x_range),
-                            yaxis=dict(title="평균 만족도", range=_pm_y_range),
-                            showlegend=False)
-                        st.plotly_chart(fig_pm, use_container_width=True, config={'staticPlot': True})
-
-                        # 우하/좌하 사분면 = 지사 평균 이하 카테고리
-                        _pm_danger = _pm_grp[(_pm_grp["비중(%)"] >= _pm_x_mid) & (_pm_grp["만족도"] < _pm_y_mid)]
-                        _pm_watch  = _pm_grp[(_pm_grp["비중(%)"] < _pm_x_mid) & (_pm_grp["만족도"] < _pm_y_mid)]
-
-                        def _calc_impact(_score, _cnt):
-                            """카테고리를 지사 평균까지 끌어올렸을 때 전체 평균 상승폭"""
-                            _gap = _sel_avg_score - _score
-                            if _gap <= 0 or _sel_total == 0:
-                                return 0.0
-                            return (_cnt * _gap) / _sel_total
-
-                        if not _pm_danger.empty:
-                            _d_html = (
-                                '<div style="background:#ffebee;border-radius:8px;padding:10px 14px;'
-                                'font-size:0.88em;">'
-                                '🚨 <b>1순위 개선</b> — 비중 큰 카테고리, 지사 평균 영향 큼<br>'
-                            )
-                            for _, _r in _pm_danger.iterrows():
-                                _imp = _calc_impact(_r["만족도"], _r["건수"])
-                                _d_html += (
-                                    f'• <b>{_r["고객군"]}</b> {_r["만족도"]:.1f}점 ({int(_r["건수"])}건) '
-                                    f'→ 지사 평균까지 끌어올리면 <b>+{_imp:.2f}점</b> 상승<br>'
-                                )
-                            _d_html += '</div>'
-                            st.markdown(_d_html, unsafe_allow_html=True)
-
-                        if not _pm_watch.empty:
-                            _w_html = (
-                                '<div style="background:#fff8e1;border-radius:8px;padding:10px 14px;'
-                                'font-size:0.88em;margin-top:6px;">'
-                                '⚡ <b>특이 리스크</b> — 소수지만 점수 낮음, 개별 민원 위험<br>'
-                            )
-                            for _, _r in _pm_watch.iterrows():
-                                _imp = _calc_impact(_r["만족도"], _r["건수"])
-                                _w_html += (
-                                    f'• <b>{_r["고객군"]}</b> {_r["만족도"]:.1f}점 ({int(_r["건수"])}건) '
-                                    f'→ 지사 평균까지 끌어올리면 <b>+{_imp:.2f}점</b> 상승 (개별 케이스 관리 필요)<br>'
-                                )
-                            _w_html += '</div>'
-                            st.markdown(_w_html, unsafe_allow_html=True)
-                    else:
-                        st.info("계약종별 데이터가 부족합니다.")
+                    st.markdown(_sol_sub("🎯 계약종별 강점 / 약점", margin_top=8), unsafe_allow_html=True)
+                    _ct_tab_hq, _ct_tab_m, _ct_tab_y = st.tabs(["본부 대비", "전월 대비", "전년 동월 대비"])
+                    with _ct_tab_hq:
+                        _render_radar_compare(_df_sel, df_f, "본부 평균",
+                                               is_timeseries=False,
+                                               cat_col=_ct_col, cat_label="계약종")
+                    with _ct_tab_m:
+                        if prev_df_f is None:
+                            st.info("📁 전월 비교 파일을 먼저 사이드바에서 업로드해주세요.")
+                        elif M["office"] not in prev_df_f.columns:
+                            st.warning("전월 비교 파일에 지사 컬럼이 없습니다.")
+                        else:
+                            _prev_sel_ct = prev_df_f[prev_df_f[M["office"]] == _sel_off]
+                            if len(_prev_sel_ct) > 0 and "_점수100" in _prev_sel_ct.columns:
+                                _render_radar_compare(_df_sel, _prev_sel_ct, "전월",
+                                                       is_timeseries=True,
+                                                       cat_col=_ct_col, cat_label="계약종")
+                            else:
+                                st.info(f"전월 비교 파일에 '{_sel_off}' 데이터가 없거나 점수 컬럼이 누락됐습니다.")
+                    with _ct_tab_y:
+                        if prev_y_df_f is None:
+                            st.info("📁 전년 동월 비교 파일을 먼저 사이드바에서 업로드해주세요.")
+                        elif M["office"] not in prev_y_df_f.columns:
+                            st.warning("전년 동월 비교 파일에 지사 컬럼이 없습니다.")
+                        else:
+                            _prev_y_sel_ct = prev_y_df_f[prev_y_df_f[M["office"]] == _sel_off]
+                            if len(_prev_y_sel_ct) > 0 and "_점수100" in _prev_y_sel_ct.columns:
+                                _render_radar_compare(_df_sel, _prev_y_sel_ct, "전년 동월",
+                                                       is_timeseries=True,
+                                                       cat_col=_ct_col, cat_label="계약종")
+                            else:
+                                st.info(f"전년 동월 비교 파일에 '{_sel_off}' 데이터가 없거나 점수 컬럼이 누락됐습니다.")
                 else:
                     st.info("계약종 컬럼이 설정되지 않았습니다.")
 
-        # ── 업무 × 계약종별 정밀 진단 ──────────────────────
+        # ── 업무 × 계약종별 교차분석 (STEP 1 내부 sub-header) ──────────
         if M.get("business") and M.get("contract"):
-            st.markdown(_sol_band("🔥", f"업무 × 계약종별 리스크 히트맵 — {_sel_off}",
-                                   "업무유형(행) × 계약종별(열) 평균 만족도"),
+            st.markdown(_sol_sub(f"🔍 업무 × 계약종별 교차분석 — {_sel_off}", margin_top=36),
                         unsafe_allow_html=True)
-            st.caption("업무유형(행) × 계약종별(열)의 평균 만족도입니다. **연라벤더 칸**은 지사 평균 미만으로 우선 관리 대상입니다.")
+            st.markdown(
+                '<p style="font-size:0.86em;color:#666;margin:4px 0 10px 0;">'
+                '업무유형(행) × 계약종별(열)의 평균 만족도입니다. '
+                '<span style="background:#fff;border:1px solid #ddd;padding:0 6px;border-radius:3px;">90점+</span> '
+                '<span style="background:rgba(126,179,122,0.22);padding:0 6px;border-radius:3px;">70~90점</span> '
+                '<span style="background:rgba(217,122,53,0.40);color:#5a2a06;padding:0 6px;border-radius:3px;">50~70점</span> '
+                '<span style="background:rgba(194,81,81,0.55);color:white;padding:0 6px;border-radius:3px;">50점 미만</span> '
+                '— <b>색이 진한 칸일수록 우선 관리 대상</b>입니다.'
+                '</p>',
+                unsafe_allow_html=True)
 
             _sol_pivot = _df_sel.pivot_table(
                 index=M["business"], columns=M["contract"],
@@ -4829,14 +5012,22 @@ with tab_sol:
                 _sol_pivot = _sol_pivot.reindex(_sol_pivot.mean(axis=1).sort_values().index)
                 _sol_cnt = _sol_cnt.reindex(_sol_pivot.index)
 
-                # 지사 평균 기준 라벤더 단일색 (Tab1 톤)
+                # 도넛 차트 색감과 통일한 히트맵 — 90점 이상은 깨끗하게, 저점일수록 진하게
                 _hm_all_mean = float(_df_sel["_점수100"].mean()) if pd.notna(_df_sel["_점수100"].mean()) else 0.0
                 def _hm_color(v):
                     if pd.isna(v):
                         return ""
-                    if v < _hm_all_mean:
-                        return "background:rgba(237,233,254,0.55);"
-                    return ""
+                    # 90점 이상 = 무색 (시선 분산 방지)
+                    # 70~90점 미만 = 연초록 (양호 but 주의)
+                    # 50~70점 미만 = 주황 (개선 필요)
+                    # 50점 미만 = 빨강 (긴급)
+                    if v >= 90:
+                        return ""
+                    if v >= 70:
+                        return "background:rgba(126,179,122,0.22);"
+                    if v >= 50:
+                        return "background:rgba(217,122,53,0.40);color:#5a2a06;"
+                    return "background:rgba(194,81,81,0.55);color:white;"
 
                 _hm_bdr = "#e5e7eb"
                 _hm_hdr = "#f1f5f9"
@@ -4888,42 +5079,21 @@ with tab_sol:
                 _hm_html += '</tr>'
                 _hm_html += '</table></div>'
                 st.markdown(_hm_html, unsafe_allow_html=True)
-                # VOC 액션 인사이트 section band
-                st.markdown(_sol_band("🔍", f"VOC 액션 인사이트 — {_sel_off}",
-                                       "사전케어 대상 · 고객 요청사항"),
+                # STEP 2 — 우선순위: 무엇을 먼저 고칠까?
+                st.markdown(_sol_step(2, "🚨", "우선순위 — 무엇을 먼저 고칠까?",
+                                       "종합 리스크 TOP 3 (임팩트 기준) + 소수 심각 케이스"),
                             unsafe_allow_html=True)
 
-                # ══════════════════════════════════════════
-                # 🔍 VOC 액션 인사이트 (사전케어 + 고객 요청사항 통합)
-                # ══════════════════════════════════════════
-                # ── 사전케어 대상 ──────────────────────────────
-                st.markdown("##### 🚨 사전케어 대상 — 50점 이하")
-                _pc_df = _df_sel[_df_sel["_점수100"] <= 50].copy()
-                if not _pc_df.empty:
-                    _pc_df = _pc_df.sort_values("_점수100")
-                    st.caption(f"해당 지사 50점 이하 **{len(_pc_df)}건** — 해피콜 우선 대상")
-                    _pc_show_cols = []
-                    if M.get("receipt_no") and M["receipt_no"] in _pc_df.columns:
-                        _pc_show_cols.append(M["receipt_no"])
-                    if M.get("business") and M["business"] in _pc_df.columns:
-                        _pc_show_cols.append(M["business"])
-                    _pc_show_cols.append("_점수100")
-                    if M.get("voc") and M["voc"] in _pc_df.columns:
-                        _pc_show_cols.append(M["voc"])
-                    _pc_show = _pc_df[[c for c in _pc_show_cols if c in _pc_df.columns]].head(10)
-                    _pc_show = _pc_show.rename(columns={"_점수100": "점수(100점)"})
-                    st.dataframe(_pc_show.reset_index(drop=True), use_container_width=True, hide_index=True)
-                else:
-                    st.success("✅ 해당 지사에 50점 이하 건이 없습니다.")
-
                 # ── 리스크 분류: 계약종별 × 업무 기준 ──────────
+                # 기준 = 지사 평균(_sel_avg) — 차트 미스매치와 동일 기준
                 _sol_score_cols = [c for c in individual_scores if c in _df_sel.columns]
+                _sol_total_cnt = int(len(_df_sel))
                 _sol_combos = _df_sel.groupby([M["contract"], M["business"]]).agg(
                     _avg=("_점수100", "mean"), _cnt=("_점수100", "count")).reset_index()
                 _sol_combos.columns = [M["contract"], M["business"], "점수", "건수"]
-                _sol_combos = _sol_combos[_sol_combos["점수"] < avg_score_100]
+                _sol_combos = _sol_combos[_sol_combos["점수"] < _sel_avg]
 
-                _real_risk, _drop_risk = [], []
+                _all_risks = []
                 for _, _cr in _sol_combos.iterrows():
                     _c_ct, _c_biz = _cr[M["contract"]], _cr[M["business"]]
                     _c_score, _c_cnt = round(float(_cr["점수"]), 1), int(_cr["건수"])
@@ -4940,64 +5110,36 @@ with tab_sol:
                         _c_vocs = [v for v in _c_vocs if v.strip() not in _VOC_EMPTY and len(v.strip()) > 2]
                         if _c_vocs:
                             _c_voc_sample = _c_vocs[0][:40]
-                    _item = {"계약종별": _c_ct, "업무": _c_biz, "점수": _c_score,
-                             "건수": _c_cnt, "최저항목": _c_worst_item,
-                             "최저점수": round(_c_worst_val, 1), "voc": _c_voc_sample,
-                             "impact": _c_cnt * (avg_score_100 - _c_score)}
-                    if _c_cnt >= 10:
-                        _real_risk.append(_item)
-                    else:
-                        _drop_risk.append(_item)
-                _real_top3 = sorted(_real_risk, key=lambda x: x["impact"], reverse=True)[:3]
-                _drop_top3 = sorted(_drop_risk, key=lambda x: x["점수"])[:3]
+                    _impact_raw = _c_cnt * (_sel_avg - _c_score)
+                    _avg_lift = _impact_raw / max(_sol_total_cnt, 1)  # 지사 평균 상승폭(점)
+                    _all_risks.append({
+                        "계약종별": _c_ct, "업무": _c_biz, "점수": _c_score,
+                        "건수": _c_cnt, "최저항목": _c_worst_item,
+                        "최저점수": round(_c_worst_val, 1), "voc": _c_voc_sample,
+                        "impact": _impact_raw, "avg_lift": _avg_lift,
+                    })
+                # 종합 TOP 3: impact 큰 순 (=평균 끌어올림 효과 큰 순)
+                _risk_top3 = sorted(_all_risks, key=lambda x: x["impact"], reverse=True)[:3]
+                _top3_keys = {(r["계약종별"], r["업무"]) for r in _risk_top3}
+                # 소수 심각: TOP 3에 안 든 것 중 건수 ≤ 5 & 점수 < 70
+                _minor_severe = sorted(
+                    [r for r in _all_risks
+                     if (r["계약종별"], r["업무"]) not in _top3_keys
+                     and r["건수"] <= 5 and r["점수"] < 70],
+                    key=lambda x: x["점수"])
+                # 호환용 변수 (기존 AI 처방전, 사전케어 등에서 참조)
+                _real_top3 = _risk_top3
+                _drop_top3 = _minor_severe[:3]
 
-                # ══════════════════════════════════════════
-                # 💬 고객 요청사항 (건의/요청 액션 아이템)
-                # ══════════════════════════════════════════
-                if M.get("voc") and M.get("score") and "_점수100" in _df_sel.columns:
-                    _vi_voc_col = M["voc"]
-                    _vi_paired = _df_sel[[_vi_voc_col, "_점수100"]].dropna(subset=[_vi_voc_col, "_점수100"])
-                    _vi_voc_raw = _vi_paired[_vi_voc_col].astype(str).tolist()
-                    _vi_scores = _vi_paired["_점수100"].tolist()
-                    _vi_voc_valid = [(t, s) for t, s in zip(_vi_voc_raw, _vi_scores)
-                                     if str(t).strip() not in ('', 'nan', '응답없음', '없음', '의견없음')
-                                     and len(str(t).strip()) > 2
-                                     and str(s) not in ('nan', '')]
-                    if _vi_voc_valid:
-                        _vi_texts = [t for t, _ in _vi_voc_valid]
-                        _vi_sc = [s for _, s in _vi_voc_valid]
-                        _, _, _notable = _extract_voc_phrases(_vi_texts, _vi_sc)
-
-                        if _notable:
-                            st.markdown(
-                                f"##### 💬 고객 요청사항 — 구체적 개선 요청 ({len(_notable)}건)")
-
-                            for _vi_i, (_voc_txt, _voc_sc) in enumerate(_notable[:7]):
-                                _voc_display = _voc_txt[:120] + ('…' if len(_voc_txt) > 120 else '')
-                                _sc_color = '#c62828' if _voc_sc and _voc_sc < 60 else '#e65100' if _voc_sc and _voc_sc < 80 else '#555'
-                                _sc_tag = (f'<span style="color:{_sc_color};font-size:0.78em;'
-                                           f'font-weight:600;margin-left:8px;">'
-                                           f'{_voc_sc:.0f}점</span>' if _voc_sc else '')
-                                st.markdown(
-                                    f'<div style="margin:8px 0;padding:10px 14px;'
-                                    f'background:#fafafa;border-left:4px solid #7b1fa2;'
-                                    f'border-radius:6px;font-size:0.9em;">'
-                                    f'"{_voc_display}"{_sc_tag}</div>',
-                                    unsafe_allow_html=True)
-                            st.caption("※ '~해주세요', '~하면 좋겠다' 등 고객이 구체적 행동을 요청한 의견입니다. 즉시 조치 가능 여부를 검토하세요.")
-
-
-                # ── 실질적 리스크 카드 (계약종별×업무) ──────────
-                if _real_top3 or _drop_top3:
-                    st.markdown(_sol_band("🚨", f"리스크 진단 — {_sel_off}",
-                                           "업무 × 계약종별 조합별 우선 개선 대상"),
-                                unsafe_allow_html=True)
-                if _real_top3:
-                    st.markdown("##### 🚨 실질적 리스크 TOP 3 — 건수 多 & 평균 이하 (우선 개선)")
-                    st.caption("카드를 클릭하면 상세 분석이 열립니다.")
+                # ── 종합 리스크 TOP 3 (impact 기준 — 실질/급락 통합) ──
+                if _risk_top3:
+                    st.markdown(_sol_sub("🚨 종합 리스크 TOP 3 — 임팩트 큰 순"), unsafe_allow_html=True)
+                    st.caption(
+                        f"※ **임팩트 = 건수 × (지사 평균 − 점수)** — 해당 조합을 지사 평균({_sel_avg:.1f}점)까지 끌어올리면 "
+                        f"전체 평균이 얼마나 상승하는지를 의미. 카드를 클릭하면 상세 분석이 열립니다.")
                     _rt_cols = st.columns(3)
-                    for _ri, _rk in enumerate(_real_top3):
-                        _rk_key = f"sol_real_{_ri}"
+                    for _ri, _rk in enumerate(_risk_top3):
+                        _rk_key = f"sol_risk_{_ri}"
                         _cur_sel = st.session_state.get("sol_cell_sel")
                         _is_sel = (_cur_sel is not None
                                    and _cur_sel.get("계약종별") == _rk["계약종별"]
@@ -5014,7 +5156,7 @@ with tab_sol:
                                 f'<div style="font-size:1em;font-weight:800;margin:4px 0;">{_rk["계약종별"]} × {_rk["업무"]}</div>'
                                 f'<div style="font-size:0.82em;color:#555;">최저: {_rk["최저항목"]} ({_rk["최저점수"]}점)</div>'
                                 f'<div style="font-size:1.4em;font-weight:900;color:#c62828;">{_rk["점수"]:.1f}점</div>'
-                                f'<div style="font-size:0.78em;color:#555;">{_rk["건수"]}건 · 임팩트 {_rk["impact"]:.0f}</div>'
+                                f'<div style="font-size:0.78em;color:#555;">{_rk["건수"]}건 · 평균 <b>+{_rk["avg_lift"]:.2f}점</b> 상승 효과</div>'
                                 f'{_voc_line}'
                                 '</div>', unsafe_allow_html=True)
                             if st.button(
@@ -5025,42 +5167,42 @@ with tab_sol:
                                     None if _is_sel else {"계약종별": _rk["계약종별"], "업무": _rk["업무"]})
                                 st.rerun()
 
-                # ── 급락 리스크 카드 ──────────────────────────────
-                if _drop_top3:
-                    st.markdown("##### ⚡ 급락 리스크 TOP 3 — 건수 少 & 점수 급락 (모니터링)")
-                    st.caption("소수 응답이지만 점수가 급락한 조합입니다. 민원 전조 신호일 수 있으니 **추이를 주시**하세요.")
-                    _dt_cols = st.columns(3)
-                    for _di, _dk in enumerate(_drop_top3):
-                        _dk_key = f"sol_drop_{_di}"
-                        _cur_sel = st.session_state.get("sol_cell_sel")
-                        _is_sel = (_cur_sel is not None
-                                   and _cur_sel.get("계약종별") == _dk["계약종별"]
-                                   and _cur_sel.get("업무") == _dk["업무"])
-                        _badge = "①②③"[_di]
-                        _bg = "#fff3e0" if _is_sel else "#fff8e1"
-                        _bd = "#ff8f00" if _is_sel else "#ffca28"
-                        with _dt_cols[_di]:
-                            _voc_line = f'<div style="font-size:0.75em;color:#888;margin-top:4px;">"{_dk["voc"]}…"</div>' if _dk["voc"] else ""
-                            st.markdown(
-                                f'<div style="background:{_bg};border:2px solid {_bd};'
-                                'border-radius:10px;padding:12px;margin-bottom:8px;">'
-                                f'<div style="font-size:0.78em;color:#e65100;font-weight:700;">급락 {_badge}</div>'
-                                f'<div style="font-size:1em;font-weight:800;margin:4px 0;">{_dk["계약종별"]} × {_dk["업무"]}</div>'
-                                f'<div style="font-size:0.82em;color:#555;">최저: {_dk["최저항목"]} ({_dk["최저점수"]}점)</div>'
-                                f'<div style="font-size:1.4em;font-weight:900;color:#e65100;">{_dk["점수"]:.1f}점</div>'
-                                f'<div style="font-size:0.78em;color:#555;">{_dk["건수"]}건 (소량)</div>'
-                                f'{_voc_line}'
-                                '</div>', unsafe_allow_html=True)
-                            if st.button(
-                                    "▲ 닫기" if _is_sel else "🔍 상세 원인 분석",
-                                    key=_dk_key, use_container_width=True,
-                                    type="secondary"):
-                                st.session_state["sol_cell_sel"] = (
-                                    None if _is_sel else {"계약종별": _dk["계약종별"], "업무": _dk["업무"]})
-                                st.rerun()
+                # ── 옵션: 소수 심각 케이스 더 보기 (TOP 3 외, 건수≤5 & 70점 미만) ──
+                if _minor_severe:
+                    with st.expander(f"⚡ 소수 심각 케이스 더 보기 ({len(_minor_severe)}건) — 건수 ≤ 5 & 70점 미만", expanded=False):
+                        st.caption("응답 수는 적지만 점수가 매우 낮은 케이스. 평균 영향은 작아도 개별 민원 비화 리스크가 있으니 모니터링하세요.")
+                        _ms_show = min(len(_minor_severe), 6)
+                        _ms_cols = st.columns(min(3, _ms_show))
+                        for _mi, _mk in enumerate(_minor_severe[:_ms_show]):
+                            _mk_key = f"sol_minor_{_mi}"
+                            _cur_sel = st.session_state.get("sol_cell_sel")
+                            _is_sel = (_cur_sel is not None
+                                       and _cur_sel.get("계약종별") == _mk["계약종별"]
+                                       and _cur_sel.get("업무") == _mk["업무"])
+                            _bg = "#fff3e0" if _is_sel else "#fff8e1"
+                            _bd = "#ff8f00" if _is_sel else "#ffca28"
+                            with _ms_cols[_mi % 3]:
+                                _voc_line = f'<div style="font-size:0.75em;color:#888;margin-top:4px;">"{_mk["voc"]}…"</div>' if _mk["voc"] else ""
+                                st.markdown(
+                                    f'<div style="background:{_bg};border:2px solid {_bd};'
+                                    'border-radius:10px;padding:12px;margin-bottom:8px;">'
+                                    f'<div style="font-size:0.78em;color:#e65100;font-weight:700;">소수 심각</div>'
+                                    f'<div style="font-size:1em;font-weight:800;margin:4px 0;">{_mk["계약종별"]} × {_mk["업무"]}</div>'
+                                    f'<div style="font-size:0.82em;color:#555;">최저: {_mk["최저항목"]} ({_mk["최저점수"]}점)</div>'
+                                    f'<div style="font-size:1.4em;font-weight:900;color:#e65100;">{_mk["점수"]:.1f}점</div>'
+                                    f'<div style="font-size:0.78em;color:#555;">{_mk["건수"]}건 (소량)</div>'
+                                    f'{_voc_line}'
+                                    '</div>', unsafe_allow_html=True)
+                                if st.button(
+                                        "▲ 닫기" if _is_sel else "🔍 상세 원인 분석",
+                                        key=_mk_key, use_container_width=True,
+                                        type="secondary"):
+                                    st.session_state["sol_cell_sel"] = (
+                                        None if _is_sel else {"계약종별": _mk["계약종별"], "업무": _mk["업무"]})
+                                    st.rerun()
 
-                if not _real_top3 and not _drop_top3:
-                    st.success("✅ 모든 업무×계약종별 조합이 본부 평균 이상입니다.")
+                if not _risk_top3:
+                    st.success("✅ 모든 업무×계약종별 조합이 지사 평균 이상입니다.")
 
                 # ══════════════════════════════════════════
                 # 상세 분석 — 선택된 카드의 범인 특정 + VOC
@@ -5191,6 +5333,13 @@ with tab_sol:
                         else:
                             st.info("세부항목 점수 데이터가 없습니다.")
 
+                # ══════════════════════════════════════════════════
+                # STEP 3 — 단서: 고객은 뭐라고 하는가?
+                # ══════════════════════════════════════════════════
+                st.markdown(_sol_step(3, "💬", "단서 — 고객은 뭐라고 하는가?",
+                                       "VOC 키워드 · 50점 이하 원문 · 고객 요청사항"),
+                            unsafe_allow_html=True)
+
                 # ── VOC 키워드 분석 (지사별, 자동 실행) ──────────────
                 if M.get("voc") and GEMINI_AVAILABLE:
                     _voc_kw_key = f"_voc_kw_{_sel_off}"
@@ -5243,18 +5392,167 @@ with tab_sol:
 
                     _kw_data = st.session_state.get(_voc_kw_key)
                     if _kw_data and isinstance(_kw_data, dict) and _kw_data.get("부정"):
-                        st.markdown("---")
-                        st.markdown(
-                            f'<div style="background:#f5f5f5;border-left:4px solid {C["blue"]};'
-                            f'border-radius:6px;padding:12px 16px;margin:8px 0;">'
-                            f'<span style="font-weight:700;color:{C["blue"]};">🔬 VOC 키워드</span>'
-                            f'<span style="margin-left:16px;">부정: <b>{_kw_data["부정"]}</b></span>'
-                            f'<span style="margin-left:16px;color:#666;">특이: {_kw_data["특이"]}</span>'
-                            f'</div>', unsafe_allow_html=True)
+                        # 부정 키워드 → 빨간 pill 태그
+                        _neg_kws = [k.strip() for k in _kw_data["부정"].split(",") if k.strip()]
+                        _neg_pills = "".join([
+                            f'<span style="display:inline-block;background:#ffebee;'
+                            f'color:#c62828;padding:4px 12px;border-radius:14px;'
+                            f'margin:3px 4px 3px 0;font-weight:700;font-size:0.88em;'
+                            f'border:1px solid #ffcdd2;">{_kw}</span>' for _kw in _neg_kws
+                        ])
+                        # 특이 키워드 처리
+                        _spec_kw = _kw_data.get("특이", "없음")
+                        if _spec_kw and _spec_kw != "없음":
+                            _spec_kws = [k.strip() for k in _spec_kw.split(",") if k.strip()]
+                            _spec_pills = "".join([
+                                f'<span style="display:inline-block;background:#fff8e1;'
+                                f'color:#e65100;padding:4px 12px;border-radius:14px;'
+                                f'margin:3px 4px 3px 0;font-weight:700;font-size:0.88em;'
+                                f'border:1px solid #ffe082;">{_kw}</span>' for _kw in _spec_kws
+                            ])
+                        else:
+                            _spec_pills = '<span style="color:#999;font-size:0.88em;">없음</span>'
 
-                # ── AI 종합 처방전 (실질+급락 전체) ──────────────
+                        st.markdown(
+                            '<div style="background:linear-gradient(135deg,#faf5ff 0%,#f3e5f5 100%);'
+                            'border:1px solid #e1bee7;border-left:5px solid #6a1b9a;'
+                            'border-radius:10px;padding:16px 20px;margin:10px 0 6px 0;'
+                            'box-shadow:0 2px 8px rgba(106,27,154,0.08);">'
+                            # 헤더 (아이콘 + 라벨)
+                            '<div style="display:flex;align-items:center;margin-bottom:10px;">'
+                            f'<span style="font-size:1.05em;font-weight:800;color:#4a148c;">🔬 VOC 키워드 자동 추출</span>'
+                            '<span style="font-size:0.72em;color:#666;margin-left:10px;'
+                            'background:white;padding:2px 8px;border-radius:10px;'
+                            'border:1px solid #e1bee7;">AI 분석</span>'
+                            '</div>'
+                            # 부정 row
+                            '<div style="display:flex;align-items:center;margin-bottom:6px;flex-wrap:wrap;">'
+                            '<span style="font-size:0.82em;color:#4a148c;font-weight:700;'
+                            'margin-right:8px;min-width:38px;">🔻 부정</span>'
+                            f'<span>{_neg_pills}</span></div>'
+                            # 특이 row
+                            '<div style="display:flex;align-items:center;flex-wrap:wrap;">'
+                            '<span style="font-size:0.82em;color:#4a148c;font-weight:700;'
+                            'margin-right:8px;min-width:38px;">⚡ 특이</span>'
+                            f'<span>{_spec_pills}</span></div>'
+                            '</div>', unsafe_allow_html=True)
+
+                # ══════════════════════════════════════════
+                # 🚨 50점 이하 원문 (사전케어 명단 — STEP 3 단서로 통합)
+                # ══════════════════════════════════════════
+                st.markdown(_sol_sub("🚨 50점 이하 원문 — 해피콜 우선 대상"), unsafe_allow_html=True)
+                _pc_df = _df_sel[_df_sel["_점수100"] <= 50].copy()
+                if not _pc_df.empty:
+                    _pc_df = _pc_df.sort_values("_점수100")
+                    st.caption(f"해당 지사 50점 이하 **{len(_pc_df)}건** — 즉시 해피콜 권장")
+                    _pc_show_cols = []
+                    if M.get("receipt_no") and M["receipt_no"] in _pc_df.columns:
+                        _pc_show_cols.append(M["receipt_no"])
+                    if M.get("business") and M["business"] in _pc_df.columns:
+                        _pc_show_cols.append(M["business"])
+                    _pc_show_cols.append("_점수100")
+                    if M.get("voc") and M["voc"] in _pc_df.columns:
+                        _pc_show_cols.append(M["voc"])
+                    _pc_show = _pc_df[[c for c in _pc_show_cols if c in _pc_df.columns]].head(10)
+                    _pc_show = _pc_show.rename(columns={"_점수100": "점수(100점)"})
+                    # 컬럼 폭 조정 — 서술 의견을 가장 넓게
+                    _pc_col_cfg = {}
+                    if M.get("receipt_no") and M["receipt_no"] in _pc_show.columns:
+                        _pc_col_cfg[M["receipt_no"]] = st.column_config.TextColumn(width="small")
+                    if M.get("business") and M["business"] in _pc_show.columns:
+                        _pc_col_cfg[M["business"]] = st.column_config.TextColumn(width="small")
+                    if "점수(100점)" in _pc_show.columns:
+                        _pc_col_cfg["점수(100점)"] = st.column_config.NumberColumn(width="small")
+                    if M.get("voc") and M["voc"] in _pc_show.columns:
+                        _pc_col_cfg[M["voc"]] = st.column_config.TextColumn(width="large")
+                    st.dataframe(_pc_show.reset_index(drop=True), use_container_width=True,
+                                  hide_index=True, column_config=_pc_col_cfg)
+                else:
+                    st.success("✅ 해당 지사에 50점 이하 건이 없습니다.")
+
+                # ══════════════════════════════════════════
+                # 💬 고객 요청사항 (정사각형 포스트잇 그리드)
+                # ══════════════════════════════════════════
+                if M.get("voc") and M.get("score") and "_점수100" in _df_sel.columns:
+                    _vi_voc_col = M["voc"]
+                    _vi_paired = _df_sel[[_vi_voc_col, "_점수100"]].dropna(subset=[_vi_voc_col, "_점수100"])
+                    _vi_voc_raw = _vi_paired[_vi_voc_col].astype(str).tolist()
+                    _vi_scores = _vi_paired["_점수100"].tolist()
+                    _vi_voc_valid = [(t, s) for t, s in zip(_vi_voc_raw, _vi_scores)
+                                     if str(t).strip() not in ('', 'nan', '응답없음', '없음', '의견없음')
+                                     and len(str(t).strip()) > 2
+                                     and str(s) not in ('nan', '')]
+                    if _vi_voc_valid:
+                        _vi_texts = [t for t, _ in _vi_voc_valid]
+                        _vi_sc = [s for _, s in _vi_voc_valid]
+                        _, _, _notable = _extract_voc_phrases(_vi_texts, _vi_sc)
+
+                        if _notable:
+                            st.markdown(_sol_sub(f"💬 고객 요청사항 — 구체적 개선 요청 ({len(_notable)}건)", margin_top=28),
+                                        unsafe_allow_html=True)
+
+                            # 포스트잇 — 5컬럼 정사각형, 테이프·라벨·중앙 정렬
+                            _postit_palette = [
+                                {"bg": "linear-gradient(135deg,#fff9c4 0%,#fff59d 100%)", "text": "#5a4a06"},  # 노랑
+                                {"bg": "linear-gradient(135deg,#fce4ec 0%,#f8bbd0 100%)", "text": "#5a1736"},  # 핑크
+                                {"bg": "linear-gradient(135deg,#e8f5e9 0%,#c8e6c9 100%)", "text": "#1b5e20"},  # 연두
+                                {"bg": "linear-gradient(135deg,#e3f2fd 0%,#bbdefb 100%)", "text": "#0d47a1"},  # 하늘
+                                {"bg": "linear-gradient(135deg,#ffe0b2 0%,#ffcc80 100%)", "text": "#5a2d06"},  # 살구
+                            ]
+                            _postit_rotates = ["-1.2deg", "0.8deg", "-0.5deg", "1.0deg", "-0.8deg", "0.6deg"]
+
+                            _grid_html = (
+                                '<div style="display:grid;'
+                                # 카드 폭 260~300px — 텍스트가 긴 VOC도 잘 안 잘림
+                                'grid-template-columns:repeat(auto-fill,minmax(260px,300px));'
+                                'justify-content:start;'
+                                'gap:18px;margin:16px 6px 10px 6px;">'
+                            )
+                            for _vi_i, (_voc_txt, _voc_sc) in enumerate(_notable[:6]):
+                                # 텍스트 길면 잘라서 카드 안에 깔끔하게
+                                _voc_display = _voc_txt[:75] + ('…' if len(_voc_txt) > 75 else '')
+                                _palette = _postit_palette[_vi_i % len(_postit_palette)]
+                                _rot = _postit_rotates[_vi_i % len(_postit_rotates)]
+                                _sc_tag = (f'<div style="position:absolute;bottom:8px;right:10px;'
+                                           f'font-size:0.7em;font-weight:700;color:rgba(0,0,0,0.5);">'
+                                           f'{_voc_sc:.0f}점</div>' if _voc_sc else '')
+                                _grid_html += (
+                                    f'<div style="position:relative;aspect-ratio:1/1;'
+                                    f'padding:24px 16px 18px;'
+                                    f'background:{_palette["bg"]};'
+                                    f'box-shadow:2px 5px 12px rgba(0,0,0,0.14),'
+                                    f'inset 0 -2px 3px rgba(0,0,0,0.04);'
+                                    f'border-radius:3px;'
+                                    f'transform:rotate({_rot});'
+                                    f'display:flex;flex-direction:column;'
+                                    f'align-items:center;justify-content:center;'
+                                    f'overflow:hidden;">'
+                                    # 상단 테이프
+                                    f'<div style="position:absolute;top:-7px;left:50%;'
+                                    f'transform:translateX(-50%) rotate(-2deg);'
+                                    f'width:54px;height:14px;'
+                                    f'background:rgba(255,255,255,0.6);'
+                                    f'box-shadow:0 2px 3px rgba(0,0,0,0.10);"></div>'
+                                    # 본문 — 폰트 키움
+                                    f'<div style="font-size:1.08em;line-height:1.55;'
+                                    f'color:{_palette["text"]};font-weight:600;text-align:center;">'
+                                    f'{_voc_display}</div>'
+                                    f'{_sc_tag}</div>'
+                                )
+                            _grid_html += '</div>'
+                            st.markdown(_grid_html, unsafe_allow_html=True)
+                            st.caption("※ '~해주세요', '~하면 좋겠다' 등 고객이 구체적 행동을 요청한 의견입니다. 즉시 조치 가능 여부를 검토하세요.")
+
+                # ══════════════════════════════════════════════════
+                # STEP 4 — 처방: 어떻게 고칠까? (AI 종합 처방전)
+                # ══════════════════════════════════════════════════
                 if _real_top3 or _drop_top3:
-                    st.markdown("---")
+                    st.markdown(_sol_step(4, "🩺", "처방 — 어떻게 고칠까?",
+                                           "위 단서를 종합해 AI가 지사 맞춤 액션 도출"),
+                                unsafe_allow_html=True)
+
+                # ── AI 종합 처방전 (실질+급락 전체) — STEP 4 안 ──
+                if _real_top3 or _drop_top3:
                     _office_kb = _get_office_kb(_sel_off)
                     _kb_ctx = _office_kb["context"] if _office_kb else "지역 특성 정보 없음"
                     _kb_act = _office_kb["action"] if _office_kb else ""
