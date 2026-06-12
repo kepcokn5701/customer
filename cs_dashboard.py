@@ -1936,6 +1936,16 @@ st.markdown(f"""
     box-shadow: 0 6px 16px rgba(15, 23, 42, 0.10);
   }}
 
+  /* VOC 키워드 칩 — hover lift만 */
+  .voc-kw-pill {{
+    transition: transform 0.18s ease, box-shadow 0.18s ease;
+    cursor: default;
+  }}
+  .voc-kw-pill:hover {{
+    transform: translateY(-2px);
+    box-shadow: 0 3px 8px rgba(15, 23, 42, 0.12);
+  }}
+
   /* 포스트잇 — 텍스트 일렁임 방지 (GPU 가속 + 서브픽셀 안정화) */
   .postit-card {{
     will-change: transform;
@@ -4296,7 +4306,7 @@ with tab3:
 
         # ── ⑤ 업무유형별 AI 진단 보고서 ──
         if M["business"] and M["score"]:
-            st.markdown('<p class="sec-head">🤖 업무유형별 진단 보고서 — 강점·약점 자동 분석</p>', unsafe_allow_html=True)
+            st.markdown('<p class="sec-head">📑 업무유형별 진단 보고서 — 강점·약점 자동 분석</p>', unsafe_allow_html=True)
             _bbl_grp = df_f.groupby(M["business"]).agg(
                 처리건수=("_점수100", "count"),
                 평균만족도=("_점수100", "mean"),
@@ -4417,79 +4427,67 @@ with tab3:
                             _gap = round(_tv - _bv, 1)
                             _ai_q_ofc.append(f"[{_biz}] 최고 {_tv}점 vs 최저 {_bv}점 (격차 {_gap}점, 지사 수 {len(_st['bottom3'])+1}개)")
 
-                    _ai_q_prompt = f"""당신은 한국전력 경남본부 고객 만족도 데이터 분석가입니다.
-사분면 데이터와 VOC 원문, 지사별 점수를 종합하여 본부의 약점·강점을 진단합니다.
+                    _ai_q_prompt = f"""당신은 한국전력 경남본부 CS 분석가입니다.
+업무유형별 데이터를 종합해 **이번 달 최우선 과제 1개 + 보조 케이스 + 공통 패턴 + 강점**을 도출합니다.
 
-[핵심 원리: 본부 평균을 끌어올리려면 "건수 × 점수갭" 영향력이 큰 업무를 우선 개선]
-- 4사분면(건수↑ 점수↓): **본부 평균 끌어올리기 우선 레버**. 건수가 많아 작은 점수 개선만으로도 전체 평균을 크게 올림.
-- 3사분면(건수↓ 점수↓): **개별 케이스 심각도 관리 트랙**. 건수는 적지만 점수가 낮아 사례 자체가 위험. 평균 영향은 작아도 VOC 클레임/민원 비화 리스크가 있어 별도 관리 필요.
-- 1·2사분면: 만족도 높음 → **강점**.
+[핵심 원리]
+"건수 × 점수갭" 영향력이 큰 업무 = 본부 평균 끌어올리기 핵심 레버.
+건수 적고 점수 낮은 업무 = 개별 클레임 비화 리스크, 별도 케이스 관리.
 
-[이번 달 사분면 데이터 — 각 업무에 본부평균까지 끌어올릴 시 전체 평균 상승 예상치 포함]
+[이번 달 업무유형 데이터]
 {_ai_q_data}
-[약점 업무(3·4사분면)의 불만족 VOC 원문]
+[약점 업무 VOC 원문]
 {chr(10).join(_ai_q_voc) if _ai_q_voc else '- 해당 없음'}
-[약점 업무의 지사별 점수 격차]
+[지사별 점수 격차 (지사명 제외)]
 {chr(10).join(_ai_q_ofc) if _ai_q_ofc else '- 해당 없음'}
 
-# 출력 형식 (반드시 아래 3개 블록만 순서대로 출력. 표 적극 활용)
+# 출력: 반드시 아래 JSON 한 객체만. 코드 블록·설명·주석 금지. JSON 외 다른 텍스트 절대 금지.
 
-#### 📋 현장 진단 — 약점 업무
+{{
+  "headline": "이번 달 최우선 과제는 ○○○입니다. (15자 이내 짧은 진단 한 줄)",
+  "top_priority": {{
+    "업무": "업무명",
+    "점수": 93.1,
+    "건수": 147,
+    "평균상승폭": 0.204,
+    "핵심문제": "VOC 기반 핵심 문제 1-2줄 (구체적, 수치/예시 포함 가능)",
+    "격차": {{
+      "최고": 99.1,
+      "최저": 84.8,
+      "원인": "저점수 지사에 집중된 원인 한 줄"
+    }}
+  }},
+  "watch_list": [
+    {{
+      "업무": "업무명",
+      "점수": 74.0,
+      "건수": 3,
+      "평균상승폭": 0.058,
+      "핵심문제": "한 줄 요약",
+      "타입": "개별 심각"
+    }}
+  ],
+  "공통패턴": "여러 약점 업무에서 반복되는 공통 불만 1가지 (한 줄). 없으면 빈 문자열.",
+  "강점업무": [
+    {{
+      "업무": "업무명",
+      "점수": 97.0,
+      "건수": 46,
+      "유지포인트": "왜 강점인지 한 줄"
+    }}
+  ]
+}}
 
-**🎯 본부 평균 끌어올리기 우선 (건수 多 · 점수 低)**
-*4사분면 업무만 — 건수 多 + 점수 低. 데이터에 4사분면 업무가 없으면 "해당 없음" 표시*
-
-| 업무 | 점수 | 건수 | 핵심 문제 (VOC 기반) | 개선 시 평균 상승폭 |
-| --- | ---: | ---: | --- | ---: |
-| 요금수납 | 91.5점 | 35건 | 시스템 처리 지연 | +0.101점 |
-
-<small>※ <b>개선 시 평균 상승폭</b>: 이 업무를 본부 평균까지 끌어올렸을 때 본부 종합 점수가 오르는 폭 (= 건수 × 점수갭 ÷ 전체 응답건수)</small>
-
-→ **이 업무들은 처리 건수가 많아 작은 점수 개선만으로도 전체 평균을 크게 끌어올립니다.** 본부 평균 개선의 핵심 레버이므로 우선 투입.
-
-**⚠️ 개별 케이스 심각도 관리 (건수 少 · 점수 低)**
-*3사분면 업무만 — 건수 少 + 점수 低. 데이터에 3사분면 업무가 없으면 "해당 없음" 표시*
-
-| 업무 | 점수 | 건수 | 핵심 문제 (VOC 기반) | 개선 시 평균 상승폭 |
-| --- | ---: | ---: | --- | ---: |
-| 검침관련 | 74.0점 | 3건 | 하청 직원 처리 미흡 | +0.058점 |
-
-<small>※ <b>개선 시 평균 상승폭</b>: 이 업무를 본부 평균까지 끌어올렸을 때 본부 종합 점수가 오르는 폭. 건수가 적어 값이 작아도, 점수 자체가 낮아 개별 케이스의 심각도는 큼.</small>
-
-→ **건수는 적지만 점수가 매우 낮아 개별 사례의 심각도가 큽니다.** 평균 영향은 작아도 VOC가 클레임/민원으로 비화할 리스크가 있어, 평균 개선 트랙과 별도로 케이스별 관리가 필요합니다.
-
-#### 🔍 비교 분석
-
-**1) 지사 간 격차** (약점 업무별 최고-최저 점수 차이 · 지사명 절대 금지)
-
-| 업무 | 최고 | 최저 | 격차 | 원인 (VOC 기반) |
-| --- | ---: | ---: | ---: | --- |
-| 신규증설 | 96점 | 73점 | 23점 | "진행 안내 부재" 불만이 저점수 지사에 집중 |
-
-**2) 업무 간 공통 패턴** (서로 다른 약점 업무에서 반복되는 불만 유형 1가지만)
-- 신규증설·검침 모두 "완료 후 결과 미안내"가 불만 키워드로 반복
-
-#### ✅ 유지 — 강점 업무 (1·2사분면이 있을 경우만)
-
-| 업무 | 점수 | 건수 | 유지 포인트 |
-| --- | ---: | ---: | --- |
-| 자동이체 | 95.2점 | 320건 | 자동 처리 + 정기 안내로 만족도 안정적 |
-
-[필수 규칙]
-- **약점 업무를 절대 한 표에 합치지 말 것**. 4사분면(건수↑ 점수↓) 표와 3사분면(건수↓ 점수↓) 표를 반드시 분리.
-- 각 표의 "개선 시 평균 상승폭" 컬럼은 데이터 입력에 명시된 값을 그대로 사용 (직접 계산하지 말 것).
-- 각 표 바로 아래 `<small>※ ...</small>` 부가 설명 블록을 위 예시 형식 그대로 반드시 포함할 것 (4사분면용/3사분면용 설명 다름).
-- 4사분면 표 아래 "→ 본부 평균 개선의 핵심 레버" 설명, 3사분면 표 아래 "→ 개별 케이스 심각도 관리 필요" 설명 반드시 포함.
-- 모든 섹션은 마크다운 표 또는 bullet만 사용. 줄글·산문체 금지.
-- 표 컬럼 정렬 유지: 점수·건수·격차·효과는 우측 정렬 (`---:`).
-- 수치(점수, 건수, 격차)를 반드시 근거로 포함할 것.
-- 지사명 절대 언급 금지. 격차 수치와 원인만.
-- 출력에는 "1사분면/4사분면" 등 사분면 용어 쓰지 말 것 ("본부 평균 끌어올리기 우선", "개별 케이스 심각도 관리"로 표현).
-- "친절하게", "자세히", "명확히" 같은 추상적 형용사/부사 금지.
-- 백틱(`)·코드 블록 금지. 강조는 **굵은 글씨**만.
+[규칙]
+- **top_priority**는 "건수 多 + 점수 低" 업무 중 평균상승폭 최대 1개만. 적합한 업무 없으면 가장 영향력 큰 약점 업무.
+- **watch_list**는 1-3개. 타입은 "본부 평균"(건수 多) 또는 "개별 심각"(건수 少+점수 低) 중 하나.
+- **강점업무**는 1-3개. 만족도 높은 업무만.
+- 사분면 용어("1사분면", "4사분면") 절대 금지. "본부 평균", "개별 심각"으로만 표현.
+- 지사명 절대 금지. 수치·원인·VOC 키워드만.
+- "친절하게", "자세히" 같은 추상적 형용사 금지.
+- 평균상승폭은 데이터에 명시된 값 그대로 사용 (직접 계산 X).
 - '전기세' → '전기요금'.
-- 미사여구·AI 추임새·인사말 금지. 바로 본론.
-- 데이터에 없는 사실 창작 금지."""
+- 데이터 창작 금지. JSON 형식만 출력."""
 
                     with st.spinner("AI가 업무유형별 분석 생성 중…"):
                         try:
@@ -4525,13 +4523,173 @@ with tab3:
                                 st.session_state[_q_ss_key] = _body["candidates"][0]["content"]["parts"][0]["text"].strip()
                         except Exception as e:
                             st.error(f"AI 분석 중 오류: {e}")
-            # 캐시된 결과 표시 (리런 후에도 유지)
+            # 캐시된 결과 표시 (리런 후에도 유지) — JSON narrative 카드
             if _q_ss_key in st.session_state:
-                st.markdown(
-                    '<div style="background:#f8f9fb;border:1px solid #d0d7de;border-radius:10px;'
-                    'padding:24px 28px;margin:8px 0;font-size:0.93em;line-height:1.85;">\n\n'
-                    f'{st.session_state[_q_ss_key]}\n\n</div>',
-                    unsafe_allow_html=True)
+                _q_raw = st.session_state[_q_ss_key].strip()
+                # JSON 추출 (코드 블록 또는 본문 내 JSON)
+                _jm = re.search(r'\{[\s\S]*\}', _q_raw)
+                _q_data = None
+                if _jm:
+                    try:
+                        _q_data = json.loads(_jm.group(0))
+                    except Exception:
+                        _q_data = None
+
+                if _q_data is None:
+                    st.warning("AI 응답 파싱 실패. 원문을 표시합니다.")
+                    with st.expander("원문 보기"):
+                        st.code(_q_raw)
+                else:
+                    _tp = _q_data.get("top_priority") or {}
+                    _hl = _q_data.get("headline", "")
+                    _wl = _q_data.get("watch_list") or []
+                    _cp = _q_data.get("공통패턴") or ""
+                    _sg = _q_data.get("강점업무") or []
+
+                    def _fmt_num(_v, _suffix=""):
+                        if _v is None or _v == "":
+                            return "-"
+                        try:
+                            _fv = float(_v)
+                            if _fv == int(_fv):
+                                return f"{int(_fv):,}{_suffix}"
+                            return f"{_fv:.1f}{_suffix}"
+                        except Exception:
+                            return f"{_v}{_suffix}"
+
+                    _html_parts = []
+
+                    # ── Headline (얇은 진단 한 줄) ──
+                    if _hl:
+                        _html_parts.append(
+                            f'<div style="font-size:0.92em;color:#555;margin:8px 0 4px 2px;'
+                            f'letter-spacing:0.2px;">💡 {_hl}</div>'
+                        )
+
+                    # ── Hero card: 최우선 과제 ──
+                    if _tp.get("업무"):
+                        _gap = _tp.get("격차") or {}
+                        _gap_html = ""
+                        if _gap and _gap.get("최고") is not None and _gap.get("최저") is not None:
+                            try:
+                                _gap_val = round(float(_gap["최고"]) - float(_gap["최저"]), 1)
+                            except Exception:
+                                _gap_val = _gap.get("격차", "-")
+                            _gap_html = (
+                                '<div style="margin-top:14px;padding:12px 16px;'
+                                'background:rgba(255,255,255,0.7);border-radius:8px;">'
+                                '<div style="font-size:0.78em;color:#888;font-weight:700;'
+                                'letter-spacing:0.4px;margin-bottom:6px;">📊 지사 간 격차</div>'
+                                f'<div style="font-size:0.96em;color:#1f2937;">'
+                                f'최고 <b>{_fmt_num(_gap.get("최고"), "점")}</b> · '
+                                f'최저 <b>{_fmt_num(_gap.get("최저"), "점")}</b> '
+                                f'<span style="color:#c25151;font-weight:700;">(격차 {_gap_val}점)</span>'
+                                '</div>'
+                                f'<div style="font-size:0.85em;color:#555;margin-top:6px;'
+                                'line-height:1.5;">└ ' + (_gap.get("원인") or "") + '</div>'
+                                '</div>'
+                            )
+                        _html_parts.append(
+                            '<div style="background:linear-gradient(135deg,#fff5f5 0%,#fff0f0 100%);'
+                            'border:1px solid #f8d7d7;border-left:5px solid #c25151;'
+                            'border-radius:14px;padding:20px 26px;margin:14px 0;'
+                            'box-shadow:0 2px 10px rgba(194,81,81,0.08);">'
+                            '<div style="font-size:0.78em;color:#b71c1c;font-weight:800;'
+                            'letter-spacing:0.8px;margin-bottom:6px;">🎯 이번 달 최우선 과제</div>'
+                            f'<div style="font-size:1.7em;font-weight:900;color:#0f172a;'
+                            f'margin:4px 0 14px 0;letter-spacing:-0.3px;">{_tp.get("업무","")}</div>'
+                            '<div style="display:flex;gap:28px;flex-wrap:wrap;align-items:baseline;'
+                            'margin-bottom:14px;">'
+                            f'<div><span style="font-size:1.5em;font-weight:900;color:#c25151;">{_fmt_num(_tp.get("점수"))}</span>'
+                            '<span style="color:#888;font-size:0.9em;margin-left:2px;">점</span></div>'
+                            f'<div><span style="font-size:1.25em;font-weight:800;color:#1f2937;">{_fmt_num(_tp.get("건수"))}</span>'
+                            '<span style="color:#888;font-size:0.9em;margin-left:2px;">건</span></div>'
+                            '<div style="color:#666;font-size:0.92em;">개선 시 본부 평균 '
+                            f'<b style="color:#1f2937;">+{_fmt_num(_tp.get("평균상승폭"))}점</b></div>'
+                            '</div>'
+                            '<div style="background:rgba(255,255,255,0.7);padding:12px 16px;'
+                            'border-radius:8px;">'
+                            '<div style="font-size:0.78em;color:#888;font-weight:700;'
+                            'letter-spacing:0.4px;margin-bottom:6px;">⚠️ 핵심 문제 (VOC 기반)</div>'
+                            f'<div style="font-size:0.96em;color:#1f2937;line-height:1.6;">{_tp.get("핵심문제","")}</div>'
+                            '</div>'
+                            f'{_gap_html}'
+                            '</div>'
+                        )
+
+                    # ── Watch list: 함께 주시할 케이스 ──
+                    if _wl:
+                        _wl_cards = ""
+                        for _w in _wl:
+                            _wt = _w.get("타입", "")
+                            _type_bg = "#fdecec" if "심각" in _wt else "#fef3e2"
+                            _type_fg = "#c25151" if "심각" in _wt else "#c2660e"
+                            _wl_cards += (
+                                '<div style="flex:1;min-width:240px;background:#ffffff;'
+                                'border:1px solid #e5e7eb;border-radius:10px;padding:14px 16px;'
+                                'box-shadow:0 1px 3px rgba(15,23,42,0.04);">'
+                                '<div style="display:flex;align-items:center;justify-content:space-between;'
+                                'margin-bottom:8px;gap:8px;">'
+                                f'<span style="font-size:1.02em;font-weight:800;color:#1f2937;">{_w.get("업무","")}</span>'
+                                f'<span style="font-size:0.72em;color:{_type_fg};background:{_type_bg};'
+                                f'padding:3px 9px;border-radius:10px;font-weight:700;white-space:nowrap;">{_wt}</span>'
+                                '</div>'
+                                '<div style="font-size:0.88em;color:#555;margin-bottom:8px;">'
+                                f'<b style="color:#1f2937;">{_fmt_num(_w.get("점수"))}점</b> · '
+                                f'{_fmt_num(_w.get("건수"))}건 · '
+                                f'<span style="color:#888;">+{_fmt_num(_w.get("평균상승폭"))}점</span>'
+                                '</div>'
+                                f'<div style="font-size:0.86em;color:#444;line-height:1.55;">{_w.get("핵심문제","")}</div>'
+                                '</div>'
+                            )
+                        _html_parts.append(
+                            '<div style="margin:16px 0 10px 0;">'
+                            '<div style="font-size:0.84em;font-weight:800;color:#555;'
+                            'letter-spacing:0.4px;margin-bottom:10px;">⚠️ 함께 주시해야 할 케이스</div>'
+                            f'<div style="display:flex;gap:10px;flex-wrap:wrap;">{_wl_cards}</div>'
+                            '</div>'
+                        )
+
+                    # ── 공통 패턴 ──
+                    if _cp:
+                        _html_parts.append(
+                            '<div style="background:linear-gradient(135deg,#f3f5fb 0%,#eef0f8 100%);'
+                            'border:1px solid #d6dcef;border-left:4px solid #3949ab;'
+                            'border-radius:10px;padding:14px 18px;margin:14px 0;">'
+                            '<div style="font-size:0.78em;color:#1a237e;font-weight:800;'
+                            'letter-spacing:0.4px;margin-bottom:6px;">🔍 공통 패턴</div>'
+                            f'<div style="font-size:0.94em;color:#1f2937;line-height:1.6;">{_cp}</div>'
+                            '</div>'
+                        )
+
+                    # ── 강점 업무 ──
+                    if _sg:
+                        _sg_chips = ""
+                        for _s in _sg:
+                            _sg_chips += (
+                                '<div style="background:rgba(255,255,255,0.75);'
+                                'border:1px solid #c8e6c9;border-radius:8px;padding:10px 14px;'
+                                'flex:1;min-width:220px;">'
+                                '<div style="display:flex;align-items:baseline;'
+                                'justify-content:space-between;margin-bottom:4px;gap:8px;">'
+                                f'<span style="font-weight:800;color:#1f2937;">{_s.get("업무","")}</span>'
+                                '<span style="font-size:0.84em;color:#2e7d32;font-weight:700;'
+                                f'white-space:nowrap;">{_fmt_num(_s.get("점수"))}점 · {_fmt_num(_s.get("건수"))}건</span>'
+                                '</div>'
+                                f'<div style="font-size:0.84em;color:#555;line-height:1.5;">{_s.get("유지포인트","")}</div>'
+                                '</div>'
+                            )
+                        _html_parts.append(
+                            '<div style="background:linear-gradient(135deg,#f1f8e9 0%,#e8f5e9 100%);'
+                            'border:1px solid #d6e9d8;border-left:4px solid #2e7d32;'
+                            'border-radius:10px;padding:14px 18px;margin:14px 0;">'
+                            '<div style="font-size:0.78em;color:#1b5e20;font-weight:800;'
+                            'letter-spacing:0.4px;margin-bottom:10px;">✅ 유지 — 강점 업무</div>'
+                            f'<div style="display:flex;gap:10px;flex-wrap:wrap;">{_sg_chips}</div>'
+                            '</div>'
+                        )
+
+                    st.markdown("".join(_html_parts), unsafe_allow_html=True)
 
         st.markdown("---")
 
@@ -5180,19 +5338,39 @@ with tab_sol:
                     return
                 _r_sel = [round(_biz_sel.get(c, 0), 1) for c in _cats]
                 _r_ref = [round(_biz_ref.get(c, 0), 1) for c in _cats]
+                # 양쪽 trace hover에 지사/기준/편차 모두 표시
+                _r_dev = [round(_r_sel[_i] - _r_ref[_i], 1) for _i in range(len(_cats))]
+                _cd_sel = [[_r_ref[_i], _r_dev[_i]] for _i in range(len(_cats))]
+                _cd_sel = _cd_sel + [_cd_sel[0]]
+                _cd_ref = [[_r_sel[_i], _r_dev[_i]] for _i in range(len(_cats))]
+                _cd_ref = _cd_ref + [_cd_ref[0]]
                 _fig = go.Figure()
                 _fig.add_trace(go.Scatterpolar(
                     r=_r_sel + [_r_sel[0]], theta=_cats + [_cats[0]],
                     fill="toself", fillcolor="rgba(255,215,0,0.15)",
                     line=dict(color="#FFD700", width=2.5),
+                    mode="lines+markers",
+                    marker=dict(size=7, color="#FFD700", line=dict(color="#caa700", width=1)),
                     name=f"{_sel_off} (이번 달)",
-                    hovertemplate="%{theta}: %{r:.1f}점<extra></extra>"))
+                    customdata=_cd_sel,
+                    hovertemplate=(
+                        "<b>%{theta}</b><br>"
+                        "📍 " + _sel_off + ": <b>%{r:.1f}점</b><br>"
+                        "📊 " + ref_label + ": %{customdata[0]:.1f}점<br>"
+                        "편차: <b>%{customdata[1]:+.1f}점</b><extra></extra>")))
                 _fig.add_trace(go.Scatterpolar(
                     r=_r_ref + [_r_ref[0]], theta=_cats + [_cats[0]],
                     fill="toself", fillcolor="rgba(144,164,174,0.08)",
                     line=dict(color="#90a4ae", width=1.5, dash="dash"),
+                    mode="lines+markers",
+                    marker=dict(size=6, color="#90a4ae", line=dict(color="#5d7a86", width=1)),
                     name=ref_label,
-                    hovertemplate="%{theta}: %{r:.1f}점<extra></extra>"))
+                    customdata=_cd_ref,
+                    hovertemplate=(
+                        "<b>%{theta}</b><br>"
+                        "📊 " + ref_label + ": <b>%{r:.1f}점</b><br>"
+                        "📍 " + _sel_off + ": %{customdata[0]:.1f}점<br>"
+                        "편차: <b>%{customdata[1]:+.1f}점</b><extra></extra>")))
                 _fig.update_layout(
                     polar=dict(radialaxis=dict(range=[60, 105], dtick=10, showticklabels=True, tickfont_size=9)),
                     template=PLOTLY_TPL, height=340,
@@ -5874,7 +6052,7 @@ with tab_sol:
                         _neg_kws = [_clean_kw(k) for k in _kw_data["부정"].split(",")]
                         _neg_kws = [k for k in _neg_kws if k]
                         _neg_pills = "".join([
-                            f'<span style="display:inline-block;background:#ffebee;'
+                            f'<span class="voc-kw-pill" style="display:inline-block;background:#ffebee;'
                             f'color:#c62828;padding:4px 12px;border-radius:14px;'
                             f'margin:3px 4px 3px 0;font-weight:700;font-size:0.88em;'
                             f'border:1px solid #ffcdd2;">{_kw}</span>' for _kw in _neg_kws
@@ -5886,7 +6064,7 @@ with tab_sol:
                             _spec_kws = [k for k in _spec_kws if k and k != "없음"]
                             if _spec_kws:
                                 _spec_pills = "".join([
-                                    f'<span style="display:inline-block;background:#fff8e1;'
+                                    f'<span class="voc-kw-pill" style="display:inline-block;background:#fff8e1;'
                                     f'color:#e65100;padding:4px 12px;border-radius:14px;'
                                     f'margin:3px 4px 3px 0;font-weight:700;font-size:0.88em;'
                                     f'border:1px solid #ffe082;">{_kw}</span>' for _kw in _spec_kws
