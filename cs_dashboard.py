@@ -1927,6 +1927,55 @@ st.markdown(f"""
     box-shadow: 0 6px 16px rgba(15, 23, 42, 0.10) !important;
   }}
 
+  /* 종합 리스크 TOP3 카드 — 그라데이션 없음, 단순 떠오름 hover */
+  .sol-risk-card {{
+    transition: transform 0.25s ease, box-shadow 0.25s ease;
+  }}
+  .sol-risk-card:hover {{
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(15, 23, 42, 0.10);
+  }}
+
+  /* 포스트잇 — 텍스트 일렁임 방지 (GPU 가속 + 서브픽셀 안정화) */
+  .postit-card {{
+    will-change: transform;
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+    transform-origin: center center;
+    /* 강제 GPU 레이어 — 자식 텍스트도 같은 레이어에 합성됨 */
+    transform: rotate(var(--rot)) translateZ(0);
+  }}
+  .postit-card * {{
+    /* 자식 요소도 GPU 레이어로 — 부모와 함께 변환되어 일렁임 X */
+    -webkit-font-smoothing: antialiased;
+    backface-visibility: hidden;
+  }}
+  /* 포스트잇 hover — 회전 유지하면서 위로 살짝 떠오름 (translate3d로 가속) */
+  .postit-card:hover {{
+    transform: rotate(var(--rot)) translate3d(0, -6px, 0) !important;
+    box-shadow: 4px 10px 24px rgba(0,0,0,0.20), inset 0 -2px 3px rgba(0,0,0,0.04) !important;
+    z-index: 5;
+  }}
+
+  /* 표 행 hover — 헤더(th 행) 제외, 데이터 행만 살짝 강조 */
+  /* inset box-shadow로 인라인 배경 위에 오버레이 (배경 안 덮음) */
+  [data-testid="stMarkdownContainer"] table tr {{
+    transition: box-shadow 0.15s ease;
+  }}
+  [data-testid="stMarkdownContainer"] table tr:has(td):hover td {{
+    box-shadow: inset 0 0 0 100px rgba(21, 101, 192, 0.06);
+    cursor: default;
+  }}
+
+  /* AI 리포트(주간/지사 처방전) 항목 hover — 행별 살짝 강조 */
+  .ai-card-item {{
+    transition: background 0.18s ease;
+    border-radius: 6px;
+  }}
+  .ai-card-item:hover {{
+    background: rgba(15, 23, 42, 0.045);
+  }}
+
   /* STEP 카드 + Tab2 chapter 카드 hover — 살짝 떠오름 */
   .sol-step-card, .tab2-chapter-card {{
     transition: transform 0.25s ease, box-shadow 0.25s ease;
@@ -2080,6 +2129,7 @@ st.markdown("""
   <span class="dash-badge">📊 종합 현황</span>
   <span class="dash-badge">📡 항목별 · 계약종별 · 업무유형별 분석</span>
   <span class="dash-badge">🏢 지사 맞춤형 CS 솔루션</span>
+  <span class="dash-badge">📋 지사별 주간 리포트</span>
   <span class="dash-badge">🎯 민원 조기 경보 시스템</span>
 </div>
 """, unsafe_allow_html=True)
@@ -2099,7 +2149,8 @@ if uploaded_file is None:
 4. **📊 종합 현황** — 구간별 비중·사업소별 점수 등 전체 현황
 5. **📡 항목별 · 계약종별 · 업무유형별 분석** — 교차 분석 및 사분면 비교
 6. **🏢 지사 맞춤형 CS 솔루션** — 지사 선택 후 단계별 정밀 진단
-7. **🎯 민원 조기 경보 시스템** — 잠재 민원고객 사전케어 리스트
+7. **📋 지사별 주간 리포트** — 지사 단위 주간 조사·피드백·AI 협조요청
+8. **🎯 민원 조기 경보 시스템** — 잠재 민원고객 사전케어 리스트
         """)
     with c_r:
         st.markdown('<span class="onboard-marker" style="display:none;"></span>', unsafe_allow_html=True)
@@ -2630,7 +2681,7 @@ tab1, tab3, tab_sol, tab_weekly, tab5 = st.tabs([
     "📊  종합 현황",
     "📡  항목별 · 계약종별 · 업무유형별 분석",
     "🏢  지사 맞춤형 CS 솔루션",
-    "📋  주간 리포트",
+    "📋  지사별 주간 리포트",
     "🎯  민원 조기 경보 시스템",
 ])
 
@@ -2661,6 +2712,9 @@ with tab_weekly:
         _wr_office = M["office"]
         _wr_biz = M["business"]
         _wr_voc = M["voc"]
+
+        # 통합 다운로드용 시트 dict
+        _wr_dl_sheets = {}
 
         _wr_ws = _wr_week_start.strftime("%m/%d")
         _wr_we = _wr_week_end.strftime("%m/%d")
@@ -2789,8 +2843,8 @@ with tab_weekly:
             html_s1 += f'<td style="border:1px solid {_bdr};padding:5px;">{_fv(_lw_all_s)}</td>'
             html_s1 += f'<td style="border:1px solid {_bdr};padding:5px;">{_fv(_mo_all_s)}</td>'
             html_s1 += f'<td style="border:1px solid {_bdr};padding:5px;">-</td>'
-            html_s1 += '</tr></table></div>'
-            html_s1 += '<div style="text-align:right;font-size:0.8em;margin-top:4px;color:#555;">(단위 : 건, 점)</div></div>'
+            html_s1 += '</tr></table>'
+            html_s1 += '<div style="text-align:right;font-size:0.8em;margin-top:6px;color:#888;">(단위 : 건, 점)</div></div>'
             st.markdown(html_s1, unsafe_allow_html=True)
 
             # 엑셀 다운로드
@@ -2804,9 +2858,7 @@ with tab_weekly:
             _s1_dl_rows = [(n, tt, tr, _fv_delta_txt(tw, lw), _fv(lw), _fv(mo), rk) for n, tt, tr, tw, lw, mo, rk in _s1_rows]
             _s1_dl = pd.DataFrame(_s1_dl_rows, columns=[_row_label,"업무처리건수","응답호수","금주(증감)","전주","월별누계","비고(순위)"])
             _s1_dl.loc[len(_s1_dl)] = ["합계", _tw_all_t, _tw_all_r, _fv_delta_txt(_tw_all_s, _lw_all_s), _fv(_lw_all_s), _fv(_mo_all_s), ""]
-            st.download_button("📥 주간 조사 결과 다운로드", df_to_excel_bytes(_s1_dl),
-                               "주간_조사결과.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                               key="dl_weekly_s1")
+            _wr_dl_sheets["주간조사결과"] = _s1_dl
         else:
             st.info("지사 컬럼과 점수 컬럼이 모두 매핑되어야 주간 조사 결과를 표시할 수 있습니다.")
 
@@ -2854,15 +2906,13 @@ with tab_weekly:
             html_s2 += '<div style="text-align:right;font-size:0.8em;margin-top:6px;color:#888;">(단위 : 건, 점)</div></div>'
             st.markdown(html_s2, unsafe_allow_html=True)
 
-            # 엑셀 다운로드
+            # 통합 다운로드용 데이터
             _s2_dl_data = {"구분": ["응답건수(금주)", "금주"]}
             for bt in _biz_types:
                 d = _s2_data[bt]
                 _s2_dl_data[bt] = [d[0], _fv(d[1])]
             _s2_dl = pd.DataFrame(_s2_dl_data)
-            st.download_button("📥 업무유형별 분석 다운로드", df_to_excel_bytes(_s2_dl),
-                               "업무유형별_조사결과.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                               key="dl_weekly_s2")
+            _wr_dl_sheets["업무유형별분석"] = _s2_dl
 
             # ── 함안의령지사 함안/의령 분리 테이블 ──
             if _wr_office and _wr_biz:
@@ -2944,15 +2994,31 @@ with tab_weekly:
             _fb_rename[_wr_voc] = "서술의견"
 
             _fb_show = _fb_df[_fb_cols].rename(columns=_fb_rename).reset_index(drop=True)
+            _wr_dl_sheets["피드백목록"] = _fb_show
 
             # HTML 테이블 (부정 행 빨간 배경 강조)
+            # 카드(흰 패딩) 안에 별도 scroll container 두고, sticky 헤더에 배경·그림자로 텍스트 누출 방지
             _fb_html = (f'<div style="background:#ffffff;border-radius:12px;padding:16px 20px;'
                         f'box-shadow:0 1px 3px rgba(15,23,42,0.04),0 4px 12px rgba(15,23,42,0.06);'
-                        f'margin-bottom:14px;overflow-x:auto;max-height:420px;overflow-y:auto;">'
-                        f'<table style="border-collapse:collapse;width:100%;font-size:0.87em;text-align:left;">')
-            _fb_html += f'<tr style="{_wr_hdr_style}position:sticky;top:0;">'
+                        f'margin-bottom:14px;">'
+                        f'<div style="max-height:420px;overflow:auto;border-radius:6px;">'
+                        f'<table style="border-collapse:separate;border-spacing:0;width:100%;font-size:0.87em;text-align:left;">')
+            # 컬럼별 폭 — 짧은 컬럼은 한 줄 보장
+            _col_widths = {
+                "지사": "min-width:96px;",
+                "감성분류": "min-width:84px;",
+                "업무구분": "min-width:120px;",
+                "종합점수": "min-width:88px;",
+                "서술의견": "min-width:320px;",
+            }
+            _fb_html += f'<tr style="{_wr_hdr_style}">'
             for col in _fb_show.columns:
-                _fb_html += f'<th style="border:1px solid {_bdr};padding:7px 8px;">{col}</th>'
+                _col_w = _col_widths.get(col, "")
+                _fb_html += (
+                    f'<th style="border-bottom:1px solid {_bdr};border-top:1px solid {_bdr};'
+                    f'padding:9px 12px;position:sticky;top:0;background:{_hdr};'
+                    f'box-shadow:0 2px 4px rgba(15,23,42,0.06);'
+                    f'white-space:nowrap;z-index:2;{_col_w}">{col}</th>')
             _fb_html += '</tr>'
             for _, row in _fb_show.iterrows():
                 _sent = row.get("감성분류", "")
@@ -2969,11 +3035,15 @@ with tab_weekly:
                 for col in _fb_show.columns:
                     v = row[col]
                     if col == "감성분류":
-                        _fb_html += f'<td style="border:1px solid {_bdr};padding:6px 8px;text-align:center;">{_badge}</td>'
+                        _fb_html += f'<td style="border-bottom:1px solid {_bdr};padding:7px 10px;text-align:center;white-space:nowrap;">{_badge}</td>'
                     elif col == "종합점수":
-                        _fb_html += f'<td style="border:1px solid {_bdr};padding:6px 8px;text-align:center;">{_fv(v)}</td>'
+                        _fb_html += f'<td style="border-bottom:1px solid {_bdr};padding:7px 10px;text-align:center;white-space:nowrap;">{_fv(v)}</td>'
+                    elif col == "서술의견":
+                        # 긴 텍스트 — 줄바꿈 허용
+                        _fb_html += f'<td style="border-bottom:1px solid {_bdr};padding:7px 12px;line-height:1.5;">{v}</td>'
                     else:
-                        _fb_html += f'<td style="border:1px solid {_bdr};padding:6px 8px;">{v}</td>'
+                        # 지사, 업무구분 등 — 한 줄로
+                        _fb_html += f'<td style="border-bottom:1px solid {_bdr};padding:7px 12px;white-space:nowrap;">{v}</td>'
                 _fb_html += '</tr>'
             _fb_html += '</table></div>'
             st.markdown(_fb_html, unsafe_allow_html=True)
@@ -2997,113 +3067,284 @@ with tab_weekly:
             '&nbsp;&nbsp;• 반복 민원 및 법적 분쟁 가능성이 있는 건은 <b>사전 보고 후 대응</b>해 주시기 바랍니다.'
             '</div>', unsafe_allow_html=True)
 
-        # AI 분석 버튼
+        # ── AI 분석 결과 카드 렌더러 (JSON 구조 → HTML 카드) ──
+        def _render_weekly_ai_cards(data):
+            html = '<div style="margin:14px 0 6px 0;">'
+            # ── 1. 핵심 이슈 (빨강 액센트) ──
+            _issues = data.get("핵심이슈", [])
+            if _issues:
+                html += (
+                    '<div style="background:#ffffff;'
+                    'border:1px solid #e5e7eb;border-left:5px solid #c62828;'
+                    'border-radius:10px;padding:16px 20px;margin-bottom:14px;'
+                    'box-shadow:0 1px 3px rgba(15,23,42,0.04);">'
+                    '<div style="font-size:1.05em;font-weight:800;color:#c62828;margin-bottom:10px;">'
+                    '🔥 1. 금주 핵심 이슈</div>'
+                )
+                for _i, _it in enumerate(_issues[:3], 1):
+                    _txt = _it if isinstance(_it, str) else _it.get("text", "")
+                    html += (
+                        '<div class="ai-card-item" style="display:flex;align-items:flex-start;gap:10px;'
+                        'margin:4px 0;padding:5px 6px;font-size:0.93em;color:#1f2937;">'
+                        '<span style="display:inline-flex;align-items:center;justify-content:center;'
+                        'width:22px;height:22px;background:#c62828;color:white;border-radius:50%;'
+                        f'font-size:0.78em;font-weight:800;flex-shrink:0;">{_i}</span>'
+                        f'<span style="line-height:1.6;">{_txt}</span></div>'
+                    )
+                html += '</div>'
+
+            # ── 2. 주의 포인트 (주황 액센트) — 회색 박스 제거 ──
+            _watches = data.get("주의포인트", [])
+            if _watches:
+                html += (
+                    '<div style="background:#ffffff;'
+                    'border:1px solid #e5e7eb;border-left:5px solid #f57c00;'
+                    'border-radius:10px;padding:16px 20px;margin-bottom:14px;'
+                    'box-shadow:0 1px 3px rgba(15,23,42,0.04);">'
+                    '<div style="font-size:1.05em;font-weight:800;color:#e65100;margin-bottom:10px;">'
+                    '⚠️ 2. 이번 주 주의 포인트</div>'
+                )
+                for _w in _watches:
+                    _biz = _w.get("업무", "") if isinstance(_w, dict) else ""
+                    _content = _w.get("내용", "") if isinstance(_w, dict) else str(_w)
+                    html += (
+                        '<div class="ai-card-item" style="display:flex;align-items:flex-start;gap:10px;'
+                        'padding:5px 6px;margin:4px 0;font-size:0.93em;color:#1f2937;">'
+                    )
+                    if _biz:
+                        html += (
+                            '<span style="display:inline-block;background:#e65100;color:white;'
+                            'padding:3px 11px;border-radius:12px;font-size:0.78em;font-weight:700;'
+                            f'flex-shrink:0;white-space:nowrap;">{_biz}</span>'
+                        )
+                    html += f'<span style="line-height:1.6;flex:1;">{_content}</span></div>'
+                html += '</div>'
+
+            # ── 3. 업무유형별 개선 포인트 (파랑 액센트) — 회색 박스 제거 ──
+            _improvements = data.get("개선포인트", [])
+            if _improvements:
+                html += (
+                    '<div style="background:#ffffff;'
+                    'border:1px solid #e5e7eb;border-left:5px solid #1565c0;'
+                    'border-radius:10px;padding:16px 20px;margin-bottom:14px;'
+                    'box-shadow:0 1px 3px rgba(15,23,42,0.04);">'
+                    '<div style="font-size:1.05em;font-weight:800;color:#1565c0;margin-bottom:10px;">'
+                    '🛠️ 3. 업무유형별 개선 포인트</div>'
+                )
+                for _im in _improvements:
+                    _biz = _im.get("업무", "") if isinstance(_im, dict) else ""
+                    _action = _im.get("액션", "") if isinstance(_im, dict) else str(_im)
+                    html += (
+                        '<div class="ai-card-item" style="display:flex;align-items:flex-start;gap:10px;'
+                        'padding:5px 6px;margin:4px 0;font-size:0.93em;color:#1f2937;">'
+                    )
+                    if _biz:
+                        html += (
+                            '<span style="display:inline-block;background:#1565c0;color:white;'
+                            'padding:3px 11px;border-radius:12px;font-size:0.78em;font-weight:700;'
+                            f'flex-shrink:0;white-space:nowrap;">{_biz}</span>'
+                        )
+                    html += f'<span style="line-height:1.6;flex:1;">{_action}</span></div>'
+                html += '</div>'
+
+            # ── 4. 금주 실행 과제 TOP 3 (초록 액센트) ──
+            _tasks = data.get("실행과제", [])
+            if _tasks:
+                html += (
+                    '<div style="background:#ffffff;'
+                    'border:1px solid #e5e7eb;border-left:5px solid #2e7d32;'
+                    'border-radius:10px;padding:16px 20px;margin-bottom:14px;'
+                    'box-shadow:0 1px 3px rgba(15,23,42,0.04);">'
+                    '<div style="font-size:1.05em;font-weight:800;color:#2e7d32;margin-bottom:10px;">'
+                    '✅ 4. 금주 실행 과제 (TOP 3)</div>'
+                )
+                for _ti, _task in enumerate(_tasks[:3], 1):
+                    _txt = _task if isinstance(_task, str) else _task.get("text", "")
+                    html += (
+                        '<div class="ai-card-item" style="display:flex;align-items:flex-start;gap:10px;'
+                        'margin:4px 0;padding:5px 6px;font-size:0.93em;color:#1f2937;">'
+                        '<span style="display:inline-flex;align-items:center;justify-content:center;'
+                        'width:22px;height:22px;background:#2e7d32;color:white;border-radius:50%;'
+                        f'font-size:0.78em;font-weight:800;flex-shrink:0;">{_ti}</span>'
+                        f'<span style="line-height:1.6;">{_txt}</span></div>'
+                    )
+                html += '</div>'
+
+            html += '</div>'
+            return html
+
+        # AI 분석 fragment - 탭 상태 유지를 위해 fragment로 감쌈
         _wr_ai_key = "_ai_weekly_coop"
-        if st.button("🤖 AI 주간 협조요청 분석", key="btn_weekly_ai", use_container_width=True):
-            # 금주 데이터 요약 생성
-            _ai_summary_parts = []
-            if _wr_office and "_점수100" in _wr_tw_view.columns:
-                _ofc_summary = _wr_tw_view.groupby(_wr_office)["_점수100"].agg(["mean","count"]).reset_index()
-                _ofc_summary.columns = ["지사","평균점수","건수"]
-                _ai_summary_parts.append("■ 지사별 금주 현황:\n" + _ofc_summary.to_string(index=False))
-            if _wr_biz and "_점수100" in _wr_tw_view.columns:
-                _biz_summary = _wr_tw_view.groupby(_wr_biz)["_점수100"].agg(["mean","count"]).reset_index()
-                _biz_summary.columns = ["업무유형","평균점수","건수"]
-                _ai_summary_parts.append("■ 업무유형별 금주 현황:\n" + _biz_summary.to_string(index=False))
-            if _wr_voc:
-                _neg_vocs = _wr_tw_view[_wr_tw_view[_wr_voc].apply(lambda x: _classify_sentiment_3tier(x) == "부정")][_wr_voc].head(10).tolist()
-                if _neg_vocs:
-                    _ai_summary_parts.append("■ 금주 부정 VOC (최대 10건):\n" + "\n".join(f"- {v}" for v in _neg_vocs))
 
-            _ai_weekly_prompt = f"""당신은 한국전력공사 경남본부 CS 담당자입니다.
-아래 금주 CS 조사 데이터를 분석하여 주간 협조요청 사항을 작성해주세요.
+        @st.fragment
+        def _weekly_ai_fragment():
+            if st.button("🧠 AI 주간 협조요청 분석", key="btn_weekly_ai", use_container_width=True):
+                # 금주 데이터 요약 생성
+                _ai_summary_parts = []
+                if _wr_office and "_점수100" in _wr_tw_view.columns:
+                    _ofc_summary = _wr_tw_view.groupby(_wr_office)["_점수100"].agg(["mean","count"]).reset_index()
+                    _ofc_summary.columns = ["지사","평균점수","건수"]
+                    _ai_summary_parts.append("■ 지사별 금주 현황:\n" + _ofc_summary.to_string(index=False))
+                if _wr_biz and "_점수100" in _wr_tw_view.columns:
+                    _biz_summary = _wr_tw_view.groupby(_wr_biz)["_점수100"].agg(["mean","count"]).reset_index()
+                    _biz_summary.columns = ["업무유형","평균점수","건수"]
+                    _ai_summary_parts.append("■ 업무유형별 금주 현황:\n" + _biz_summary.to_string(index=False))
+                if _wr_voc:
+                    _neg_vocs = _wr_tw_view[_wr_tw_view[_wr_voc].apply(lambda x: _classify_sentiment_3tier(x) == "부정")][_wr_voc].head(10).tolist()
+                    if _neg_vocs:
+                        _ai_summary_parts.append("■ 금주 부정 VOC (최대 10건):\n" + "\n".join(f"- {v}" for v in _neg_vocs))
 
-{chr(10).join(_ai_summary_parts)}
+                _ai_weekly_prompt = f"""당신은 한국전력공사 경남본부 CS 담당자입니다.
+    아래 금주 CS 조사 데이터를 분석하여 주간 협조요청 사항을 작성해주세요.
 
-# 고객응대 매뉴얼 기반 원칙 (개선 방향·실행 과제에 반드시 반영)
+    {chr(10).join(_ai_summary_parts)}
 
-## 톤앤매너 — 원스톱 책임주의, 남 탓 금지
-- 부서 핑퐁('~부서에 문의하세요'), 외부 기관 탓('국세청 마감이라 안 된다', '지자체 때문에 어쩔 수 없다') 화법은 NG 멘트. 절대 금지.
-- 규정/약관 한계가 있더라도 '한전이 알아보고 대안을 찾겠다'는 능동적 동행 화법 유지.
-- 독단적 확언('무조건 됩니다')과 희망고문 절대 금지. '확인 후 연락드리겠다'는 액션으로 끝맺음.
+    # 고객응대 매뉴얼 기반 원칙 (개선 방향·실행 과제에 반드시 반영)
 
-## 솔루션 4단계 프레임
-1. 감정 공감 — 고객의 절박함·억울함·불안을 먼저 인정
-2. 상황 투명 안내 — 전산 데이터 기준 객관적 설명
-3. 규정 내 대안 — 안 되는 건 명확히 하되, 현실적 우회로 매칭
-4. 능동적 마무리 — 담당자가 먼저 움직이겠다는 액션
+    ## 톤앤매너 — 원스톱 책임주의, 남 탓 금지
+    - 부서 핑퐁('~부서에 문의하세요'), 외부 기관 탓('국세청 마감이라 안 된다', '지자체 때문에 어쩔 수 없다') 화법은 NG 멘트. 절대 금지.
+    - 규정/약관 한계가 있더라도 '한전이 알아보고 대안을 찾겠다'는 능동적 동행 화법 유지.
+    - 독단적 확언('무조건 됩니다')과 희망고문 절대 금지. '확인 후 연락드리겠다'는 액션으로 끝맺음.
 
-## 불만 유형별 처방 가이드 (VOC에서 해당 징후 감지 시 적용)
-- 핑퐁·책임전가 → 영업 담당자가 직접 유관 부서와 소통, 원스톱 피드백. 전화번호만 주고 끝내는 처방 금지.
-- 절차·서류·디지털 소외 → 행정정보 공동이용 활용, 날짜·시한 콕 집어 안내. 모호한 안내 금지.
-- 요금·복지·소급 → 생계 영향 공감 우선, 분납/우회 혜택 대안 제시. 냉소적 화법 금지.
-- 정전·품질·배상 → 현장 기술팀 투입 원인 규명. 배상은 전담 부서 영역, 현장 확언 금지.
-- 규정 한계 안내 시 → '안 됩니다'로 끝내지 말 것. 대안 또는 능동적 마무리 필수.
+    ## 솔루션 4단계 프레임
+    1. 감정 공감 — 고객의 절박함·억울함·불안을 먼저 인정
+    2. 상황 투명 안내 — 전산 데이터 기준 객관적 설명
+    3. 규정 내 대안 — 안 되는 건 명확히 하되, 현실적 우회로 매칭
+    4. 능동적 마무리 — 담당자가 먼저 움직이겠다는 액션
 
-다음 4개 항목을 개조식(bullet point)으로 작성해주세요:
+    ## 불만 유형별 처방 가이드 (VOC에서 해당 징후 감지 시 적용)
+    - 핑퐁·책임전가 → 영업 담당자가 직접 유관 부서와 소통, 원스톱 피드백. 전화번호만 주고 끝내는 처방 금지.
+    - 절차·서류·디지털 소외 → 행정정보 공동이용 활용, 날짜·시한 콕 집어 안내. 모호한 안내 금지.
+    - 요금·복지·소급 → 생계 영향 공감 우선, 분납/우회 혜택 대안 제시. 냉소적 화법 금지.
+    - 정전·품질·배상 → 현장 기술팀 투입 원인 규명. 배상은 전담 부서 영역, 현장 확언 금지.
+    - 규정 한계 안내 시 → '안 됩니다'로 끝내지 말 것. 대안 또는 능동적 마무리 필수.
 
-#### 1. 금주 핵심 이슈
-- 이번 주 가장 주목해야 할 CS 이슈 3가지
+    다음 JSON 구조로만 응답하세요. JSON 외 다른 텍스트(설명/인사/마크다운 fence) 절대 금지:
 
-#### 2. 지사별 주의사항
-- 점수가 낮거나 부정 VOC가 많은 지사 중심으로 개선 방향 제시
+    {{
+      "핵심이슈": ["이슈1 (한 줄)", "이슈2 (한 줄)", "이슈3 (한 줄)"],
+      "주의포인트": [
+        {{"업무": "업무유형명", "내용": "주의할 내용 한 줄"}}
+      ],
+      "개선포인트": [
+        {{"업무": "업무유형명", "액션": "구체적 개선 액션 한 줄"}}
+      ],
+      "실행과제": ["실행 과제1 (한 줄)", "실행 과제2 (한 줄)", "실행 과제3 (한 줄)"]
+    }}
 
-#### 3. 업무유형별 개선 포인트
-- 업무유형별 취약점과 구체적 개선 방안
+    [JSON 작성 규칙]
+    - 핵심이슈: 정확히 3개
+    - 주의포인트: 2~4개
+    - 개선포인트: 2~4개
+    - 실행과제: 정확히 3개 (우선순위 높은 순)
+    - 모든 문장 한 줄, 짧고 명확하게
+    - 업무유형명은 데이터에 나온 그대로 사용 (예: "정전", "신규증설", "검침관련" 등)
+    - "지사별/지사:" 같은 표현 절대 금지 — 이미 단일 지사 리포트이므로 불필요
+    - 본부 비교 금지 — 이 리포트는 단일 사업소용
 
-#### 4. 금주 실행 과제
-- 이번 주 즉시 실행 가능한 CS 개선 과제 3-5개
+    [문장 종결 규칙 — 절대 준수]
+    - 모든 문장은 **명사형/부사형**으로 끝맺기 (개조식 보고서 스타일)
+      · OK 예시: "~ 안내 강화", "~ 매뉴얼 점검", "~ 우회 대안 매칭", "~ 능동적 마무리", "~ 점검 권장", "~ 책임 안내", "~ 공유 필요"
+      · NG 예시: "~ 안내해야 합니다", "~ 점검합니다", "~ 매칭하여 안내합니다", "~ 강화해주세요"
+    - "~합니다", "~해야 합니다", "~ 됩니다", "~ 입니다", "~ 주세요" 등 종결어미 절대 금지
+    - 격식 있는 보고서 톤: 명사 + 동사명사형(검토/강화/확인/조치/공유/안내/점검/매칭/권장 등)으로 마무리
 
-[현실적 제약]
-- 123 고객센터 전화 연결 지연 → 사업소 권한 밖. 해결 불가 이슈이므로 실행 과제에서 제외.
-- 전기요금 단가·정책·제도 변경 → 본사 권한. 사업소에서 불가.
-- TF 구성, 전담 창구/핫라인 → 소규모 사업소에서 비현실적. 제안 금지.
-- 새 프로세스·절차·시스템 도입 → 사업소 권한 밖. 제안 금지.
-- 문자 발송·해피콜·만족도 조사 → 이미 자동화 시행 중. 제안 불필요.
-- 멘토링, 코칭, 직원 교육, 롤플레이, 모니터링 평가 등 직원 저격성 제안 금지.
+    [현실적 제약]
+    - 123 고객센터 전화 연결 지연 → 사업소 권한 밖. 실행 과제에서 제외.
+    - 전기요금 단가·정책·제도 변경 → 본사 권한. 사업소에서 불가.
+    - TF 구성, 전담 창구/핫라인 → 소규모 사업소에서 비현실적. 제안 금지.
+    - 새 프로세스·절차·시스템 도입 → 사업소 권한 밖. 제안 금지.
+    - 문자 발송·해피콜·만족도 조사 → 이미 자동화 시행 중. 제안 불필요.
+    - 멘토링, 코칭, 직원 교육, 롤플레이, 모니터링 평가 등 직원 저격성 제안 금지.
 
-[필수 규칙]
-- '전기세' 표현 절대 금지. 반드시 '전기요금'으로 표기.
-- 줄글(산문체) 금지. 반드시 개조식(bullet, 짧은 문장) 보고서 형태로 작성.
-- 한 bullet = 한 줄. 2줄 이상 금지. 핵심만 짧게.
-- VOC 원문을 길게 인용하지 말 것. 핵심 키워드만 추출.
-- 미사여구·AI 추임새·인사말 금지. 바로 본론.
-- 데이터에 없는 사실 창작 금지."""
+    [필수 규칙]
+    - '전기세' 표현 절대 금지. 반드시 '전기요금'으로 표기.
+    - VOC 원문을 길게 인용하지 말 것. 핵심 키워드만 추출.
+    - 미사여구·AI 추임새·인사말 금지.
+    - 데이터에 없는 사실 창작 금지.
+    - JSON 응답 외 다른 텍스트(```json fence, 인사말, 설명) 절대 출력 금지."""
 
-            with st.spinner("AI가 주간 협조요청 분석 중…"):
-                try:
-                    import urllib.request
-                    _models = ["gemini-2.5-flash", "gemini-flash-latest", "gemini-2.5-flash-lite", "gemini-2.5-pro", "gemini-2.0-flash"]
-                    _payload = {"contents": [{"parts": [{"text": _ai_weekly_prompt}]}],
-                                 "generationConfig": {"temperature": 0.7, "maxOutputTokens": 8192}}
-                    _ctx = ssl._create_unverified_context()
-                    _body = None
-                    for _model in _models:
-                        _api_url = f"https://generativelanguage.googleapis.com/v1beta/models/{_model}:generateContent?key={_GEMINI_KEY}"
-                        _req = urllib.request.Request(_api_url, data=json.dumps(_payload).encode("utf-8"),
-                                                       headers={"Content-Type": "application/json"}, method="POST")
-                        try:
-                            with urllib.request.urlopen(_req, context=_ctx, timeout=90) as _resp:
-                                _body = json.loads(_resp.read().decode("utf-8"))
-                            break
-                        except urllib.error.HTTPError as _http_err:
-                            if _http_err.code in (429, 500, 502, 503):
-                                continue
-                            raise
-                    if _body is None:
-                        st.error("모든 AI 모델의 일일 한도가 소진되었습니다. 내일 다시 시도해주세요.")
-                    else:
-                        st.session_state[_wr_ai_key] = _body["candidates"][0]["content"]["parts"][0]["text"].strip()
-                except Exception as e:
-                    st.error(f"AI 분석 중 오류: {e}")
+                with st.spinner("AI가 주간 협조요청 분석 중…"):
+                    try:
+                        import urllib.request
+                        _models = ["gemini-2.5-flash", "gemini-flash-latest", "gemini-2.5-flash-lite", "gemini-2.5-pro", "gemini-2.0-flash"]
+                        _payload = {"contents": [{"parts": [{"text": _ai_weekly_prompt}]}],
+                                     "generationConfig": {"temperature": 0.7, "maxOutputTokens": 8192}}
+                        _ctx = ssl._create_unverified_context()
+                        _body = None
+                        for _model in _models:
+                            _api_url = f"https://generativelanguage.googleapis.com/v1beta/models/{_model}:generateContent?key={_GEMINI_KEY}"
+                            _req = urllib.request.Request(_api_url, data=json.dumps(_payload).encode("utf-8"),
+                                                           headers={"Content-Type": "application/json"}, method="POST")
+                            try:
+                                with urllib.request.urlopen(_req, context=_ctx, timeout=90) as _resp:
+                                    _body = json.loads(_resp.read().decode("utf-8"))
+                                break
+                            except urllib.error.HTTPError as _http_err:
+                                if _http_err.code in (429, 500, 502, 503):
+                                    continue
+                                raise
+                        if _body is None:
+                            st.error("모든 AI 모델의 일일 한도가 소진되었습니다. 내일 다시 시도해주세요.")
+                        else:
+                            _raw_text = _body["candidates"][0]["content"]["parts"][0]["text"].strip()
+                            # JSON 파싱 시도 (마크다운 fence 안에 들어있을 수도)
+                            import re as _re_wr
+                            _json_match = _re_wr.search(r'\{[\s\S]*\}', _raw_text)
+                            _parsed = None
+                            if _json_match:
+                                try:
+                                    _parsed = json.loads(_json_match.group(0))
+                                except Exception:
+                                    _parsed = None
+                            if _parsed and isinstance(_parsed, dict):
+                                st.session_state[_wr_ai_key] = {"type": "json", "data": _parsed}
+                            else:
+                                # fallback — JSON 실패 시 원본 텍스트로 표시
+                                st.session_state[_wr_ai_key] = {"type": "text", "data": _raw_text}
+                    except Exception as e:
+                        st.error(f"AI 분석 중 오류: {e}")
 
-        # 캐시된 결과 표시
-        if _wr_ai_key in st.session_state:
-            st.markdown(
-                '<div style="background:#f8f9fb;border:1px solid #d0d7de;border-radius:10px;'
-                'padding:24px 28px;margin:8px 0;font-size:0.93em;line-height:1.85;">\n\n'
-                f'{st.session_state[_wr_ai_key]}\n\n</div>',
-                unsafe_allow_html=True)
+            # 캐시된 결과 표시
+            if _wr_ai_key in st.session_state:
+                _cached = st.session_state[_wr_ai_key]
+                # Backward compat: 옛 캐시는 문자열 그대로
+                if isinstance(_cached, str):
+                    st.markdown(
+                        '<div style="background:#f8f9fb;border:1px solid #d0d7de;border-radius:10px;'
+                        'padding:24px 28px;margin:8px 0;font-size:0.93em;line-height:1.85;">\n\n'
+                        f'{_cached}\n\n</div>',
+                        unsafe_allow_html=True)
+                elif isinstance(_cached, dict) and _cached.get("type") == "json":
+                    st.markdown(_render_weekly_ai_cards(_cached["data"]), unsafe_allow_html=True)
+                elif isinstance(_cached, dict) and _cached.get("type") == "text":
+                    # JSON 파싱 실패 시 fallback — 텍스트 그대로
+                    st.warning("⚠️ AI 응답이 정형화되지 않아 원문으로 표시합니다.")
+                    st.markdown(
+                        '<div style="background:#f8f9fb;border:1px solid #d0d7de;border-radius:10px;'
+                        'padding:24px 28px;margin:8px 0;font-size:0.93em;line-height:1.85;">\n\n'
+                        f'{_cached["data"]}\n\n</div>',
+                        unsafe_allow_html=True)
+
+
+        _weekly_ai_fragment()
+
+        # ── 통합 다운로드 (주간조사 + 업무유형별 + 피드백) ──
+        if _wr_dl_sheets:
+            st.markdown("---")
+            _wr_all_buf = io.BytesIO()
+            with pd.ExcelWriter(_wr_all_buf, engine="openpyxl") as _aw:
+                for _sname, _sdf in _wr_dl_sheets.items():
+                    _sdf.to_excel(_aw, index=False, sheet_name=_sname)
+            _wr_fname = f"주간리포트_{_wr_ws.replace('/','')}_{_wr_we.replace('/','')}.xlsx"
+            st.download_button(
+                label=f"📥 주간 리포트 통합 다운로드 ({' · '.join(_wr_dl_sheets.keys())})",
+                data=_wr_all_buf.getvalue(),
+                file_name=_wr_fname,
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                key="dl_weekly_all",
+                use_container_width=True,
+            )
 
 # ─────────────────────────────────────────────────────────────
 #  TAB 1  구간별 비중 · 종합 현황
@@ -3159,7 +3400,7 @@ with tab1:
         _hq2_html += f'<td style="border:1px solid {_RP_BDR};padding:8px 8px;">{_resp_n_actual:,}</td>'
         _hq2_html += f'<td style="border:1px solid {_RP_BDR};padding:8px 8px;">{_resp_rate}</td>' if _resp_rate is not None else f'<td style="border:1px solid {_RP_BDR};padding:8px 8px;">-</td>'
         _hq2_html += f'<td style="border:1px solid {_RP_BDR};padding:8px 8px;font-weight:700;color:{C["navy"]};">{_cur_score_val}</td>' if _cur_score_val is not None else f'<td style="border:1px solid {_RP_BDR};padding:8px 8px;">-</td>'
-        _hq2_html += f'<td style="border:1px solid {_RP_BDR};padding:8px 8px;">{_fmt_diff(_prev_diff_overall)}</td>'
+        _hq2_html += f'<td style="border:1px solid {_RP_BDR};padding:8px 8px;">{_fmt_diff_colored(_prev_diff_overall)}</td>'
         _hq2_html += f'<td style="border:1px solid {_RP_BDR};padding:8px 8px;">-</td></tr>'
         _hq2_html += '</table>'
         # 표 카드 + 다음 sec-head를 한 markdown으로 출력 (gap 3과 동일한 패턴)
@@ -3192,7 +3433,14 @@ with tab1:
 
         if _diff_p90 is not None:
             _delta_word = "증가" if _diff_p90 > 0 else ("감소" if _diff_p90 < 0 else "유지")
-            _title3 = f'본부 만족도 90점 이상 비중 {_p90:.1f}%로 {compare_label} 대비 {_fmt_diff(_diff_p90)}%p {_delta_word}'
+            # 화살표/△ 없이 "X%p 증가/감소" 전체를 한 색으로 (증가=파랑, 감소=빨강)
+            if _diff_p90 > 0:
+                _delta_html = f'<span style="color:#0055a5;font-weight:700;">{abs(_diff_p90):.1f}%p {_delta_word}</span>'
+            elif _diff_p90 < 0:
+                _delta_html = f'<span style="color:#c62828;font-weight:700;">{abs(_diff_p90):.1f}%p {_delta_word}</span>'
+            else:
+                _delta_html = f'{abs(_diff_p90):.1f}%p {_delta_word}'
+            _title3 = f'본부 만족도 90점 이상 비중 {_p90:.1f}%로 {compare_label} 대비 {_delta_html}'
         else:
             _title3 = f'본부 만족도 90점 이상 비중 {_p90:.1f}%로 {compare_label} 대비 (   )%p 감소'
         # sec-head는 위 _gap1_html에 합쳐서 이미 출력됨
@@ -3271,7 +3519,8 @@ with tab1:
                 height=290, margin=dict(t=10, b=10, l=10, r=10),
                 paper_bgcolor="white", plot_bgcolor="white",
                 showlegend=False)
-            st.plotly_chart(fig_bp, use_container_width=True, config={'staticPlot': True})
+            st.plotly_chart(fig_bp, use_container_width=True,
+                            config={'displayModeBar': False, 'displaylogo': False})
 
         with _bk_tbl_col:
             # 표 위에 동적 멘트 (글씨 크기 키움)
@@ -3307,10 +3556,7 @@ with tab1:
             _bk3_html += f'<td style="padding:9px 6px;font-weight:700;background:{_RP_SUB_BG};color:{C["navy"]};">{compare_label}대비(%p)</td>'
             if _diff_pcts is not None:
                 for d in _diff_pcts:
-                    _v = _fmt_diff(d)
-                    # 양수(증가)에만 ↑ + 컬러 포인트(블루), 감소는 그대로
-                    if d is not None and not pd.isna(d) and d > 0:
-                        _v = f'<span style="color:{C["blue"]};font-weight:700;">{_v} ↑</span>'
+                    _v = _fmt_diff_colored(d)
                     _bk3_html += f'<td style="padding:9px 6px;">{_v}</td>'
                 _bk3_html += f'<td style="padding:9px 6px;">-</td></tr>'
             else:
@@ -3430,13 +3676,19 @@ with tab1:
                     _biz_df = _biz_df.sort_values("비율(%)", ascending=True)
                     _biz_top3 = set(_biz_df.sort_values("비율(%)", ascending=False).head(3)["유형"].tolist())
                     _biz_df["구분"] = _biz_df["유형"].apply(lambda x: "상위 3" if x in _biz_top3 else "일반")
-                    fig_biz = px.bar(_biz_df, x="비율(%)", y="유형", orientation="h", color="구분",
-                                     text=[f"{r:.1f}% ({int(c):,}건)" for r, c in zip(_biz_df["비율(%)"], _biz_df["건수"])],
-                                     color_discrete_map={"상위 3": C["navy"], "일반": C["sky"]},
-                                     template=PLOTLY_TPL)
-                    fig_biz.update_traces(textposition="outside", textfont_size=13,
-                                          hovertemplate="%{y}: %{x:.1f}% (%{customdata[0]:,}건)<extra></extra>",
-                                          customdata=_biz_df[["건수"]].values)
+                    # go.Bar 단일 trace로 — px.bar(color=)가 trace를 쪼개면 customdata 인덱스 어긋남
+                    _biz_colors = [C["navy"] if _y in _biz_top3 else C["sky"] for _y in _biz_df["유형"]]
+                    fig_biz = go.Figure(go.Bar(
+                        x=_biz_df["비율(%)"].tolist(),
+                        y=_biz_df["유형"].tolist(),
+                        orientation="h",
+                        marker_color=_biz_colors,
+                        text=[f"{r:.1f}% ({int(c):,}건)" for r, c in zip(_biz_df["비율(%)"], _biz_df["건수"])],
+                        textposition="outside",
+                        textfont=dict(size=13),
+                        customdata=_biz_df[["건수"]].values,
+                        hovertemplate="%{y}: %{x:.1f}% (%{customdata[0]:,}건)<extra></extra>",
+                    ))
                     _biz_x_max = _biz_df["비율(%)"].max() * 1.30
                     fig_biz.update_layout(height=460,
                                            margin=dict(t=50, b=15, l=10, r=10), showlegend=False,
@@ -3444,7 +3696,8 @@ with tab1:
                                            title=_chart_title,
                                            xaxis=dict(title="비율(%)", range=[0, _biz_x_max], tickfont=dict(size=12)),
                                            yaxis=dict(tickfont=dict(size=13)), yaxis_title="")
-                    st.plotly_chart(fig_biz, use_container_width=True, config={'staticPlot': True})
+                    st.plotly_chart(fig_biz, use_container_width=True,
+                                    config={'displayModeBar': False, 'displaylogo': False})
                 else:
                     # 연령대, 계약종별: 원형 파이 — 큰 조각 안쪽 / 작은 조각 자동 outside
                     _pie_labels = [f"{nm} ({cnt:,}건)" for nm, cnt in zip(counts.index, counts.values)]
@@ -3465,7 +3718,8 @@ with tab1:
                         showlegend=False,
                         title=_chart_title,
                         paper_bgcolor="white", plot_bgcolor="white")
-                    st.plotly_chart(fig_pie, use_container_width=True, config={'staticPlot': True})
+                    st.plotly_chart(fig_pie, use_container_width=True,
+                                    config={'displayModeBar': False, 'displaylogo': False})
 
 
 # ─────────────────────────────────────────────────────────────
@@ -3588,25 +3842,47 @@ def _render_category_section(df, cat_col, cat_label, office_col, score_col, over
 
     with st.expander(f"📊 {cat_label} 상세 차트 보기", expanded=False):
         st.markdown('<span class="no-border-expander" style="display:none;"></span>', unsafe_allow_html=True)
-        # 막대 그래프 — 제목 가운데 정렬, 하위 3 카드는 미포함
-        fig = px.bar(grp, x="평균만족도", y=cat_label, color="구분",
-                     color_discrete_map={"하위 3": C["red"], "일반": C["sky"]},
-                     orientation="h", text="평균만족도", template=PLOTLY_TPL)
-        fig.update_traces(texttemplate="%{text:.1f}", textposition="outside", cliponaxis=False,
-                          hovertemplate="%{y}<br>평균: %{x:.1f}점<br>응답: %{customdata[0]:,}건<extra></extra>",
-                          customdata=grp[["응답수"]].values)
-        fig.add_vline(x=overall_avg, line_color="#aaa", line_dash="dash", line_width=1.2,
-                      annotation_text=f"▼ 전체 평균 {overall_avg:.1f}",
-                      annotation_font_size=11, annotation_font_color="#888",
-                      annotation_position="top", annotation_yshift=10)
+        # 막대 그래프 — 도넛 차트 색감과 통일(점수 4구간), 범례 제거
+        def _score_color(v):
+            if v >= 90: return "#4a7c4d"   # 진초록
+            if v >= 70: return "#7eb37a"   # 연초록
+            if v >= 50: return "#d97a35"   # 주황
+            return "#c25151"               # 빨강
+        _bar_colors = [_score_color(v) for v in grp["평균만족도"].tolist()]
+        fig = go.Figure(go.Bar(
+            x=grp["평균만족도"].tolist(),
+            y=grp[cat_label].tolist(),
+            orientation="h",
+            marker=dict(color=_bar_colors,
+                        line=dict(width=0)),
+            text=[f"{v:.1f}" for v in grp["평균만족도"].tolist()],
+            textposition="outside",
+            textfont=dict(size=12, color="#374151"),
+            cliponaxis=False,
+            customdata=grp[["응답수"]].values,
+            hovertemplate="<b>%{y}</b><br>평균: %{x:.1f}점<br>응답: %{customdata[0]:,}건<extra></extra>",
+        ))
+        # 전체 평균 라인 — 옅은 점선
+        fig.add_vline(x=overall_avg, line_color="#9ca3af", line_dash="dot", line_width=1,
+                      annotation_text=f"전체 평균 {overall_avg:.1f}",
+                      annotation_font_size=10, annotation_font_color="#6b7280",
+                      annotation_position="top", annotation_yshift=8)
         fig.update_layout(
-            height=max(300, len(grp) * 30 + 80),
-            margin=dict(t=60, b=20, l=10, r=160),
-            legend_title_text="",
-            title=dict(text=f"<b>{cat_label}별 평균 만족도 (빨간색 = 하위 3개)</b>",
+            height=max(300, len(grp) * 32 + 80),
+            margin=dict(t=60, b=20, l=10, r=60),
+            template=PLOTLY_TPL,
+            paper_bgcolor="rgba(0,0,0,0)",
+            plot_bgcolor="rgba(0,0,0,0)",
+            showlegend=False,
+            title=dict(text=f"<b>{cat_label}별 평균 만족도</b>",
                        x=0.5, xanchor="center", y=0.97, yanchor="top",
-                       font=dict(size=14, color=C["navy"])))
-        st.plotly_chart(fig, use_container_width=True, config={'staticPlot': True})
+                       font=dict(size=15, color=C["navy"])),
+            xaxis=dict(showgrid=True, gridcolor="rgba(0,0,0,0.06)",
+                       zeroline=False, showline=False, tickfont=dict(size=10, color="#6b7280")),
+            yaxis=dict(showgrid=False, zeroline=False, showline=False,
+                       tickfont=dict(size=11, color="#374151")),
+        )
+        st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False, 'displaylogo': False})
 
     # ── 지사별 × 범주별 점수 테이블/히트맵 ──
     if office_col:
@@ -4349,7 +4625,8 @@ with tab5:
                                           hovertemplate="%{x}: %{y}회<extra></extra>")
                     fig_neg.update_layout(height=340, margin=dict(t=50, b=70, l=60, r=20), xaxis_tickangle=-25,
                                            title_font=dict(size=14, color=C["navy"]))
-                    st.plotly_chart(fig_neg, use_container_width=True, config={'staticPlot': True})
+                    st.plotly_chart(fig_neg, use_container_width=True,
+                                    config={'displayModeBar': False, 'displaylogo': False})
                 with nk_r:
                     fig_don = px.pie(nkw_df.head(10), names="부정키워드", values="감지횟수", hole=0.5,
                                      color_discrete_sequence=px.colors.sequential.Reds[::-1],
@@ -4359,7 +4636,8 @@ with tab5:
                                            hovertemplate="%{label}<br>%{value}회 (%{percent})<extra></extra>")
                     fig_don.update_layout(height=340, margin=dict(t=50, b=20, l=20, r=20), showlegend=False,
                                            title_font=dict(size=14, color=C["navy"]))
-                    st.plotly_chart(fig_don, use_container_width=True, config={'staticPlot': True})
+                    st.plotly_chart(fig_don, use_container_width=True,
+                                    config={'displayModeBar': False, 'displaylogo': False})
 
             # 리스트 테이블
             display_cols = []
@@ -4797,12 +5075,16 @@ with tab_sol:
             _hero_biz["본부평균"] = _hero_biz["업무"].map(_hero_biz_hq)
             _hero_biz["편차"] = (_hero_biz["평균"] - _hero_biz["본부평균"]).round(1)
             _hero_biz_v = _hero_biz[(_hero_biz["건수"] >= 2) & _hero_biz["편차"].notna()]
-            if not _hero_biz_v.empty:
-                _r_top = _hero_biz_v.sort_values("편차", ascending=False).iloc[0]
-                _r_bot = _hero_biz_v.sort_values("편차").iloc[0]
+            # 진짜 강점 = 편차 > 0 인 것 중 최고, 진짜 약점 = 편차 < 0 인 것 중 최저
+            _hero_pos = _hero_biz_v[_hero_biz_v["편차"] > 0]
+            _hero_neg = _hero_biz_v[_hero_biz_v["편차"] < 0]
+            if not _hero_pos.empty:
+                _r_top = _hero_pos.sort_values("편차", ascending=False).iloc[0]
                 _top_str_label = _r_top["업무"]
                 _top_str_score = float(_r_top["평균"])
                 _top_str_dev = float(_r_top["편차"])
+            if not _hero_neg.empty:
+                _r_bot = _hero_neg.sort_values("편차").iloc[0]
                 _top_weak_label = _r_bot["업무"]
                 _top_weak_score = float(_r_bot["평균"])
                 _top_weak_dev = float(_r_bot["편차"])
@@ -4818,7 +5100,10 @@ with tab_sol:
                 f'<div style="font-size:0.74em;color:#a5d6a7;">본부 대비 +{_top_str_dev:.1f}점</div>'
             )
         else:
-            _str_html = '<div style="font-size:0.85em;opacity:0.7;margin-top:14px;">데이터 부족</div>'
+            _str_html = (
+                '<div style="font-size:0.95em;font-weight:700;margin:8px 0 4px;line-height:1.2;">✨ 강점 없음</div>'
+                '<div style="font-size:0.75em;opacity:0.75;">본부 평균 상회 업무 없음</div>'
+            )
 
         # 약점 카드 컨텐츠
         if _top_weak_label is not None:
@@ -4830,7 +5115,10 @@ with tab_sol:
                 f'<div style="font-size:0.74em;color:{_weak_dev_color};">본부 대비 {_weak_dev_sign}점</div>'
             )
         else:
-            _weak_html = '<div style="font-size:0.85em;opacity:0.7;margin-top:14px;">데이터 부족</div>'
+            _weak_html = (
+                '<div style="font-size:0.95em;font-weight:700;margin:8px 0 4px;line-height:1.2;">🎉 약점 없음</div>'
+                '<div style="font-size:0.75em;opacity:0.75;">전 영역 본부 평균 이상</div>'
+            )
 
         st.markdown(
             '<div style="background:linear-gradient(135deg,#1a237e 0%,#283593 60%,#1565c0 100%);'
@@ -4881,7 +5169,10 @@ with tab_sol:
                 """레이더 + 강점/약점(개선/악화) 카드. cat_col 미지정시 업무유형 기준."""
                 if cat_col is None:
                     cat_col = M["business"]
-                _biz_sel = sel_df.groupby(cat_col)["_점수100"].mean().dropna()
+                # 평균 + 건수 (건수 ≥ 2 필터용)
+                _biz_sel_agg = sel_df.groupby(cat_col)["_점수100"].agg(["mean", "count"]).dropna()
+                _biz_sel = _biz_sel_agg["mean"]
+                _biz_cnt = _biz_sel_agg["count"]
                 _biz_ref = ref_df.groupby(cat_col)["_점수100"].mean().dropna()
                 _cats = sorted(set(_biz_sel.index) & set(_biz_ref.index))
                 if len(_cats) < 3:
@@ -4910,26 +5201,39 @@ with tab_sol:
                     showlegend=True)
                 st.plotly_chart(_fig, use_container_width=True,
                                 config={'displayModeBar': False, 'displaylogo': False})
-                _gap = pd.DataFrame({cat_label: _cats, "지사": _r_sel, "기준": _r_ref})
+                # 건수 매핑 (≥2건만 포함)
+                _r_cnt = [int(_biz_cnt.get(c, 0)) for c in _cats]
+                _gap = pd.DataFrame({cat_label: _cats, "지사": _r_sel, "기준": _r_ref, "건수": _r_cnt})
                 _gap["편차"] = _gap["지사"] - _gap["기준"]
-                _good = _gap.sort_values("편차", ascending=False).head(3)
-                _bad = _gap.sort_values("편차").head(3)
+                _gap_v = _gap[_gap["건수"] >= 2]
+                # 진짜 강점/약점만 (편차 방향 필터)
+                _good = _gap_v[_gap_v["편차"] > 0].sort_values("편차", ascending=False).head(3)
+                _bad = _gap_v[_gap_v["편차"] < 0].sort_values("편차").head(3)
                 if is_timeseries:
                     _good_label, _bad_label = "📈 개선 TOP 3", "📉 악화 TOP 3"
                     _good_icon, _bad_icon = "🔼", "🔽"
+                    _empty_good, _empty_bad = "✨ 전월 대비 개선 없음", "🎉 전월 대비 악화 없음"
                 else:
                     _good_label, _bad_label = "💪 강점 TOP 3", "🩹 약점 TOP 3"
                     _good_icon, _bad_icon = "🟢", "🔴"
+                    _empty_good = f"✨ {ref_label} 상회 영역 없음"
+                    _empty_bad = f"🎉 {ref_label} 대비 약점 없음"
                 _gl, _gr = st.columns(2)
                 with _gl:
                     _h = f'<div class="sol-tt-card sol-tt-good" style="background:#e8f5e9;border-radius:8px;padding:10px 14px;font-size:0.88em;"><b>{_good_label}</b><br>'
-                    for _, r in _good.iterrows():
-                        _h += f'{_good_icon} {r[cat_label]} — {r["지사"]:.1f}점 ({ref_label} 대비 <b>{r["편차"]:+.1f}</b>점)<br>'
+                    if _good.empty:
+                        _h += f'<span style="color:#777;">{_empty_good}</span>'
+                    else:
+                        for _, r in _good.iterrows():
+                            _h += f'{_good_icon} {r[cat_label]} — {r["지사"]:.1f}점 ({ref_label} 대비 <b>{r["편차"]:+.1f}</b>점)<br>'
                     st.markdown(_h + '</div>', unsafe_allow_html=True)
                 with _gr:
                     _h = f'<div class="sol-tt-card sol-tt-bad" style="background:#ffebee;border-radius:8px;padding:10px 14px;font-size:0.88em;"><b>{_bad_label}</b><br>'
-                    for _, r in _bad.iterrows():
-                        _h += f'{_bad_icon} {r[cat_label]} — {r["지사"]:.1f}점 ({ref_label} 대비 <b style="color:#c62828">{r["편차"]:+.1f}</b>점)<br>'
+                    if _bad.empty:
+                        _h += f'<span style="color:#777;">{_empty_bad}</span>'
+                    else:
+                        for _, r in _bad.iterrows():
+                            _h += f'{_bad_icon} {r[cat_label]} — {r["지사"]:.1f}점 ({ref_label} 대비 <b style="color:#c62828">{r["편차"]:+.1f}</b>점)<br>'
                     st.markdown(_h + '</div>', unsafe_allow_html=True)
 
             with _sol_mid_l:
@@ -5114,7 +5418,14 @@ with tab_sol:
 
                 # ── 리스크 분류: 계약종별 × 업무 기준 ──────────
                 # 기준 = 지사 평균(_sel_avg) — 차트 미스매치와 동일 기준
-                _sol_score_cols = [c for c in individual_scores if c in _df_sel.columns]
+                # 양수 값이 하나라도 있어야 포함 (이용편리성처럼 점수 안 매기는 컬럼 자동 제외)
+                _sol_score_cols = []
+                for _c_col in individual_scores:
+                    if _c_col not in _df_sel.columns:
+                        continue
+                    _c_vals = pd.to_numeric(_df_sel[_c_col], errors="coerce").dropna()
+                    if len(_c_vals) > 0 and (_c_vals > 0).any():
+                        _sol_score_cols.append(_c_col)
                 _sol_total_cnt = int(len(_df_sel))
                 _sol_combos = _df_sel.groupby([M["contract"], M["business"]]).agg(
                     _avg=("_점수100", "mean"), _cnt=("_점수100", "count")).reset_index()
@@ -5129,7 +5440,8 @@ with tab_sol:
                     _c_worst_item, _c_worst_val = "", 100.0
                     for _sc in _sol_score_cols:
                         _sv = pd.to_numeric(_c_sub[_sc], errors="coerce").dropna()
-                        if len(_sv) > 0 and float(_sv.mean()) < _c_worst_val:
+                        # 양수 값이 있는 컬럼만 (0만 있는 컬럼 제외 — 이용편리성 등)
+                        if len(_sv) > 0 and (_sv > 0).any() and float(_sv.mean()) < _c_worst_val:
                             _c_worst_val = float(_sv.mean())
                             _c_worst_item = _sc
                     _c_voc_sample = ""
@@ -5173,17 +5485,18 @@ with tab_sol:
                                    and _cur_sel.get("계약종별") == _rk["계약종별"]
                                    and _cur_sel.get("업무") == _rk["업무"])
                         _badge = "①②③"[_ri]
-                        _bg = "#fff3e0" if _is_sel else "#ffebee"
-                        _bd = "#ff8f00" if _is_sel else "#ef9a9a"
+                        # Tab1 도넛 50점 미만 색상(#c25151)과 통일 — bg 톤은 동일, 선택 시 border만 진하게
+                        _bg = "#fdecec"
+                        _bd = "#c25151" if _is_sel else "#e8a8a8"
                         with _rt_cols[_ri]:
                             _voc_line = f'<div style="font-size:0.75em;color:#888;margin-top:4px;">"{_rk["voc"]}…"</div>' if _rk["voc"] else ""
                             st.markdown(
-                                f'<div class="sol-tt-card sol-tt-bad" style="background:{_bg};border:2px solid {_bd};'
+                                f'<div class="sol-risk-card" style="background:{_bg};border:2px solid {_bd};'
                                 'border-radius:10px;padding:12px;margin-bottom:8px;">'
-                                f'<div style="font-size:0.78em;color:#c62828;font-weight:700;">리스크 {_badge}</div>'
+                                f'<div style="font-size:0.78em;color:#c25151;font-weight:700;">리스크 {_badge}</div>'
                                 f'<div style="font-size:1em;font-weight:800;margin:4px 0;">{_rk["계약종별"]} × {_rk["업무"]}</div>'
                                 f'<div style="font-size:0.82em;color:#555;">최저: {_rk["최저항목"]} ({_rk["최저점수"]}점)</div>'
-                                f'<div style="font-size:1.4em;font-weight:900;color:#c62828;">{_rk["점수"]:.1f}점</div>'
+                                f'<div style="font-size:1.4em;font-weight:900;color:#c25151;">{_rk["점수"]:.1f}점</div>'
                                 f'<div style="font-size:0.78em;color:#555;">{_rk["건수"]}건 · 평균 <b>+{_rk["avg_lift"]:.2f}점</b> 상승 효과</div>'
                                 f'{_voc_line}'
                                 '</div>', unsafe_allow_html=True)
@@ -5396,12 +5709,13 @@ with tab_sol:
                                 _sorted_items = sorted(_item_scores.items(), key=lambda x: x[1])
                                 _sorted_keys = [k for k, _ in _sorted_items]
                                 _sorted_vals = [v for _, v in _sorted_items]
-                                _sorted_colors = [
-                                    "#c62828" if k == _worst_item_name
-                                    else "#f57c00" if v < _sel_avg
-                                    else "#90a4ae"
-                                    for k, v in _sorted_items
-                                ]
+                                # 응답분포 4컬러 팔레트 (90+ 진초록 / 70~90 연초록 / 50~70 주황 / 50- 빨강)
+                                def _c3_color(_v):
+                                    if _v >= 90: return "#4a7c4d"
+                                    if _v >= 70: return "#7eb37a"
+                                    if _v >= 50: return "#d97a35"
+                                    return "#c25151"
+                                _sorted_colors = [_c3_color(v) for _, v in _sorted_items]
                                 fig_c3 = go.Figure(go.Bar(
                                     y=_sorted_keys, x=_sorted_vals,
                                     orientation="h", marker_color=_sorted_colors,
@@ -5552,8 +5866,13 @@ with tab_sol:
 
                     _kw_data = st.session_state.get(_voc_kw_key)
                     if _kw_data and isinstance(_kw_data, dict) and _kw_data.get("부정"):
+                        # 키워드 정제: 괄호·따옴표·여백 제거
+                        def _clean_kw(_s):
+                            return _s.strip().strip("()[]{}\"'`「」『』").strip()
+
                         # 부정 키워드 → 빨간 pill 태그
-                        _neg_kws = [k.strip() for k in _kw_data["부정"].split(",") if k.strip()]
+                        _neg_kws = [_clean_kw(k) for k in _kw_data["부정"].split(",")]
+                        _neg_kws = [k for k in _neg_kws if k]
                         _neg_pills = "".join([
                             f'<span style="display:inline-block;background:#ffebee;'
                             f'color:#c62828;padding:4px 12px;border-radius:14px;'
@@ -5563,13 +5882,17 @@ with tab_sol:
                         # 특이 키워드 처리
                         _spec_kw = _kw_data.get("특이", "없음")
                         if _spec_kw and _spec_kw != "없음":
-                            _spec_kws = [k.strip() for k in _spec_kw.split(",") if k.strip()]
-                            _spec_pills = "".join([
-                                f'<span style="display:inline-block;background:#fff8e1;'
-                                f'color:#e65100;padding:4px 12px;border-radius:14px;'
-                                f'margin:3px 4px 3px 0;font-weight:700;font-size:0.88em;'
-                                f'border:1px solid #ffe082;">{_kw}</span>' for _kw in _spec_kws
-                            ])
+                            _spec_kws = [_clean_kw(k) for k in _spec_kw.split(",")]
+                            _spec_kws = [k for k in _spec_kws if k and k != "없음"]
+                            if _spec_kws:
+                                _spec_pills = "".join([
+                                    f'<span style="display:inline-block;background:#fff8e1;'
+                                    f'color:#e65100;padding:4px 12px;border-radius:14px;'
+                                    f'margin:3px 4px 3px 0;font-weight:700;font-size:0.88em;'
+                                    f'border:1px solid #ffe082;">{_kw}</span>' for _kw in _spec_kws
+                                ])
+                            else:
+                                _spec_pills = '<span style="color:#999;font-size:0.88em;">없음</span>'
                         else:
                             _spec_pills = '<span style="color:#999;font-size:0.88em;">없음</span>'
 
@@ -5677,7 +6000,7 @@ with tab_sol:
                                            f'font-size:0.7em;font-weight:700;color:rgba(0,0,0,0.5);">'
                                            f'{_voc_sc:.0f}점</div>' if _voc_sc else '')
                                 _grid_html += (
-                                    f'<div style="position:relative;aspect-ratio:5/4;'
+                                    f'<div class="postit-card" data-rot="{_rot}" style="position:relative;aspect-ratio:5/4;'
                                     f'padding:18px 16px 14px;'
                                     f'background:{_palette["bg"]};'
                                     f'box-shadow:2px 5px 12px rgba(0,0,0,0.14),'
@@ -5686,7 +6009,10 @@ with tab_sol:
                                     f'transform:rotate({_rot});'
                                     f'display:flex;flex-direction:column;'
                                     f'align-items:center;justify-content:center;'
-                                    f'overflow:hidden;">'
+                                    f'overflow:hidden;'
+                                    f'transition:transform 0.25s ease, box-shadow 0.25s ease;'
+                                    f'cursor:default;'
+                                    f'--rot:{_rot};">'
                                     # 상단 테이프
                                     f'<div style="position:absolute;top:-7px;left:50%;'
                                     f'transform:translateX(-50%) rotate(-2deg);'
@@ -5722,6 +6048,189 @@ with tab_sol:
                     st.markdown(_sol_step(4, "🩺", "처방 — 어떻게 고칠까?",
                                            "위 단서를 종합해 AI가 지사 맞춤 액션 도출"),
                                 unsafe_allow_html=True)
+
+                    # ── 리스크 recap 박스 — STEP 2 TOP3 + 범인 항목 리마인드 ──
+                    if _real_top3:
+                        _recap_html = (
+                            '<div style="background:#f8fafc;border:1px solid #e5e7eb;'
+                            'border-radius:10px;padding:14px 18px;margin:14px 0 8px 0;'
+                            'box-shadow:0 1px 2px rgba(15,23,42,0.03);">'
+                            '<div style="font-size:0.82em;font-weight:700;color:#64748b;'
+                            'letter-spacing:1px;margin-bottom:8px;">'
+                            '📌 기억하세요 — 이번 진단의 핵심 리스크 · 범인 항목'
+                            '</div>'
+                        )
+                        for _ri, _rk in enumerate(_real_top3, 1):
+                            _badge = "①②③"[_ri-1] if _ri <= 3 else f"{_ri}."
+                            _worst = _rk.get("최저항목", "")
+                            _worst_score = _rk.get("최저점수", None)
+                            # 한 항목 = wrapper (hover 효과)
+                            _recap_html += (
+                                f'<div class="ai-card-item" style="padding:6px 8px;margin:3px 0;">'
+                                # 1줄: 계약종 × 업무 + 점수
+                                f'<div style="display:flex;align-items:center;gap:10px;'
+                                f'font-size:0.91em;color:#1f2937;">'
+                                f'<span style="display:inline-flex;align-items:center;justify-content:center;'
+                                f'min-width:22px;height:22px;background:#c62828;color:white;border-radius:50%;'
+                                f'font-size:0.78em;font-weight:800;flex-shrink:0;">{_badge}</span>'
+                                f'<span style="font-weight:700;color:#0a2540;">{_rk["계약종별"]} × {_rk["업무"]}</span>'
+                                f'<span style="color:#c62828;font-weight:700;margin-left:auto;">'
+                                f'{_rk["점수"]:.1f}점</span>'
+                                f'</div>'
+                            )
+                            # 2줄: 범인 항목 (있을 때만)
+                            if _worst:
+                                _ws_str = f' ({_worst_score:.1f}점)' if _worst_score is not None else ''
+                                _recap_html += (
+                                    f'<div style="display:flex;align-items:center;gap:6px;'
+                                    f'margin:2px 0 0 32px;font-size:0.85em;color:#6b7280;">'
+                                    f'<span style="color:#9ca3af;">└</span>'
+                                    f'<span>범인 항목: <b style="color:#c62828;">{_worst}</b>{_ws_str}</span>'
+                                    f'</div>'
+                                )
+                            _recap_html += '</div>'
+                        _recap_html += '</div>'
+                        st.markdown(_recap_html, unsafe_allow_html=True)
+
+                # ── AI 종합 처방전 카드 렌더러 (JSON 구조 → HTML) ──
+                def _render_sol_ai_cards(data):
+                    html = '<div style="margin:14px 0 6px 0;">'
+                    # ── 1. 잘하고 있는 점 (초록) ──
+                    _str = data.get("잘하고있는점", [])
+                    if _str:
+                        html += (
+                            '<div style="background:#ffffff;'
+                            'border:1px solid #e5e7eb;border-left:5px solid #2e7d32;'
+                            'border-radius:10px;padding:16px 20px;margin-bottom:14px;'
+                            'box-shadow:0 1px 3px rgba(15,23,42,0.04);">'
+                            '<div style="font-size:1.05em;font-weight:800;color:#2e7d32;margin-bottom:10px;">'
+                            '👍 잘하고 있는 점</div>'
+                        )
+                        for _i, _it in enumerate(_str[:3], 1):
+                            _txt = _it if isinstance(_it, str) else _it.get("text", "")
+                            html += (
+                                '<div class="ai-card-item" style="display:flex;align-items:flex-start;gap:10px;'
+                                'margin:4px 0;padding:5px 6px;font-size:0.93em;color:#1f2937;">'
+                                '<span style="display:inline-flex;align-items:center;justify-content:center;'
+                                'width:22px;height:22px;background:#2e7d32;color:white;border-radius:50%;'
+                                f'font-size:0.78em;font-weight:800;flex-shrink:0;">{_i}</span>'
+                                f'<span style="line-height:1.6;">{_txt}</span></div>'
+                            )
+                        html += '</div>'
+
+                    # ── 2. 점수 하락 원인 (빨강) — 회색 박스 제거, 한 줄 ──
+                    _causes = data.get("점수하락원인", [])
+                    if _causes:
+                        html += (
+                            '<div style="background:#ffffff;'
+                            'border:1px solid #e5e7eb;border-left:5px solid #c62828;'
+                            'border-radius:10px;padding:16px 20px;margin-bottom:14px;'
+                            'box-shadow:0 1px 3px rgba(15,23,42,0.04);">'
+                            '<div style="font-size:1.05em;font-weight:800;color:#c62828;margin-bottom:10px;">'
+                            '📌 점수 하락 원인</div>'
+                        )
+                        for _c in _causes:
+                            _cat = _c.get("카테고리", "") if isinstance(_c, dict) else ""
+                            _content = _c.get("내용", "") if isinstance(_c, dict) else str(_c)
+                            html += (
+                                '<div class="ai-card-item" style="display:flex;align-items:flex-start;gap:10px;'
+                                'padding:5px 6px;margin:4px 0;font-size:0.93em;color:#1f2937;">'
+                            )
+                            if _cat:
+                                html += (
+                                    '<span style="display:inline-block;background:#c62828;color:white;'
+                                    'padding:3px 11px;border-radius:12px;font-size:0.78em;font-weight:700;'
+                                    f'flex-shrink:0;white-space:nowrap;">{_cat}</span>'
+                                )
+                            html += f'<span style="line-height:1.6;flex:1;">{_content}</span></div>'
+                        html += '</div>'
+
+                    # ── 3. 응대 초점 포인트 (파랑) — 회색 박스 제거, 계층만 유지 ──
+                    _focus = data.get("응대초점포인트", [])
+                    if _focus:
+                        html += (
+                            '<div style="background:#ffffff;'
+                            'border:1px solid #e5e7eb;border-left:5px solid #1565c0;'
+                            'border-radius:10px;padding:16px 20px;margin-bottom:14px;'
+                            'box-shadow:0 1px 3px rgba(15,23,42,0.04);">'
+                            '<div style="font-size:1.05em;font-weight:800;color:#1565c0;margin-bottom:10px;">'
+                            '💡 응대 초점 포인트</div>'
+                        )
+                        for _fi, _f in enumerate(_focus, 1):
+                            _sit = _f.get("상황", "") if isinstance(_f, dict) else ""
+                            _points = _f.get("포인트", []) if isinstance(_f, dict) else []
+                            # 상황 헤더 (회색 박스 없이, 번호 + 굵은 텍스트)
+                            if _sit:
+                                html += (
+                                    f'<div style="font-size:0.95em;font-weight:700;color:#0d47a1;'
+                                    f'margin:{"14px" if _fi > 1 else "8px"} 0 4px 0;'
+                                    f'display:flex;align-items:center;gap:8px;">'
+                                    f'<span style="display:inline-flex;align-items:center;justify-content:center;'
+                                    f'width:20px;height:20px;background:#1565c0;color:white;border-radius:50%;'
+                                    f'font-size:0.78em;font-weight:800;flex-shrink:0;">{_fi}</span>'
+                                    f'{_sit}</div>'
+                                )
+                            # 항목별 배지 색 매핑 (옅은 파스텔)
+                            _item_badge_palette = {
+                                "전반적만족": ("#f1f5f9", "#475569"),    # 회색
+                                "직원친절도": ("#fce4ec", "#c2185b"),    # 분홍
+                                "처리신속도": ("#fff3e0", "#e65100"),    # 주황
+                                "처리정확도": ("#e3f2fd", "#1565c0"),    # 파랑
+                                "업무개선도": ("#f3e5f5", "#6a1b9a"),    # 보라
+                                "이용편리성": ("#e0f2f1", "#00695c"),    # 청록
+                            }
+                            for _p in _points:
+                                if isinstance(_p, dict):
+                                    _ptxt = _p.get("text", "")
+                                    _pitem = _p.get("항목", "")
+                                else:
+                                    _ptxt = str(_p)
+                                    _pitem = ""
+                                # 배지 (항목 있을 때만)
+                                _badge_html = ""
+                                if _pitem and _pitem in _item_badge_palette:
+                                    _bg_c, _fg_c = _item_badge_palette[_pitem]
+                                    _badge_html = (
+                                        f'<span style="display:inline-block;background:{_bg_c};'
+                                        f'color:{_fg_c};padding:1px 8px;border-radius:10px;'
+                                        f'font-size:0.7em;font-weight:700;margin-left:8px;'
+                                        f'white-space:nowrap;vertical-align:middle;">'
+                                        f'{_pitem} ↑</span>'
+                                    )
+                                html += (
+                                    '<div class="ai-card-item" style="display:flex;align-items:flex-start;gap:8px;'
+                                    'margin:2px 0 2px 28px;padding:4px 6px;'
+                                    'font-size:0.9em;color:#374151;">'
+                                    '<span style="color:#1565c0;font-weight:700;flex-shrink:0;">•</span>'
+                                    f'<span style="line-height:1.6;">{_ptxt}{_badge_html}</span></div>'
+                                )
+                        html += '</div>'
+
+                    # ── 4. 환경 개선 (보라) ──
+                    _env = data.get("환경개선", [])
+                    if _env:
+                        html += (
+                            '<div style="background:#ffffff;'
+                            'border:1px solid #e5e7eb;border-left:5px solid #6a1b9a;'
+                            'border-radius:10px;padding:16px 20px;margin-bottom:14px;'
+                            'box-shadow:0 1px 3px rgba(15,23,42,0.04);">'
+                            '<div style="font-size:1.05em;font-weight:800;color:#6a1b9a;margin-bottom:10px;">'
+                            '🏢 환경 개선</div>'
+                        )
+                        for _ei, _e in enumerate(_env[:3], 1):
+                            _txt = _e if isinstance(_e, str) else _e.get("text", "")
+                            html += (
+                                '<div class="ai-card-item" style="display:flex;align-items:flex-start;gap:10px;'
+                                'margin:4px 0;padding:5px 6px;font-size:0.93em;color:#1f2937;">'
+                                '<span style="display:inline-flex;align-items:center;justify-content:center;'
+                                'width:22px;height:22px;background:#6a1b9a;color:white;border-radius:50%;'
+                                f'font-size:0.78em;font-weight:800;flex-shrink:0;">{_ei}</span>'
+                                f'<span style="line-height:1.6;">{_txt}</span></div>'
+                            )
+                        html += '</div>'
+
+                    html += '</div>'
+                    return html
 
                 # ── AI 종합 처방전 (실질+급락 전체) — STEP 4 안 ──
                 if _real_top3 or _drop_top3:
@@ -5774,143 +6283,242 @@ with tab_sol:
                     _risk_tasks = [r["업무"] for r in (_real_top3 or [])] + [r["업무"] for r in (_drop_top3 or [])]
                     _voc_conditional = _get_conditional_voc_insights(_sel_off, _data_months, _risk_tasks)
 
+                    # AI 처방전 fragment — 탭 상태 유지
                     _sol_ai_key = f"_ai_sol_{_sel_off}"
-                    if st.button("🤖 AI 종합 처방전 생성", key="sol_ai_total_btn",
-                                 type="primary", use_container_width=True):
-                        if not GEMINI_AVAILABLE:
-                            st.error("Gemini API 키가 설정되지 않았습니다.")
-                        else:
-                            _sol_prompt = (
-                                f"# 역할\n"
-                                f"한국전력 경남본부 CS 분석가. 점수가 낮은 원인을 VOC에서 찾아내고, 직원이 기존 업무 흐름 안에서 '조금만 더 신경 쓰면 되는 포인트'를 짚어주는 역할.\n\n"
-                                f"# 고객응대 매뉴얼 기반 원칙 (모든 솔루션에 반드시 반영)\n\n"
-                                f"## 톤앤매너 — 원스톱 책임주의, 남 탓 금지\n"
-                                f"- 부서 핑퐁('~부서에 문의하세요'), 외부 기관 탓('국세청 마감이라 안 된다', '지자체 때문에 어쩔 수 없다') 화법은 민원을 폭발시키는 NG 멘트. 절대 금지.\n"
-                                f"- 규정/약관/법령상 한계가 있더라도 '한전이 알아보고 대안을 찾겠다'는 능동적 동행 화법 유지.\n"
-                                f"- 독단적 확언('이번 주 안에 무조건 됩니다')과 희망고문(구두 약속) 절대 금지. 외부 변수가 있는 사안은 '확인 후 연락드리겠다'는 액션으로 끝맺음.\n\n"
-                                f"## 솔루션 4단계 프레임 (처방의 뼈대)\n"
-                                f"1. 감정 공감 — 고객의 절박함·억울함·불안을 먼저 인정하는 포인트 포함\n"
-                                f"2. 상황 투명 안내 — 전산 데이터 기준, 핑계 없이 객관적 설명\n"
-                                f"3. 규정 내 대안 — 안 되는 건 약관 근거로 명확히 하되, 현실적 우회로 매칭\n"
-                                f"4. 능동적 마무리 — '어쩔 수 없다'가 아니라, 담당자가 먼저 움직이겠다는 액션\n\n"
-                                f"# 불만 유형별 처방 가이드 (VOC에서 해당 징후 감지 시 적용)\n\n"
-                                f"## 핑퐁·책임전가 ('떠넘긴다', '부서 돌린다', '소관이 아니라 한다')\n"
-                                f"→ 영업 담당자가 전산 조회 후 직접 유관 부서(배전/계기/세무)와 소통, 고객에게 원스톱 피드백. 전화번호만 주고 끝내는 처방 금지.\n\n"
-                                f"## 절차·서류·디지털 소외 ('복잡하다', '어렵다', '어르신', '서류 떼오라')\n"
-                                f"→ 행정정보 공동이용 활용, 자녀/보호자 연결 프로세스 가이드. 날짜·시한을 콕 집어 안내('○월 ○일까지 접수 시 반영'). '조만간', '다음 달에 확인' 같은 모호한 안내 금지.\n\n"
-                                f"## 요금·복지·소급 ('요금 폭탄', '할인 누락', '전 세입자 체납', '소급 안 된다')\n"
-                                f"→ 생계 영향 공감 우선, 분납 제도/우회 혜택(차상위 전환 등) 대안 제시. 이사정산은 당일 잔침 확인 + 즉시 수납 대행으로 분쟁 현장 종결. '약관상 소급 불가니 진작 신청했어야죠' 식 냉소적 화법 금지.\n\n"
-                                f"## 정전·품질·배상 ('정전 피해', '전압 이상', '보상해라', '늑장 출동')\n"
-                                f"→ 현장 기술팀 즉시 투입, 원인(내선/외선) 정밀 규명. 배상 판단은 전담 부서(법무/보상실) 영역 — 현장에서 '다 보상한다'/'절대 안 된다' 확언 금지. 재발 방지를 위한 정전 예방 컨설팅·품질 계측 일정 잡기로 마무리.\n\n"
-                                f"## 규정 한계 안내 시 (공통)\n"
-                                f"→ 약관 근거를 명확히 하되, '안 됩니다'로 끝내지 말 것. 반드시 '대신 이런 방법이 있다'는 대안을 붙이거나, '한전이 다른 가능성을 확인해 보겠다'는 능동적 마무리로 종결.\n\n"
-                                f"# 분석 대상\n"
-                                f"- 지사: {_sel_off}\n"
-                                f"- 지역 특성: {_kb_ctx}\n"
-                                f"- 종합 평균: {_sel_avg:.1f}점 (본부 평균 {avg_score_100:.1f}점)\n"
-                                f"{('- 참고 배경(추세 판단용, 반드시 언급할 필요 없음): ' + _office_annual + chr(10)) if _office_annual else ''}"
-                                f"{('- 2025 VOC 배경: ' + _voc_conditional + chr(10)) if _voc_conditional else ''}\n"
-                                f"# 리스크 요약 (참고용 — 제목에 그대로 쓰지 말 것)\n{_rx_lines}\n"
-                                f"# 고객 불만 VOC 원문 (핵심 데이터 — 반드시 패턴 분석할 것)\n"
-                                f"{_all_neg_vocs or '없음'}\n\n"
-                                f"# 고객 칭찬 VOC 원문 (강점 파악용)\n"
-                                f"{_all_pos_vocs or '없음'}\n\n"
-                                f"# 현장 현실 (반드시 숙지)\n"
-                                f"- 123 고객센터 전화 연결 지연 → 사업소 권한 밖. 해결 불가 이슈이므로 제안에서 제외.\n"
-                                f"- 전기요금 단가·정책·제도 변경 → 본사 권한. 사업소에서 불가.\n"
-                                f"- 문자 발송·해피콜·만족도 조사는 이미 시행/자동화됨. 제안 불필요.\n"
-                                f"- 전담 창구/핫라인/TF 구성 → 소규모 사업소에서 비현실적. 특정인에게 업무 몰리는 제안 금지.\n"
-                                f"- 사업소는 콜센터가 아님. 전화 전문 인력 없음.\n"
-                                f"- 새로운 프로세스·절차·시스템 도입은 사업소 권한 밖. 제안 금지.\n\n"
-                                f"# 핵심 방향 (이것만 제안할 것)\n"
-                                f"**A. 응대 초점 포인트** — 새 일거리가 아님. 기존 업무를 하면서 '이 부분만 한마디 더/조금 더 신경 쓰면' 점수가 오르는 포인트.\n"
-                                f"  - 예: '설치 접수 시 예상 소요기간을 먼저 안내 → 재문의 감소'\n"
-                                f"  - 예: '요금 문의 시 계산 근거를 숫자로 짧게 설명 → 납득감 상승'\n"
-                                f"  - 예: '정전 복구 후 원인을 한 줄로 고객에게 전달 → 불안 해소'\n"
-                                f"**B. 물리적 환경 개선** — 안내물·게시물·대기공간·서식 등 한 번 세팅하면 계속 효과 나는 것.\n"
-                                f"  - 예: '자주 묻는 요금 Q&A 대기석 비치'\n"
-                                f"  - 예: '명의변경 필요서류 안내판 창구 부착'\n\n"
-                                f"# 요청\n"
-                                f"1. VOC에서 **점수가 낮은 원인** 2~3가지 패턴 도출 (왜 낮은지)\n"
-                                f"2. 각 원인별로 A(응대 초점) 또는 B(환경 개선) 중 맞는 방향 1~2개 제시\n"
-                                f"3. **중요: 리스크 요약에 나온 업무유형(정전, 청구서재발행, 계기업무, 신규증설 등)을 반드시 처방에 구체적으로 연결할 것.**\n"
-                                f"   - 제너럴한 '공감하세요, 능동적으로 하세요'만 쓰지 말고, 해당 업무에서 실제로 뭘 어떻게 하라는 건지 구체적으로 짚어줘야 함.\n"
-                                f"   - 업무유형별 처방 예시:\n"
-                                f"     · 정전 → '복구 후 원인(내선/외선)을 고객에게 한 줄로 전달', '사설 업체 떠넘기기 금지, 전기안전관리자와 공조 원스톱 규명'\n"
-                                f"     · 청구서재발행/세금계산서 → '수정 발행 가능 시점을 날짜 콕 집어 안내', '국세청 탓 금지, 예외 사유 전산 조회 먼저'\n"
-                                f"     · 신규증설 → '인허가 진행 단계를 구체적으로 안내', '지자체 탓 금지, 한전이 독촉·조율 중임을 전달'\n"
-                                f"     · 요금문의 → '계산 근거를 숫자로 짧게 설명', '요금 폭탄 호소 시 분납/감면 제도 먼저 안내'\n"
-                                f"     · 계기업무 → '노후 계량기 고장 가능성 먼저 열어두고 설명', '어르신 대상 범죄자 취급 뉘앙스 절대 금지'\n"
-                                f"     · 복지할인 → '자격 상실 시점을 정확한 날짜로 안내', '소급 불가 시에도 즉시 최대 혜택 적용 조치'\n"
-                                f"     · 명의변경/기본사항변경 → '어르신은 자녀 연결 원스톱 대행', '필요 서류를 모바일로 직접 발송'\n"
-                                f"   - 위에 없는 업무유형도 같은 원리로 구체적 처방을 도출할 것. '공감하세요' 수준의 제너럴한 답변 금지.\n\n"
-                                f"# 문체 규칙 (가장 중요)\n"
-                                f"- 극도로 짧은 개조식. 한 bullet = 명사형 종결 또는 짧은 서술 1개.\n"
-                                f"- '~합니다', '~하도록 합니다' 같은 장황한 종결 금지.\n"
-                                f"- '세부 행동 1:', '세부 행동 2:' 같은 레이블 붙이지 말 것. 그냥 '-' bullet만.\n\n"
-                                f"# 출력 형식\n"
-                                f"### 👍 잘하고 있는 점\n"
-                                f"- (칭찬 VOC에서 도출한 이 지사의 강점 1~2개. 직원들에게 '이건 잘 하고 있다, 계속 유지하자'는 독려 멘트)\n\n"
-                                f"### 📌 점수 하락 원인\n"
-                                f"- (한 줄 요약: 어떤 상황에서 왜 불만이 나오는지)\n"
-                                f"- ...\n\n"
-                                f"### 💡 응대 초점 포인트\n"
-                                f"**1. (상황명)**\n"
-                                f"- 기존 응대에서 이것만 추가/유의\n"
-                                f"- ...\n\n"
-                                f"**2. ...**\n\n"
-                                f"### 🏢 환경 개선\n"
-                                f"- (한 번 세팅으로 지속 효과 나는 것 1~2개)\n\n"
-                                f"# 절대 금지\n"
-                                f"- TF 구성, 교육 프로그램, 매뉴얼 제작, 시스템 개편, 멘토링, 코칭\n"
-                                f"- 문자 발송, 만족도 조사, 해피콜, 전담 창구/핫라인\n"
-                                f"- 새 프로세스·절차·서식 만들기 (기존 업무에 일거리 추가하는 제안)\n"
-                                f"- bullet 간 같은 말 반복\n"
-                                f"- 특정 직원 지목·업무 과중 유발\n"
-                                f"- '전기세' → '전기요금'\n"
-                                f"- 줄글·산문·미사여구·AI 추임새\n"
-                                f"- VOC 원문을 길게 인용('~라고 말했다' 식). 키워드만 추출할 것\n"
-                                f"- '(출처: ...)' 같은 인용 표기 금지\n"
-                                f"- 데이터에 없는 사실 창작\n"
-                            )
-                            with st.spinner("AI가 종합 처방전 생성 중…"):
-                                try:
-                                    import urllib.request
-                                    _models = ["gemini-2.5-flash", "gemini-flash-latest", "gemini-2.5-flash-lite", "gemini-2.5-pro", "gemini-2.0-flash"]
-                                    _sol_pl = {
-                                        "contents": [{"parts": [{"text": _sol_prompt}]}],
-                                        "generationConfig": {"temperature": 0.7, "maxOutputTokens": 8192}
-                                    }
-                                    _ctx = ssl._create_unverified_context()
-                                    _body = None
-                                    for _model in _models:
-                                        _url = (f"https://generativelanguage.googleapis.com/v1beta/"
-                                                f"models/{_model}:generateContent?key={_GEMINI_KEY}")
-                                        _req = urllib.request.Request(
-                                            _url, data=json.dumps(_sol_pl).encode("utf-8"),
-                                            headers={"Content-Type": "application/json"}, method="POST")
-                                        try:
-                                            with urllib.request.urlopen(_req, context=_ctx, timeout=90) as _rsp:
-                                                _body = json.loads(_rsp.read().decode("utf-8"))
-                                            break
-                                        except urllib.error.HTTPError as _he:
-                                            if _he.code in (429, 500, 502, 503):
-                                                continue
-                                            raise
-                                    if _body is None:
-                                        st.error("모든 AI 모델의 일일 한도가 소진되었습니다.")
-                                    else:
-                                        st.session_state[_sol_ai_key] = _body["candidates"][0]["content"]["parts"][0]["text"].strip()
-                                except Exception as _e:
-                                    st.error(f"AI 분석 중 오류: {_e}")
 
-                    if _sol_ai_key in st.session_state:
-                        st.markdown(
-                            '<div style="background:#f8f9fb;border:1px solid #d0d7de;border-radius:12px;'
-                            'padding:28px 32px;margin:12px 0;font-size:1.05em;line-height:2.0;">\n\n'
-                            f'{st.session_state[_sol_ai_key]}\n\n</div>',
-                            unsafe_allow_html=True)
+                    @st.fragment
+                    def _sol_ai_fragment():
+                        if st.button("💊 AI 종합 처방전 생성", key="sol_ai_total_btn",
+                                     type="primary", use_container_width=True):
+                            if not GEMINI_AVAILABLE:
+                                st.error("Gemini API 키가 설정되지 않았습니다.")
+                            else:
+                                _sol_prompt = (
+                                    f"# 역할\n"
+                                    f"한국전력 경남본부 CS 분석가. 점수가 낮은 원인을 VOC에서 찾아내고, 직원이 기존 업무 흐름 안에서 '조금만 더 신경 쓰면 되는 포인트'를 짚어주는 역할.\n\n"
+                                    f"# 고객응대 매뉴얼 기반 원칙 (모든 솔루션에 반드시 반영)\n\n"
+                                    f"## 톤앤매너 — 원스톱 책임주의, 남 탓 금지\n"
+                                    f"- 부서 핑퐁('~부서에 문의하세요'), 외부 기관 탓('국세청 마감이라 안 된다', '지자체 때문에 어쩔 수 없다') 화법은 민원을 폭발시키는 NG 멘트. 절대 금지.\n"
+                                    f"- 규정/약관/법령상 한계가 있더라도 '한전이 알아보고 대안을 찾겠다'는 능동적 동행 화법 유지.\n"
+                                    f"- 독단적 확언('이번 주 안에 무조건 됩니다')과 희망고문(구두 약속) 절대 금지. 외부 변수가 있는 사안은 '확인 후 연락드리겠다'는 액션으로 끝맺음.\n\n"
+                                    f"## 솔루션 4단계 프레임 (처방의 뼈대)\n"
+                                    f"1. 감정 공감 — 고객의 절박함·억울함·불안을 먼저 인정하는 포인트 포함\n"
+                                    f"2. 상황 투명 안내 — 전산 데이터 기준, 핑계 없이 객관적 설명\n"
+                                    f"3. 규정 내 대안 — 안 되는 건 약관 근거로 명확히 하되, 현실적 우회로 매칭\n"
+                                    f"4. 능동적 마무리 — '어쩔 수 없다'가 아니라, 담당자가 먼저 움직이겠다는 액션\n\n"
+                                    f"# 불만 유형별 처방 가이드 (VOC에서 해당 징후 감지 시 적용)\n\n"
+                                    f"## 핑퐁·책임전가 ('떠넘긴다', '부서 돌린다', '소관이 아니라 한다')\n"
+                                    f"→ 영업 담당자가 전산 조회 후 직접 유관 부서(배전/계기/세무)와 소통, 고객에게 원스톱 피드백. 전화번호만 주고 끝내는 처방 금지.\n\n"
+                                    f"## 절차·서류·디지털 소외 ('복잡하다', '어렵다', '어르신', '서류 떼오라')\n"
+                                    f"→ 행정정보 공동이용 활용, 자녀/보호자 연결 프로세스 가이드. 날짜·시한을 콕 집어 안내('○월 ○일까지 접수 시 반영'). '조만간', '다음 달에 확인' 같은 모호한 안내 금지.\n\n"
+                                    f"## 요금·복지·소급 ('요금 폭탄', '할인 누락', '전 세입자 체납', '소급 안 된다')\n"
+                                    f"→ 생계 영향 공감 우선, 분납 제도/우회 혜택(차상위 전환 등) 대안 제시. 이사정산은 당일 잔침 확인 + 즉시 수납 대행으로 분쟁 현장 종결. '약관상 소급 불가니 진작 신청했어야죠' 식 냉소적 화법 금지.\n\n"
+                                    f"## 정전·품질·배상 ('정전 피해', '전압 이상', '보상해라', '늑장 출동')\n"
+                                    f"→ 현장 기술팀 즉시 투입, 원인(내선/외선) 정밀 규명. 배상 판단은 전담 부서(법무/보상실) 영역 — 현장에서 '다 보상한다'/'절대 안 된다' 확언 금지. 재발 방지를 위한 정전 예방 컨설팅·품질 계측 일정 잡기로 마무리.\n\n"
+                                    f"## 규정 한계 안내 시 (공통)\n"
+                                    f"→ 약관 근거를 명확히 하되, '안 됩니다'로 끝내지 말 것. 반드시 '대신 이런 방법이 있다'는 대안을 붙이거나, '한전이 다른 가능성을 확인해 보겠다'는 능동적 마무리로 종결.\n\n"
+                                    f"# 분석 대상\n"
+                                    f"- 지사: {_sel_off}\n"
+                                    f"- 지역 특성: {_kb_ctx}\n"
+                                    f"- 종합 평균: {_sel_avg:.1f}점 (본부 평균 {avg_score_100:.1f}점)\n"
+                                    f"{('- 참고 배경(추세 판단용, 반드시 언급할 필요 없음): ' + _office_annual + chr(10)) if _office_annual else ''}"
+                                    f"{('- 2025 VOC 배경: ' + _voc_conditional + chr(10)) if _voc_conditional else ''}\n"
+                                    f"# 리스크 요약 (참고용 — 제목에 그대로 쓰지 말 것)\n{_rx_lines}\n"
+                                    f"# 고객 불만 VOC 원문 (핵심 데이터 — 반드시 패턴 분석할 것)\n"
+                                    f"{_all_neg_vocs or '없음'}\n\n"
+                                    f"# 고객 칭찬 VOC 원문 (강점 파악용)\n"
+                                    f"{_all_pos_vocs or '없음'}\n\n"
+                                    f"# 현장 현실 (반드시 숙지)\n"
+                                    f"- 123 고객센터 전화 연결 지연 → 사업소 권한 밖. 해결 불가 이슈이므로 제안에서 제외.\n"
+                                    f"- 전기요금 단가·정책·제도 변경 → 본사 권한. 사업소에서 불가.\n"
+                                    f"- 문자 발송·해피콜·만족도 조사는 이미 시행/자동화됨. 제안 불필요.\n"
+                                    f"- 전담 창구/핫라인/TF 구성 → 소규모 사업소에서 비현실적. 특정인에게 업무 몰리는 제안 금지.\n"
+                                    f"- 사업소는 콜센터가 아님. 전화 전문 인력 없음.\n"
+                                    f"- 새로운 프로세스·절차·시스템 도입은 사업소 권한 밖. 제안 금지.\n\n"
+                                    f"# 핵심 방향 (이것만 제안할 것)\n"
+                                    f"**A. 응대 초점 포인트** — 새 일거리가 아님. 기존 업무를 하면서 '이 부분만 한마디 더/조금 더 신경 쓰면' 점수가 오르는 포인트.\n"
+                                    f"  - 예: '설치 접수 시 예상 소요기간을 먼저 안내 → 재문의 감소'\n"
+                                    f"  - 예: '요금 문의 시 계산 근거를 숫자로 짧게 설명 → 납득감 상승'\n"
+                                    f"  - 예: '정전 복구 후 원인을 한 줄로 고객에게 전달 → 불안 해소'\n"
+                                    f"**B. 물리적 환경 개선** — 안내물·게시물·대기공간·서식 등 한 번 세팅하면 계속 효과 나는 것.\n"
+                                    f"  - 예: '자주 묻는 요금 Q&A 대기석 비치'\n"
+                                    f"  - 예: '명의변경 필요서류 안내판 창구 부착'\n\n"
+                                    f"# 요청\n"
+                                    f"1. VOC에서 **점수가 낮은 원인** 2~3가지 패턴 도출 (왜 낮은지)\n"
+                                    f"2. 각 원인별로 A(응대 초점) 또는 B(환경 개선) 중 맞는 방향 1~2개 제시\n"
+                                    f"3. **중요: 리스크 요약에 나온 업무유형(정전, 청구서재발행, 계기업무, 신규증설 등)을 반드시 처방에 구체적으로 연결할 것.**\n"
+                                    f"   - 제너럴한 '공감하세요, 능동적으로 하세요'만 쓰지 말고, 해당 업무에서 실제로 뭘 어떻게 하라는 건지 구체적으로 짚어줘야 함.\n"
+                                    f"   - 업무유형별 처방 예시:\n"
+                                    f"     · 정전 → '복구 후 원인(내선/외선)을 고객에게 한 줄로 전달', '사설 업체 떠넘기기 금지, 전기안전관리자와 공조 원스톱 규명'\n"
+                                    f"     · 청구서재발행/세금계산서 → '수정 발행 가능 시점을 날짜 콕 집어 안내', '국세청 탓 금지, 예외 사유 전산 조회 먼저'\n"
+                                    f"     · 신규증설 → '인허가 진행 단계를 구체적으로 안내', '지자체 탓 금지, 한전이 독촉·조율 중임을 전달'\n"
+                                    f"     · 요금문의 → '계산 근거를 숫자로 짧게 설명', '요금 폭탄 호소 시 분납/감면 제도 먼저 안내'\n"
+                                    f"     · 계기업무 → '노후 계량기 고장 가능성 먼저 열어두고 설명', '어르신 대상 범죄자 취급 뉘앙스 절대 금지'\n"
+                                    f"     · 복지할인 → '자격 상실 시점을 정확한 날짜로 안내', '소급 불가 시에도 즉시 최대 혜택 적용 조치'\n"
+                                    f"     · 명의변경/기본사항변경 → '어르신은 자녀 연결 원스톱 대행', '필요 서류를 모바일로 직접 발송'\n"
+                                    f"   - 위에 없는 업무유형도 같은 원리로 구체적 처방을 도출할 것. '공감하세요' 수준의 제너럴한 답변 금지.\n\n"
+                                    f"# 범인 항목별 솔루션 결 (가장 중요 — 자연스럽게 녹일 것)\n"
+                                    f"위 'STEP 2 리스크 요약'의 각 조합에는 '최저항목'(범인 항목)이 표시되어 있다. 항목마다 점수를 올리는 액션의 결이 다르다:\n"
+                                    f"- **전반적 만족** ↑ → 마무리 멘트·끝맺음 인사·한 번 더 안내 (종합적 인상 관리)\n"
+                                    f"- **직원 친절도** ↑ → 톤·표정·말투·경어·인사 (응대 태도)\n"
+                                    f"- **처리 신속도** ↑ → 처리 시점 사전 안내·단계별 알림·예상 소요 시간 명시 (시간 투명성)\n"
+                                    f"- **처리 정확도** ↑ → 정보 정확성·재확인 절차·서류 사전 점검·실수 차단 (디테일 관리)\n"
+                                    f"- **업무 개선도** ↑ → '이전보다 나아진 점' 명시·절차 간소화 안내·시스템 개선 체감 (변화 인식)\n"
+                                    f"- **이용 편리성** ↑ → 접근성 강화·안내 표지·서식 단순화·모바일 활용·고령층 배려 (편의성)\n"
+                                    f"규칙:\n"
+                                    f"- 범인 항목이 명확한 조합은 그 항목 결에 맞는 액션으로 처방.\n"
+                                    f"  · OK 예시(범인=처리 정확도): '정전 복구 후 원인(내선/외선)을 한 줄로 정확히 전달'\n"
+                                    f"  · OK 예시(범인=직원 친절도): '농사용 명의 변경 시 어르신 눈높이 안내, 천천히 또박또박'\n"
+                                    f"  · OK 예시(범인=이용 편리성): '신규증설 진행 단계를 모바일로 단계별 안내'\n"
+                                    f"- 항목 결을 자연스럽게 본문에 녹일 것. **'(처리 정확도 ↑)' 같은 강제 태그/뱃지 붙이지 말 것.**\n"
+                                    f"- 항목과 무관한 일반 처방이면 굳이 항목 언급하지 말 것 (억지 매핑 금지).\n\n"
+                                    f"# 계약종 맥락 녹이기 규칙 (가장 중요)\n"
+                                    f"- 위 'STEP 2 리스크 요약'에서 도출된 TOP3 조합(예: 주택용×정전, 농사용×기본사항변경 등)을 처방 전반에 자연스럽게 반영할 것.\n"
+                                    f"- **특정 계약종이 점수 하락의 결정적 원인이거나, 응대 화법이 계약종마다 달라지는 경우** 문장에 자연스럽게 녹여넣기:\n"
+                                    f"  · OK 예시: '주택용 정전 시 식료품 피해 우선 공감 후 복구 시점 안내'\n"
+                                    f"  · OK 예시: '산업용 정전은 생산 손실 규모 파악 우선, 보상 절차는 전담 부서 연결'\n"
+                                    f"  · OK 예시: '농사용 명의 변경 시 행정정보 공동이용으로 서류 최소화'\n"
+                                    f"- **계약종 무관하게 모두 같은 처방이라면 굳이 계약종 언급하지 말 것** (억지 매핑 금지):\n"
+                                    f"  · NG 예시(억지): '주택용·일반용·산업용 정전 시 원인을 한 줄로 안내' ← 다 같은 처방이면 그냥 '정전 시'\n"
+                                    f"  · NG 예시(억지): 모든 항목 제목에 [주택용][일반용] 같은 prefix 강제로 붙이기\n"
+                                    f"- 점수 하락 원인 설명에 계약종 자연스럽게 녹여내기. 응대 초점 포인트의 bullets에도 의미 있는 차이가 있을 때만 계약종 언급.\n"
+                                    f"- 환경 개선·잘하고 있는 점은 일반적인 영역이라 계약종 언급 불필요.\n\n"
+                                    f"# 문체 규칙 (보조 규칙 — 위 '범인 항목 결'과 '계약종 녹이기'가 우선)\n"
+                                    f"- 간결한 개조식, 한 bullet = 한 줄 (20~50자 권장).\n"
+                                    f"- 명사형/부사형 종결 ('~ 안내', '~ 강화', '~ 매칭', '~ 마무리'). '~합니다', '~ 됩니다', '~ 주세요' 종결어미 금지.\n"
+                                    f"- **단, 짧게 만들려고 매뉴얼 근거·계약종별 특수 상황·구체적 디테일을 자르지 말 것.**\n"
+                                    f"  · 디테일·맥락 > 짧음 (절대 원칙)\n"
+                                    f"  · 일반적이고 추상적인 멘트는 안 쓰는 것이 짧은 것보다 낫다.\n"
+                                    f"- 이상적인 bullet 예시 (이 정도 디테일·맥락 유지):\n"
+                                    f"  · '정전 복구 후 원인(내선/외선)을 고객에게 한 줄로 요약하여 명확히 전달'\n"
+                                    f"  · '사설 업체 책임 전가 금지, 한전 기술팀과 전기안전관리자의 공조 상황을 투명하게 안내'\n"
+                                    f"  · '농사용 시설하우스 등 고정 전력 필수 고객 대상 작업 전 정전 영향 사전 안내'\n"
+                                    f"  · '세금계산서 수정 요청 시 국세청 마감 핑계 금지, 전산 조회 후 예외 발행 가능 시점 즉시 안내'\n"
+                                    f"  · '농사용 명의 변경 시 어르신 행정정보 공동이용 활용 제안하여 현장 서류 제출 최소화 유도'\n"
+                                    f"- 피해야 할 예시 (너무 짧고 추상적 — 컨텍스트 누락):\n"
+                                    f"  · NG: '수정 발행 가능 시점 날짜 콕 집어 안내' ← 어떤 업무? 어떤 고객? 빠짐\n"
+                                    f"  · NG: '국세청 탓 금지, 전산 조회 후 예외 사유 명확히 설명' ← 액션은 있으나 어디서 적용? 모호\n"
+                                    f"  · NG: '정전 영향 사전 안내' ← 누구에게? 어떤 상황? 누락\n\n"
+                                    f"# 출력 형식 — JSON으로만 응답 (다른 텍스트, ```json fence, 인사말 절대 금지)\n"
+                                    f'{{\n'
+                                    f'  "잘하고있는점": ["강점 1 (한 줄)", "강점 2 (한 줄)"],\n'
+                                    f'  "점수하락원인": [\n'
+                                    f'    {{"카테고리": "정전/품질", "내용": "원인 한 줄"}},\n'
+                                    f'    {{"카테고리": "신규증설", "내용": "..."}},\n'
+                                    f'    {{"카테고리": "요금/청구", "내용": "..."}}\n'
+                                    f'  ],\n'
+                                    f'  "응대초점포인트": [\n'
+                                    f'    {{\n'
+                                    f'      "상황": "산업용 정전 및 고장 신고 시",\n'
+                                    f'      "포인트": [\n'
+                                    f'        {{"text": "정전 복구 후 원인(내선/외선)을 한 줄로 정확히 전달", "항목": "처리정확도"}},\n'
+                                    f'        {{"text": "한전 기술팀과 전기안전관리자의 공조 상황을 투명하게 안내", "항목": "처리신속도"}},\n'
+                                    f'        {{"text": "일반적 응대 마무리 멘트"}}\n'
+                                    f'      ]\n'
+                                    f'    }},\n'
+                                    f'    {{\n'
+                                    f'      "상황": "신규증설 및 현장 계기 작업 시",\n'
+                                    f'      "포인트": [\n'
+                                    f'        {{"text": "...", "항목": "직원친절도"}}\n'
+                                    f'      ]\n'
+                                    f'    }}\n'
+                                    f'  ],\n'
+                                    f'  "환경개선": ["환경 개선 1 (한 줄)", "환경 개선 2 (한 줄)"]\n'
+                                    f'}}\n\n'
+                                    f"[JSON 작성 규칙]\n"
+                                    f"- 잘하고있는점: 1~3개 (직원 독려 멘트)\n"
+                                    f"- 점수하락원인: 2~4개. 카테고리는 [정전/품질], [신규증설], [요금/청구], [계기/명의변경] 등 짧은 카테고리명\n"
+                                    f"- 응대초점포인트: 2~3개 상황. 각 상황당 포인트 2~4개. **포인트는 객체 형식 {{\"text\": \"...\", \"항목\": \"...\"}}**\n"
+                                    f"- 환경개선: 1~3개\n"
+                                    f"- 모든 문장 한 줄, 명사형 종결\n\n"
+                                    f"[응대초점포인트 '항목' 필드 규칙]\n"
+                                    f"- 각 포인트가 명확히 특정 만족도 항목 점수 끌어올리는 처방이면 '항목' 필드 부여:\n"
+                                    f"  · '전반적만족' (마무리 멘트·종합 인상)\n"
+                                    f"  · '직원친절도' (톤·표정·말투·경어)\n"
+                                    f"  · '처리신속도' (시간 안내·단계별 알림)\n"
+                                    f"  · '처리정확도' (정보 정확성·재확인)\n"
+                                    f"  · '업무개선도' (변화 인식·간소화)\n"
+                                    f"  · '이용편리성' (접근성·서식 단순화·모바일)\n"
+                                    f"- 항목명은 위 6개 중 하나로 정확히 일치 (띄어쓰기 없이)\n"
+                                    f"- 일반적이거나 복합적인 처방이면 '항목' 필드 생략 (배지 안 보임)\n"
+                                    f"- 억지로 모든 포인트에 항목 부여하지 말 것\n\n"
+                                    f"# 절대 금지\n"
+                                    f"- TF 구성, 교육 프로그램, 매뉴얼 제작, 시스템 개편, 멘토링, 코칭\n"
+                                    f"- 문자 발송, 만족도 조사, 해피콜, 전담 창구/핫라인\n"
+                                    f"- 새 프로세스·절차·서식 만들기 (기존 업무에 일거리 추가하는 제안)\n"
+                                    f"- bullet 간 같은 말 반복\n"
+                                    f"- 특정 직원 지목·업무 과중 유발\n"
+                                    f"- '전기세' → '전기요금'\n"
+                                    f"- 줄글·산문·미사여구·AI 추임새\n"
+                                    f"- VOC 원문을 길게 인용('~라고 말했다' 식). 키워드만 추출할 것\n"
+                                    f"- '(출처: ...)' 같은 인용 표기 금지\n"
+                                    f"- 데이터에 없는 사실 창작\n"
+                                )
+                                with st.spinner("AI가 종합 처방전 생성 중…"):
+                                    try:
+                                        import urllib.request
+                                        _models = ["gemini-2.5-flash", "gemini-flash-latest", "gemini-2.5-flash-lite", "gemini-2.5-pro", "gemini-2.0-flash"]
+                                        _sol_pl = {
+                                            "contents": [{"parts": [{"text": _sol_prompt}]}],
+                                            "generationConfig": {"temperature": 0.7, "maxOutputTokens": 8192}
+                                        }
+                                        _ctx = ssl._create_unverified_context()
+                                        _body = None
+                                        for _model in _models:
+                                            _url = (f"https://generativelanguage.googleapis.com/v1beta/"
+                                                    f"models/{_model}:generateContent?key={_GEMINI_KEY}")
+                                            _req = urllib.request.Request(
+                                                _url, data=json.dumps(_sol_pl).encode("utf-8"),
+                                                headers={"Content-Type": "application/json"}, method="POST")
+                                            try:
+                                                with urllib.request.urlopen(_req, context=_ctx, timeout=90) as _rsp:
+                                                    _body = json.loads(_rsp.read().decode("utf-8"))
+                                                break
+                                            except urllib.error.HTTPError as _he:
+                                                if _he.code in (429, 500, 502, 503):
+                                                    continue
+                                                raise
+                                        if _body is None:
+                                            st.error("모든 AI 모델의 일일 한도가 소진되었습니다.")
+                                        else:
+                                            _raw = _body["candidates"][0]["content"]["parts"][0]["text"].strip()
+                                            # JSON 파싱 시도
+                                            import re as _re_sol
+                                            _jm = _re_sol.search(r'\{[\s\S]*\}', _raw)
+                                            _parsed_sol = None
+                                            if _jm:
+                                                try:
+                                                    _parsed_sol = json.loads(_jm.group(0))
+                                                except Exception:
+                                                    _parsed_sol = None
+                                            if _parsed_sol and isinstance(_parsed_sol, dict):
+                                                st.session_state[_sol_ai_key] = {"type": "json", "data": _parsed_sol}
+                                            else:
+                                                st.session_state[_sol_ai_key] = {"type": "text", "data": _raw}
+                                    except Exception as _e:
+                                        st.error(f"AI 분석 중 오류: {_e}")
 
+                        if _sol_ai_key in st.session_state:
+                            _sol_cached = st.session_state[_sol_ai_key]
+                            # Backward compat: 옛 캐시는 문자열
+                            if isinstance(_sol_cached, str):
+                                st.markdown(
+                                    '<div style="background:#f8f9fb;border:1px solid #d0d7de;border-radius:12px;'
+                                    'padding:28px 32px;margin:12px 0;font-size:1.05em;line-height:2.0;">\n\n'
+                                    f'{_sol_cached}\n\n</div>',
+                                    unsafe_allow_html=True)
+                            elif isinstance(_sol_cached, dict) and _sol_cached.get("type") == "json":
+                                st.markdown(_render_sol_ai_cards(_sol_cached["data"]), unsafe_allow_html=True)
+                            elif isinstance(_sol_cached, dict) and _sol_cached.get("type") == "text":
+                                st.warning("⚠️ AI 응답이 정형화되지 않아 원문으로 표시합니다.")
+                                st.markdown(
+                                    '<div style="background:#f8f9fb;border:1px solid #d0d7de;border-radius:12px;'
+                                    'padding:28px 32px;margin:12px 0;font-size:1.05em;line-height:2.0;">\n\n'
+                                    f'{_sol_cached["data"]}\n\n</div>',
+                                    unsafe_allow_html=True)
+
+
+                    _sol_ai_fragment()
         else:
             st.info("업무유형·계약종별 컬럼이 필요합니다.")
 
