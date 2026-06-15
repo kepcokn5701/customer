@@ -1012,14 +1012,38 @@ _POS_PHRASES = [
 
 # 건의/요청 감지 패턴
 _REQUEST_PATTERNS = [
+    # ── 직접 요청 ──
     r'(해\s*주세요|해\s*주시|해\s*줬으면|해\s*주셨으면)',
-    r'(바랍니다|바래요|바람)',
-    r'(좋겠습니다|좋겠어요|좋겠네요|좋을\s*것\s*같|좋을것같)',
-    r'(개선|시정|조치|보완).{0,4}(해|필요|바|요|되)',
-    r'(했으면|됐으면|되었으면)\s*(좋겠|합니다|해요|하는)',
-    r'(필요합니다|필요해요|필요\s*함|필요\s*하다)',
-    r'(부탁합니다|부탁드립니다|부탁\s*해요|부탁이요)',
+    r'(알려\s*주세요|알려\s*주시|알려\s*주신다면|알려주시면)',
+    r'(연락\s*주세요|연락\s*주시|통보\s*해\s*주|안내\s*해\s*주|미리\s*알림)',
+    r'(주시면|주신다면|주시기를)',
+
+    # ── 바람·희망 ──
+    r'(바랍니다|바래요|바람|희망합니다)',
+    r'(좋겠습니다|좋겠어요|좋겠네요|좋을\s*것\s*같|좋을것같|좋을\s*듯|좋을듯)',
+    r'(했으면|됐으면|되었으면|있었으면|주었으면|있으면|하셨으면|되시면)\s*(좋겠|합니다|해요|하는|좋을|싶)',
+
+    # ── 개선·보완·건의 ──
+    r'(개선|시정|조치|보완|정비).{0,5}(해|필요|바|요|되|건의|의견)',
+    r'(개선\s*건의|개선\s*의견|개선\s*제안|건의\s*드립|건의합니다|의견\s*드립)',
+    r'(시스템|절차|규정).{0,10}(필요|개선|마련)',
+
+    # ── 필요·요청 ──
+    r'(필요합니다|필요해요|필요\s*함|필요\s*하다|필요할\s*것\s*같|필요할것같)',
+    r'(부탁합니다|부탁드립니다|부탁\s*해요|부탁이요|노력\s*부탁)',
     r'(요망|요청\s*합니다|요청\s*드립니다)',
+
+    # ── 의견·제안 표현 ──
+    r'(아쉬운\s*점|아쉽\s*습니다|아쉬워요|아쉽다)',
+    r'(미흡|부족|불충분)(한|할|함|합니다)',
+    r'(이해\s*안|이해가\s*안|이해되지\s*않|납득\s*안)',
+    r'(생각합니다|생각\s*해\s*봅니다|생각\s*해요|적어\s*봅니다|드는\s*생각)',
+
+    # ── 의문형 제안 ──
+    r'(할\s*수\s*없는지|되지\s*않을까|는\s*어떨까|할\s*수\s*있다면|있게\s*할)',
+
+    # ── 활용·도입 제안 ──
+    r'(활용하길|활용했으면|활용\s*하면|도입했으면|도입\s*하면)',
 ]
 
 
@@ -1077,7 +1101,7 @@ def _extract_voc_phrases(voc_texts, scores):
         [(label, len(vocs), vocs[:2]) for label, vocs in pos_counts.items() if vocs],
         key=lambda x: -x[1])
 
-    return neg_results, pos_results, notable[:10]
+    return neg_results, pos_results, notable[:30]
 
 
 # ── VOC 키워드 워드클라우드 함수 ────────────────────────────
@@ -2813,18 +2837,6 @@ with tab_weekly:
             # 통합 다운로드용 시트 dict
             _wr_dl_sheets = {}
 
-            _wr_ws = _wr_week_start.strftime("%m/%d")
-            _wr_we = _wr_week_end.strftime("%m/%d")
-            _wr_ls = _wr_last_start.strftime("%m/%d")
-            _wr_le = _wr_last_end.strftime("%m/%d")
-            st.markdown(
-                f'<div style="background:#eef3fb;border-radius:8px;padding:10px 16px;margin-bottom:12px;font-size:0.88em;color:#333;">'
-                f'📅 <b>기준일:</b> {_wr_ref_date.strftime("%Y-%m-%d")} &nbsp;│&nbsp; '
-                f'<b>금주:</b> {_wr_ws}~{_wr_we} ({len(_wr_this_week):,}건) &nbsp;│&nbsp; '
-                f'<b>전주:</b> {_wr_ls}~{_wr_le} ({len(_wr_last_week):,}건) &nbsp;│&nbsp; '
-                f'<b>월 누계:</b> {len(_wr_month):,}건'
-                f'</div>', unsafe_allow_html=True)
-
             # ── 지사 선택 (전체 / 개별 지사) ──
             _wr_offices_all = _sort_offices(df_f[_wr_office].dropna().unique().tolist()) if _wr_office else []
             _wr_view_opts = ["전체 (본부 종합)"] + _wr_offices_all
@@ -3442,7 +3454,7 @@ with tab_weekly:
                 with pd.ExcelWriter(_wr_all_buf, engine="openpyxl") as _aw:
                     for _sname, _sdf in _wr_dl_sheets.items():
                         _sdf.to_excel(_aw, index=False, sheet_name=_sname)
-                _wr_fname = f"주간리포트_{_wr_ws.replace('/','')}_{_wr_we.replace('/','')}.xlsx"
+                _wr_fname = f"주간리포트_{_wr_week_start.strftime('%m%d')}_{_wr_week_end.strftime('%m%d')}.xlsx"
                 st.download_button(
                     label=f"📥 주간 리포트 통합 다운로드 ({' · '.join(_wr_dl_sheets.keys())})",
                     data=_wr_all_buf.getvalue(),
@@ -5962,7 +5974,7 @@ with tab_sol:
                                     'justify-content:start;'
                                     'gap:18px;margin:16px 6px 10px 6px;">'
                                 )
-                                for _vi_i, (_voc_txt, _voc_sc) in enumerate(_notable[:6]):
+                                for _vi_i, (_voc_txt, _voc_sc) in enumerate(_notable[:15]):
                                     # 텍스트 길면 잘라서 카드 안에 깔끔하게
                                     _voc_display = _voc_txt[:75] + ('…' if len(_voc_txt) > 75 else '')
                                     _palette = _postit_palette[_vi_i % len(_postit_palette)]
