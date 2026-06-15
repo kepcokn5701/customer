@@ -2815,13 +2815,62 @@ with tab_weekly:
                 _wr_this_week = _this_f
             if _last_f is not None:
                 _wr_last_week = _last_f
+
+            # 날짜 컬럼 정규화 (Excel 시리얼 / 다양한 컬럼명 / 접수번호 fallback)
+            def _normalize_wr_dates(_df):
+                """비교 파일의 날짜 컬럼을 datetime으로 변환. (변환된 df, 사용된 컬럼명) 반환."""
+                if _df.empty:
+                    return _df, None
+                _df = _df.copy()
+                # 후보 컬럼: 메인 M["date"] 포함, 일반적인 날짜 컬럼명들
+                _candidates = []
+                if M.get("date"):
+                    _candidates.append(M["date"])
+                _candidates += ["접수일자", "접수일", "조사일자", "조사일", "일자", "날짜", "등록일", "업무처리완료일"]
+                for _col in _candidates:
+                    if not _col or _col not in _df.columns:
+                        continue
+                    _sample = _df[_col].dropna().head(5)
+                    if _sample.empty:
+                        continue
+                    # Excel 시리얼 감지
+                    _is_serial = False
+                    try:
+                        if _sample.dtype in ("int64", "float64"):
+                            _is_serial = True
+                        else:
+                            _vals_str = [str(v).replace(".", "").replace("-", "") for v in _sample]
+                            if all(v.isdigit() for v in _vals_str):
+                                _test = pd.to_numeric(_sample, errors="coerce").dropna()
+                                if not _test.empty and 40000 < _test.iloc[0] < 55000:
+                                    _is_serial = True
+                    except Exception:
+                        pass
+                    if _is_serial:
+                        _df[_col] = pd.to_timedelta(pd.to_numeric(_df[_col], errors="coerce") - 2, unit="D") + pd.Timestamp("1900-01-01")
+                    else:
+                        _df[_col] = pd.to_datetime(_df[_col], errors="coerce")
+                    _valid = _df[_col].dropna()
+                    if not _valid.empty and 2020 <= _valid.iloc[0].year <= 2030:
+                        return _df, _col
+                # 날짜 컬럼 추출 실패 → 접수번호에서 추출 시도
+                if M.get("receipt_no") and M["receipt_no"] in _df.columns:
+                    _df["_접수일"] = _df[M["receipt_no"]].apply(_parse_date_from_receipt)
+                    if _df["_접수일"].dropna().any():
+                        return _df, "_접수일"
+                return _df, None
+
+            _wr_this_week, _this_date_col = _normalize_wr_dates(_wr_this_week)
+            _wr_last_week, _last_date_col = _normalize_wr_dates(_wr_last_week)
+            _date_col_used = _this_date_col or _last_date_col
+
             # 월누계 = 금주 + 전주 합본 (로컬 모드)
             _parts = [d for d in (_wr_this_week, _wr_last_week) if not d.empty]
             _wr_month = pd.concat(_parts, ignore_index=True) if _parts else pd.DataFrame()
             # 기준일 = 이번주 파일에서 추출 (없으면 전주 파일)
             _src_for_date = _wr_this_week if not _wr_this_week.empty else _wr_last_week
-            if M["date"] and not _src_for_date.empty and M["date"] in _src_for_date.columns:
-                _src_dates = pd.to_datetime(_src_for_date[M["date"]], errors="coerce").dropna()
+            if _date_col_used and not _src_for_date.empty and _date_col_used in _src_for_date.columns:
+                _src_dates = _src_for_date[_date_col_used].dropna()
                 if not _src_dates.empty:
                     _wr_week_start = _src_dates.min()
                     _wr_week_end = _src_dates.max()
@@ -3853,7 +3902,11 @@ with tab1:
                     _biz_df = pd.DataFrame({"유형": counts.index, "건수": counts.values})
                     _biz_df["비율(%)"] = (_biz_df["건수"] / max(_total, 1) * 100).round(1)
                     _biz_df = _biz_df.sort_values("비율(%)", ascending=True)
-                    _biz_top3 = set(_biz_df.sort_values("비율(%)", ascending=False).head(3)["유형"].tolist())
+                    # 상위 3 강조 — 3위와 동률인 항목도 모두 포함 (head(3)은 동률 처리 안 함)
+                    _biz_desc = _biz_df.sort_values("비율(%)", ascending=False)
+                    _3rd_val = _biz_desc.iloc[2]["비율(%)"] if len(_biz_desc) >= 3 else (
+                        _biz_desc.iloc[-1]["비율(%)"] if len(_biz_desc) > 0 else 0)
+                    _biz_top3 = set(_biz_desc[_biz_desc["비율(%)"] >= _3rd_val]["유형"].tolist())
                     _biz_df["구분"] = _biz_df["유형"].apply(lambda x: "상위 3" if x in _biz_top3 else "일반")
                     # go.Bar 단일 trace로 — px.bar(color=)가 trace를 쪼개면 customdata 인덱스 어긋남
                     _biz_colors = [C["navy"] if _y in _biz_top3 else C["sky"] for _y in _biz_df["유형"]]
@@ -5823,7 +5876,8 @@ with tab_sol:
                                             "부정: (불만 키워드 3개, 쉼표 구분)\n"
                                             "특이: (이 지사 VOC에 자주 등장하는 고유한 패턴/이슈 1~2개, 쉼표 구분)\n\n"
                                             "규칙:\n"
-                                            "- 키워드는 구체적 명사형 2~5자 (예: 처리지연, 전화불통, 하청태도)\n"
+                                            "- 키워드는 구체적 명사형 2~7자 (예: 처리지연, 전화불통, 하청태도, 독거노인, 농사용방문)\n"
+                                            "- **단어를 자르지 말 것**. '독거노인'을 '독거노'로 자르거나 '장애인'을 '장애'로 자르면 안 됨. 완전한 명사로 출력.\n"
                                             "- '불만', '불편', '개선필요' 같은 포괄적 단어 금지\n"
                                             "- 부정/특이는 서로 겹치지 않게 다른 단어를 추출\n"
                                             "- 특이는 진짜로 아무 고유 패턴이 안 보일 때만 '없음'. "
@@ -5847,11 +5901,20 @@ with tab_sol:
                                                     _rbody = json.loads(_resp.read().decode("utf-8"))
                                                     _kw_text = _rbody["candidates"][0]["content"]["parts"][0]["text"].strip()
                                                     import re as _re_kw2
-                                                    _neg_m = _re_kw2.search(r'부정[:：]\s*(.+)', _kw_text)
-                                                    _spec_m = _re_kw2.search(r'특이[:：]\s*(.+)', _kw_text)
+                                                    # 콜론 변형(마크다운 ** ** 포함) 모두 매칭
+                                                    _neg_m = _re_kw2.search(r'부정\s*\**\s*[:：]\s*\**\s*(.+)', _kw_text)
+                                                    _spec_m = _re_kw2.search(r'특이\s*\**\s*[:：]\s*\**\s*(.+)', _kw_text)
+                                                    _neg_text = _neg_m.group(1).strip() if _neg_m else ""
+                                                    # ** 같은 마크다운 잔여 제거
+                                                    _neg_text = _neg_text.lstrip("*").rstrip("*").strip()
+                                                    # 부정 키워드도 못 잡았으면 캐시 안 하고 다음 모델 시도
+                                                    if not _neg_text:
+                                                        continue
+                                                    _spec_text = _spec_m.group(1).strip() if _spec_m else "없음"
+                                                    _spec_text = _spec_text.lstrip("*").rstrip("*").strip() or "없음"
                                                     st.session_state[_voc_kw_key] = {
-                                                        "부정": _neg_m.group(1).strip() if _neg_m else "",
-                                                        "특이": _spec_m.group(1).strip() if _spec_m else "없음"
+                                                        "부정": _neg_text,
+                                                        "특이": _spec_text,
                                                     }
                                                     break
                                             except Exception:
