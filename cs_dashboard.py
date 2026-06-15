@@ -579,13 +579,21 @@ def _sort_df_by_office(df, office_col, ascending=True):
 #  2. 키워드 사전
 # ══════════════════════════════════════════════════════════════
 NEGATIVE_KEYWORDS = [
-    "불만","불편","항의","화남","짜증","느림","느려","오류","오작동",
-    "불량","고장","재방문","지연","오래","기다림","실망","최악","별로",
-    "안됨","문제","취소","환불","비싸다","비싸","과다","과금","폭탄",
-    "불친절","무시","황당","어이없","답답","이해불가","납득불가","부당",
-    "잘못","실수","착오","불합리","불공정","차별","반복","또다시","여전히",
-    "아직도","힘듭니다","어렵습니다","불쾌","무성의","소홀","방치","지체",
-    "정전","단전","누전","위험","안전","사고",
+    # 감정·평가 표현
+    "불만","불편","항의","화남","짜증","실망","최악","별로",
+    "황당","어이없","답답","부당","불합리","불공정","차별","불쾌","불성의",
+    # 품질·처리 표현
+    "느림","느려","지연","오래","기다림","지체","재방문","미흡","미처리","누락",
+    "안됨","문제","취소","환불","오류","오작동","불량","잘못","실수","착오",
+    "방치","무성의","소홀","바보스럽","고자세","밀대기","시원치않","엉망",
+    # 요금 불만
+    "비싸다","비싸","과다","과금","폭탄",
+    # 응대 태도 — RUDE_KEYWORDS와 일부 중복 OK
+    "불친절","무시","무례","권위적",
+    # 반복 불만 표현
+    "반복","또다시","여전히","아직도",
+    # 도메인 명사(정전·고장·위험·안전·사고 등)는 단순 사실 서술 케이스가 많아 NEG에서 제외
+    # → 분류 시 점수와 함께 종합 판단
 ]
 
 # VOC 하이라이팅 전용 — 시설·기술·제도 중심 (감정어 제외)
@@ -611,10 +619,15 @@ RUDE_KEYWORDS = [
 
 # 긍정 문맥 키워드 — 이 단어가 부정/불친절 키워드 근처에 있으면 긍정으로 재판정
 POSITIVE_CONTEXT = [
+    # 명시적 긍정·만족 표현
     "감사","친절","좋","만족","잘","훌륭","경청","공감","인상깊","고마",
     "칭찬","최고","기쁘","따뜻","성실","편안","빠르","신속","정확","꼼꼼",
     "배려","존경","사려깊","세심","상냥","다정","협조","도움","반갑","행복",
     "깔끔","쾌적","개선","나아","발전",
+    # 사용자 피드백 반영 — 100점 응답에 자주 나오는 칭찬 표현
+    "수고","감동","상세","자세","해주셨","해주시","주셨","주시어","받았",
+    "추천","원활","무난","양호","적절","현명","꼼꼼히","상냥하게","친절히",
+    "신속하게","정확하게","깔끔하게","처리해주","안내해주","설명해주",
 ]
 
 _STOP = {
@@ -1046,10 +1059,11 @@ def _extract_voc_phrases(voc_texts, scores):
                         pos_counts[label].append(s)
                         break
 
-        # 건의/요청 감지 (만족(≥90점) 제외 + 만족 키워드 들어간 문장 제외)
-        _is_high_score = sc is not None and sc >= 90
-        _has_satisfy_kw = any(kw in s for kw in ("좋아요", "좋습니다", "좋네요", "감사", "만족", "훌륭", "최고", "고맙"))
-        if not _is_high_score and not _has_satisfy_kw:
+        # 건의/요청 감지 — 점수 무관하게 추출
+        # (90점 이상도 만족도 높지만 개선 의견을 같이 주는 경우 많아 모두 포함)
+        # 단, "감사합니다" 같은 단순 인사만 있는 경우는 제외
+        _is_pure_thanks = bool(re.fullmatch(r'\s*(감사합니다|감사드립니다|고맙습니다|만족합니다|좋습니다)[.\s!~]*', s))
+        if not _is_pure_thanks:
             for pat in _REQUEST_PATTERNS:
                 if re.search(pat, s):
                     notable.append((s, sc))
@@ -1493,25 +1507,47 @@ _ADVERSATIVE_PATTERNS = re.compile(
     r"몰라|걱정|당황|힘들었|어려웠|불안했|막막했)"
 )
 
+# 결론부에서만 작동하는 "강한 긍정" 표현 (단순 'POSITIVE_CONTEXT 포함'보다 엄격)
+_STRONG_POS_CONCL = [
+    "감사합니다", "감사드립니다", "감사하", "고맙습니다", "고맙",
+    "만족합니다", "만족스러", "감동", "훌륭", "최고",
+    "친절하", "친절히", "잘 처리", "잘처리", "잘해주", "잘 해주",
+    "수고하", "수고 많", "수고많", "신속하게 처리",
+]
+# 결론부 부정 신호 (긍정 결론으로 잘못 잡히는 케이스 방어)
+_NEG_CONCL_PATTERNS = [
+    "않습니다", "않았", "지 않", "지않", "안되", "안됐", "못했",
+    "엉망", "참았", "시원치", "바보스럽", "고자세", "민원넣",
+    "실망", "최악", "아쉬운", "부적절", "부족합", "미흡합",
+]
+
+
 def _has_positive_conclusion(text):
-    """텍스트의 결론(뒷부분)이 긍정인지 확인
-    한국어 VOC는 '~는데 잘 해주셔서 감사합니다' 패턴이 매우 빈번.
-    역접 접속사 뒤에 긍정이 있거나, 문장 끝이 긍정이면 True.
+    """텍스트의 결론(뒷부분)이 명확히 긍정인지 확인.
+    - 강한 긍정 표현(감사합니다/만족합니다/감동 등)이 끝부분에 있어야 True
+    - 단, 결론부에 부정 신호(않습니다/안됐/엉망 등)가 같이 있으면 False
+    - 역접('~지만') 뒤에 강한 긍정이 와도 True
     """
     s = str(text)
-    # 1) 역접 패턴 찾기 → 뒷부분에 긍정 있는지
+    tail = s[-30:] if len(s) > 30 else s
+
+    # 결론부에 부정 신호가 있으면 긍정 결론 아님
+    if any(p in tail for p in _NEG_CONCL_PATTERNS):
+        return False
+
+    # 강한 긍정 표현이 끝부분에 있어야 긍정 결론 인정
+    if any(p in tail for p in _STRONG_POS_CONCL):
+        return True
+
+    # 역접 패턴 뒤 강한 긍정
     match = _ADVERSATIVE_PATTERNS.search(s)
     if match:
         after = s[match.end():]
-        if any(pw in after for pw in POSITIVE_CONTEXT):
+        after_tail = after[-30:] if len(after) > 30 else after
+        if any(p in after_tail for p in _NEG_CONCL_PATTERNS):
+            return False
+        if any(p in after_tail for p in _STRONG_POS_CONCL):
             return True
-
-    # 2) 문장 끝 40자에 긍정 키워드가 있는지
-    tail = s[-40:] if len(s) > 40 else s
-    tail_pos = sum(1 for pw in POSITIVE_CONTEXT if pw in tail)
-    tail_neg = sum(1 for kw in NEGATIVE_KEYWORDS if kw in tail)
-    if tail_pos > 0 and tail_pos > tail_neg:
-        return True
 
     return False
 
@@ -1567,26 +1603,76 @@ def _is_negation_absence(text, keyword):
     return any(t in tail for t in _NEG_ABSENCE_TAILS)
 
 
-def classify_voc_binary(text):
-    """VOC 의견을 [긍정/부정]으로 2단 분류.
+def classify_voc_binary(text, score=None):
+    """VOC 의견을 [긍정/부정]으로 2단 분류 — 점수 가드레일 + 키워드 카운트 종합.
     - VOC 미작성(빈 텍스트/nan/응답없음) → None (분류 대상 제외)
-    - 부정 부재 표현('불편 없', '문제 없') 자동 긍정 인식
-    - 역접 후 긍정 결론 우선 처리
+    - 점수 극단값 가드레일 (≥95 긍정, ≤30 부정)
+    - 중간 점수: 긍정/부정 키워드 카운트 + 결론 톤 + 점수 가중
+    - 도메인 명사(정전/고장/위험 등)는 NEGATIVE_KEYWORDS에서 빠짐
     """
     if not text or str(text).strip() in ("", "nan", "응답없음", "없음", "의견없음", "빈문서", "빈항목"):
         return None
     s = str(text)
-    # 1) 역접 후 긍정 결론 ('~지만 잘 해주셨다') → 긍정
+
+    # ── 점수 정규화 ──
+    sv = None
+    if score is not None and not (isinstance(score, float) and pd.isna(score)):
+        try:
+            sv = float(score)
+        except (TypeError, ValueError):
+            sv = None
+
+    # ── 1) 점수 극단값 가드레일 ──
+    if sv is not None:
+        if sv >= 95:
+            return "긍정"
+        if sv <= 30:
+            return "부정"
+
+    # ── 2) 강한 긍정 결론 우선 ──
     if _has_positive_conclusion(s):
         return "긍정"
-    # 2) 부정/불친절 키워드 점검 — 단, 긍정 문맥 또는 부정 부재 패턴이면 무효화
+
+    # ── 3) 키워드 카운트 ──
+    neg_cnt = 0
     for kw in NEGATIVE_KEYWORDS + RUDE_KEYWORDS:
         if kw in s:
             if _has_positive_context(s, kw):
                 continue
             if _is_negation_absence(s, kw):
                 continue
+            neg_cnt += 1
+    pos_cnt = sum(1 for pw in POSITIVE_CONTEXT if pw in s)
+
+    # 결론부 부정 신호 → 부정 가중치
+    tail = s[-30:] if len(s) > 30 else s
+    if any(p in tail for p in _NEG_CONCL_PATTERNS):
+        neg_cnt += 2
+
+    # ── 4) 점수 가중 ──
+    if sv is not None:
+        if sv >= 80:
+            # 80~94점: 긍정 우대. 명확한 부정 다수일 때만 부정
+            if neg_cnt >= 3 and pos_cnt == 0:
+                return "부정"
+            return "긍정"
+        elif sv >= 60:
+            # 60~79점: 균형 — 카운트 비교
+            if neg_cnt > pos_cnt:
+                return "부정"
+            return "긍정"
+        elif sv >= 40:
+            # 40~59점: 부정 우대
+            if pos_cnt >= 2 and neg_cnt == 0:
+                return "긍정"
             return "부정"
+        else:
+            # 31~39점: 부정 강 우대
+            return "부정"
+
+    # 점수 없음 — 카운트만으로 판단
+    if neg_cnt > pos_cnt:
+        return "부정"
     return "긍정"
 
 
@@ -2595,8 +2681,11 @@ if M["voc"]:
     raw_voc = df_f[M["voc"]].astype(str).str.strip()
     all_texts = raw_voc.tolist()
     voc_texts_all = [t for t in all_texts if t and t != "nan" and t != "응답없음"]
+    # 점수 인자 같이 전달 (점수 가드레일 적용)
+    _scores_all = df_f["_점수100"].tolist() if "_점수100" in df_f.columns else [None] * len(all_texts)
     for i, t in enumerate(all_texts):
-        _r = classify_voc_binary(t)
+        _sc = _scores_all[i] if i < len(_scores_all) else None
+        _r = classify_voc_binary(t, _sc)
         _row_sentiments[i] = _r
         if _r == "긍정":   pos_cnt += 1
         elif _r == "부정": neg_cnt += 1
@@ -2612,32 +2701,7 @@ neg_ratio = neg_cnt / max(_voc_total, 1) * 100
 
 # KPI 메트릭은 종합현황 탭(tab1) 내부 최상단에서 렌더링
 
-# ══════════════════════════════════════════════════════════════
-#  주간 리포트 기준일 계산
-#  - 업로드된 데이터 전체 = 금주 (목~수 고정 주기)
-#  - 전주 = 금주 시작일 - 7일 ~ 금주 시작일 - 1일
-# ══════════════════════════════════════════════════════════════
-_wr_week_available = False
-_wr_this_week = _wr_last_week = _wr_month = pd.DataFrame()
-_wr_ref_date = _wr_week_start = _wr_week_end = _wr_last_start = _wr_last_end = None
-if M["date"]:
-    _wr_dates = df_f[M["date"]].dropna()
-    if not _wr_dates.empty:
-        # 업로드 데이터의 실제 날짜 범위 = 금주
-        _wr_date_min = _wr_dates.min()
-        _wr_date_max = _wr_dates.max()
-        _wr_ref_date = _wr_date_max
-        _wr_week_start = _wr_date_min
-        _wr_week_end = _wr_date_max
-        _wr_last_end = _wr_week_start - pd.Timedelta(days=1)
-        _wr_last_start = _wr_last_end - pd.Timedelta(days=6)
-        _wr_month_start = _wr_date_min.replace(day=1)
-        # 금주 = 업로드 데이터 전체
-        _wr_this_week = df_f.copy()
-        # 전주 = 금주 시작 전 7일 (데이터에 있으면)
-        _wr_last_week = df_f[(df_f[M["date"]] >= _wr_last_start) & (df_f[M["date"]] < _wr_week_start)]
-        _wr_month = df_f[(df_f[M["date"]] >= _wr_month_start) & (df_f[M["date"]] <= _wr_week_end)]
-        _wr_week_available = len(_wr_this_week) > 0
+# 주간 리포트 변수는 tab_weekly 내부에서 업로더 결과에 따라 계산
 
 # ══════════════════════════════════════════════════════════════
 #  13. 탭 구성
@@ -2672,8 +2736,74 @@ with tab_weekly:
 
     @st.fragment
     def _render_tab_weekly():
+        # ── 주간 데이터 업로더 (이 탭 전용) ──────────────────
+        st.markdown(
+            '<div style="background:#fff8e1;border-left:4px solid #f9a825;'
+            'padding:10px 14px;border-radius:6px;margin-bottom:10px;font-size:0.86em;color:#555;">'
+            '💡 이 탭은 <b>주단위 데이터</b>를 사용합니다. 주간 파일을 따로 올리거나, '
+            '미업로드 시 사이드바 메인 데이터의 날짜 컬럼으로 자동 분류합니다.'
+            '</div>', unsafe_allow_html=True)
+        _wu_c1, _wu_c2 = st.columns(2)
+        with _wu_c1:
+            _wr_this_file = st.file_uploader(
+                "📂 이번주 데이터 (옵션)", type=["xlsx", "xls", "csv"],
+                key="wr_this_uploader", label_visibility="visible")
+        with _wu_c2:
+            _wr_last_file = st.file_uploader(
+                "📂 전주 데이터 (옵션)", type=["xlsx", "xls", "csv"],
+                key="wr_last_uploader", label_visibility="visible")
+
+        # ── 데이터 결정 ───────────────────────────────────────
+        _wr_local_mode = (_wr_this_file is not None) or (_wr_last_file is not None)
+        _wr_this_week = pd.DataFrame()
+        _wr_last_week = pd.DataFrame()
+        _wr_month = pd.DataFrame()
+        _wr_ref_date = _wr_week_start = _wr_week_end = _wr_last_start = _wr_last_end = None
+        _wr_week_available = False
+
+        if _wr_local_mode:
+            # 로컬 업로더 모드: 각 파일을 그대로 금주/전주로 사용
+            _this_raw, _this_f, _ = _load_compare_file(_wr_this_file)
+            _last_raw, _last_f, _ = _load_compare_file(_wr_last_file)
+            if _this_f is not None:
+                _wr_this_week = _this_f
+            if _last_f is not None:
+                _wr_last_week = _last_f
+            # 월누계 = 금주 + 전주 합본 (로컬 모드)
+            _parts = [d for d in (_wr_this_week, _wr_last_week) if not d.empty]
+            _wr_month = pd.concat(_parts, ignore_index=True) if _parts else pd.DataFrame()
+            # 기준일 = 이번주 파일에서 추출 (없으면 전주 파일)
+            _src_for_date = _wr_this_week if not _wr_this_week.empty else _wr_last_week
+            if M["date"] and not _src_for_date.empty and M["date"] in _src_for_date.columns:
+                _src_dates = pd.to_datetime(_src_for_date[M["date"]], errors="coerce").dropna()
+                if not _src_dates.empty:
+                    _wr_week_start = _src_dates.min()
+                    _wr_week_end = _src_dates.max()
+                    _wr_ref_date = _wr_week_end
+                    _wr_last_end = _wr_week_start - pd.Timedelta(days=1)
+                    _wr_last_start = _wr_last_end - pd.Timedelta(days=6)
+            # 데이터도 있고 날짜 컬럼이 추출 가능해야 가능
+            _wr_week_available = (not _wr_this_week.empty or not _wr_last_week.empty) and _wr_week_start is not None
+        else:
+            # 사이드바 메인 데이터로 날짜 자동 분류 (기존 동작)
+            if M["date"]:
+                _wr_dates = df_f[M["date"]].dropna()
+                if not _wr_dates.empty:
+                    _wr_date_min = _wr_dates.min()
+                    _wr_date_max = _wr_dates.max()
+                    _wr_ref_date = _wr_date_max
+                    _wr_week_start = _wr_date_min
+                    _wr_week_end = _wr_date_max
+                    _wr_last_end = _wr_week_start - pd.Timedelta(days=1)
+                    _wr_last_start = _wr_last_end - pd.Timedelta(days=6)
+                    _wr_month_start = _wr_date_min.replace(day=1)
+                    _wr_this_week = df_f.copy()
+                    _wr_last_week = df_f[(df_f[M["date"]] >= _wr_last_start) & (df_f[M["date"]] < _wr_week_start)]
+                    _wr_month = df_f[(df_f[M["date"]] >= _wr_month_start) & (df_f[M["date"]] <= _wr_week_end)]
+                    _wr_week_available = len(_wr_this_week) > 0
+
         if not _wr_week_available:
-            st.warning("날짜 정보가 없거나 금주 데이터가 없어 주간 리포트를 생성할 수 없습니다. 엑셀에 접수일자/접수번호 컬럼이 있는지 확인해주세요.")
+            st.warning("날짜 정보가 없거나 금주 데이터가 없어 주간 리포트를 생성할 수 없습니다. 엑셀에 접수일자/접수번호 컬럼이 있는지, 또는 위 업로더로 주간 데이터를 올려주세요.")
         else:
             _wr_score = M["score"]
             _wr_office = M["office"]
@@ -2926,7 +3056,12 @@ with tab_weekly:
 
             if _wr_voc:
                 _fb_df = _wr_tw_view.copy()
-                _fb_df["_감성분류"] = _fb_df[_wr_voc].apply(classify_voc_binary)
+                # 점수 인자 전달 — 점수 가드레일 적용
+                if "_점수100" in _fb_df.columns:
+                    _fb_df["_감성분류"] = _fb_df.apply(
+                        lambda r: classify_voc_binary(r[_wr_voc], r.get("_점수100")), axis=1)
+                else:
+                    _fb_df["_감성분류"] = _fb_df[_wr_voc].apply(classify_voc_binary)
                 # VOC 미작성(None)은 표/카운트 대상에서 제외
                 _fb_df = _fb_df[_fb_df["_감성분류"].notna()]
                 _fb_pos = int((_fb_df["_감성분류"] == "긍정").sum())
@@ -3156,7 +3291,12 @@ with tab_weekly:
                         _biz_summary.columns = ["업무유형","평균점수","건수"]
                         _ai_summary_parts.append("■ 업무유형별 금주 현황:\n" + _biz_summary.to_string(index=False))
                     if _wr_voc:
-                        _neg_vocs = _wr_tw_view[_wr_tw_view[_wr_voc].apply(lambda x: classify_voc_binary(x) == "부정")][_wr_voc].head(10).tolist()
+                        if "_점수100" in _wr_tw_view.columns:
+                            _neg_mask = _wr_tw_view.apply(
+                                lambda r: classify_voc_binary(r[_wr_voc], r.get("_점수100")) == "부정", axis=1)
+                        else:
+                            _neg_mask = _wr_tw_view[_wr_voc].apply(lambda x: classify_voc_binary(x) == "부정")
+                        _neg_vocs = _wr_tw_view[_neg_mask][_wr_voc].head(10).tolist()
                         if _neg_vocs:
                             _ai_summary_parts.append("■ 금주 부정 VOC (최대 10건):\n" + "\n".join(f"- {v}" for v in _neg_vocs))
 
@@ -3381,6 +3521,9 @@ with tab1:
         _prev_diff_overall = None
         if prev_avg_score_100 is not None and not pd.isna(prev_avg_score_100) and _cur_score_val is not None:
             _prev_diff_overall = round(_cur_score_val - round(prev_avg_score_100, 1), 1)
+        _prev_y_diff_overall = None
+        if prev_y_avg_score_100 is not None and not pd.isna(prev_y_avg_score_100) and _cur_score_val is not None:
+            _prev_y_diff_overall = round(_cur_score_val - round(prev_y_avg_score_100, 1), 1)
 
         _hq2_html = '<table style="width:100%;border-collapse:collapse;font-size:0.95em;text-align:center;margin:0;">'
         _hq2_html += f'<tr style="{_RP_HDR_STYLE}">'
@@ -3403,7 +3546,7 @@ with tab1:
         _hq2_html += f'<td style="border:1px solid {_RP_BDR};padding:8px 8px;">{_resp_rate}</td>' if _resp_rate is not None else f'<td style="border:1px solid {_RP_BDR};padding:8px 8px;">-</td>'
         _hq2_html += f'<td style="border:1px solid {_RP_BDR};padding:8px 8px;font-weight:700;color:{C["navy"]};">{_cur_score_val}</td>' if _cur_score_val is not None else f'<td style="border:1px solid {_RP_BDR};padding:8px 8px;">-</td>'
         _hq2_html += f'<td style="border:1px solid {_RP_BDR};padding:8px 8px;">{_fmt_diff_colored(_prev_diff_overall)}</td>'
-        _hq2_html += f'<td style="border:1px solid {_RP_BDR};padding:8px 8px;">-</td></tr>'
+        _hq2_html += f'<td style="border:1px solid {_RP_BDR};padding:8px 8px;">{_fmt_diff_colored(_prev_y_diff_overall)}</td></tr>'
         _hq2_html += '</table>'
         # 표 카드 + 다음 sec-head를 한 markdown으로 출력 (gap 3과 동일한 패턴)
         # inline margin-top:24px — 클래스 margin이 Streamlit prose CSS에 묻히는 케이스 회피
@@ -4091,600 +4234,606 @@ def _render_category_section(df, cat_col, cat_label, office_col, score_col, over
 
 
 with tab3:
-    if not M["score"]:
-        st.warning("만족도 점수 컬럼이 필요합니다.")
-    else:
-        # 통합 다운로드 버튼은 진단 보고서 직전에 위치 (placeholder 사용 안 함)
-        _dl_sheets = {}  # {시트명: DataFrame}
 
-        # ── Chapter 헤더 헬퍼 (메인 섹션 구분용) ──
-        def _chapter_header(num, icon, title, subtitle, top_margin=48):
-            return (
-                f'<div class="tab2-chapter-card" style="display:flex;align-items:center;'
-                f'background:linear-gradient(135deg,#eef4fb 0%,#dbe6f5 100%);'
-                f'border-left:5px solid {C["navy"]};border-radius:12px;'
-                f'padding:18px 26px;margin:{top_margin}px 0 20px 0;'
-                f'box-shadow:0 1px 3px rgba(15,23,42,0.04),0 4px 12px rgba(15,23,42,0.06);">'
-                f'<div style="font-size:2.1rem;font-weight:800;color:{C["blue"]};'
-                f'line-height:1;letter-spacing:-1px;margin-right:22px;min-width:54px;">{num:02d}</div>'
-                f'<div>'
-                f'<div style="font-size:1.25rem;font-weight:700;color:{C["navy"]};'
-                f'margin-bottom:3px;letter-spacing:-0.3px;">{icon} {title}</div>'
-                f'<div style="font-size:0.86rem;color:#5a6577;">{subtitle}</div>'
-                f'</div>'
-                f'</div>'
-            )
+    @st.fragment
+    def _render_tab3():
+        if not M["score"]:
+            st.warning("만족도 점수 컬럼이 필요합니다.")
+        else:
+            # 통합 다운로드 버튼은 진단 보고서 직전에 위치 (placeholder 사용 안 함)
+            _dl_sheets = {}  # {시트명: DataFrame}
 
-        # ── ① 항목별 결과 (양식1) ──
-        # 모든 값이 0(또는 NaN)인 컬럼은 자동 제외
-        # (작년처럼 이용편리성에 점수 있는 자료는 자동 포함됨)
-        _f1_score_cols = []
-        for _sc in individual_scores:
-            if _sc not in df_f.columns:
-                continue
-            _vals = pd.to_numeric(df_f[_sc], errors="coerce").dropna()
-            if len(_vals) > 0 and (_vals > 0).any():
-                _f1_score_cols.append(_sc)
-        if M["office"] and _f1_score_cols and "_점수100" in df_f.columns:
-            st.markdown(_chapter_header(1, "📋", "항목별 만족도 분석",
-                                         "본부 · 사업소별 5개 항목 점수 한눈에", top_margin=24),
-                        unsafe_allow_html=True)
-            _item_offices = _sort_offices(df_f[M["office"]].dropna().unique().tolist())
-            _resp_col = M.get("response")
-            _item_rows = []
-            for _ofc in _item_offices:
-                _odf = df_f[df_f[M["office"]] == _ofc]  # 응답(점수 있는) 데이터
-                _raw_ofc = df_raw[df_raw[M["office"]] == _ofc]  # 전체 원본
-                _completed = len(_raw_ofc)
+            # ── Chapter 헤더 헬퍼 (메인 섹션 구분용) ──
+            def _chapter_header(num, icon, title, subtitle, top_margin=48):
+                return (
+                    f'<div class="tab2-chapter-card" style="display:flex;align-items:center;'
+                    f'background:linear-gradient(135deg,#eef4fb 0%,#dbe6f5 100%);'
+                    f'border-left:5px solid {C["navy"]};border-radius:12px;'
+                    f'padding:18px 26px;margin:{top_margin}px 0 20px 0;'
+                    f'box-shadow:0 1px 3px rgba(15,23,42,0.04),0 4px 12px rgba(15,23,42,0.06);">'
+                    f'<div style="font-size:2.1rem;font-weight:800;color:{C["blue"]};'
+                    f'line-height:1;letter-spacing:-1px;margin-right:22px;min-width:54px;">{num:02d}</div>'
+                    f'<div>'
+                    f'<div style="font-size:1.25rem;font-weight:700;color:{C["navy"]};'
+                    f'margin-bottom:3px;letter-spacing:-0.3px;">{icon} {title}</div>'
+                    f'<div style="font-size:0.86rem;color:#5a6577;">{subtitle}</div>'
+                    f'</div>'
+                    f'</div>'
+                )
+
+            # ── ① 항목별 결과 (양식1) ──
+            # 모든 값이 0(또는 NaN)인 컬럼은 자동 제외
+            # (작년처럼 이용편리성에 점수 있는 자료는 자동 포함됨)
+            _f1_score_cols = []
+            for _sc in individual_scores:
+                if _sc not in df_f.columns:
+                    continue
+                _vals = pd.to_numeric(df_f[_sc], errors="coerce").dropna()
+                if len(_vals) > 0 and (_vals > 0).any():
+                    _f1_score_cols.append(_sc)
+            if M["office"] and _f1_score_cols and "_점수100" in df_f.columns:
+                st.markdown(_chapter_header(1, "📋", "항목별 만족도 분석",
+                                             "본부 · 사업소별 5개 항목 점수 한눈에", top_margin=24),
+                            unsafe_allow_html=True)
+                _item_offices = _sort_offices(df_f[M["office"]].dropna().unique().tolist())
+                _resp_col = M.get("response")
+                _item_rows = []
+                for _ofc in _item_offices:
+                    _odf = df_f[df_f[M["office"]] == _ofc]  # 응답(점수 있는) 데이터
+                    _raw_ofc = df_raw[df_raw[M["office"]] == _ofc]  # 전체 원본
+                    _completed = len(_raw_ofc)
+                    if _resp_col and _resp_col in df_raw.columns:
+                        _rv = _raw_ofc[_resp_col].astype(str).str.strip()
+                        _sent = int(_rv.isin(["응답", "미응답"]).sum())
+                        _responded = int((_rv == "응답").sum())
+                    else:
+                        _sent = "-"
+                        _responded = len(_odf)
+                    _resp_rate = round(_responded / _sent * 100, 1) if isinstance(_sent, int) and _sent > 0 else "-"
+                    _row = {"구분": _ofc, "업무처리완료고객": f"{_completed:,}",
+                            "발송호수": f"{_sent:,}" if isinstance(_sent, int) else _sent,
+                            "응답호수": f"{_responded:,}" if isinstance(_responded, int) else _responded,
+                            "응답률(%)": _resp_rate}
+                    for _sc in _f1_score_cols:
+                        if _sc in _odf.columns:
+                            _val = _odf[_sc].dropna()
+                            _row[_sc] = round(_val.mean(), 1) if len(_val) > 0 else ""
+                        else:
+                            _row[_sc] = ""
+                    _row["종합점수"] = round(_odf["_점수100"].mean(), 1) if len(_odf) > 0 else ""
+                    _item_rows.append(_row)
+
+                # 본부 합계 행
+                _all_completed = len(df_raw[df_raw[M["office"]].notna()])
                 if _resp_col and _resp_col in df_raw.columns:
-                    _rv = _raw_ofc[_resp_col].astype(str).str.strip()
-                    _sent = int(_rv.isin(["응답", "미응답"]).sum())
-                    _responded = int((_rv == "응답").sum())
+                    _raw_with_ofc = df_raw[df_raw[M["office"]].notna()]
+                    _rv_all = _raw_with_ofc[_resp_col].astype(str).str.strip()
+                    _all_sent = int(_rv_all.isin(["응답", "미응답"]).sum())
+                    _all_responded = int((_rv_all == "응답").sum())
                 else:
-                    _sent = "-"
-                    _responded = len(_odf)
-                _resp_rate = round(_responded / _sent * 100, 1) if isinstance(_sent, int) and _sent > 0 else "-"
-                _row = {"구분": _ofc, "업무처리완료고객": f"{_completed:,}",
-                        "발송호수": f"{_sent:,}" if isinstance(_sent, int) else _sent,
-                        "응답호수": f"{_responded:,}" if isinstance(_responded, int) else _responded,
-                        "응답률(%)": _resp_rate}
+                    _all_sent = "-"
+                    _all_responded = len(df_f)
+                _all_resp_rate = round(_all_responded / _all_sent * 100, 1) if isinstance(_all_sent, int) and _all_sent > 0 else "-"
+                _hq_row = {"구분": "본부", "업무처리완료고객": f"{_all_completed:,}",
+                           "발송호수": f"{_all_sent:,}" if isinstance(_all_sent, int) else _all_sent,
+                           "응답호수": f"{_all_responded:,}" if isinstance(_all_responded, int) else _all_responded,
+                           "응답률(%)": _all_resp_rate}
+                # 본부 행도 필터된 컬럼(_f1_score_cols)만 — 전체 0/NaN 컬럼(이용편리성 등) 자동 제외
                 for _sc in _f1_score_cols:
-                    if _sc in _odf.columns:
-                        _val = _odf[_sc].dropna()
-                        _row[_sc] = round(_val.mean(), 1) if len(_val) > 0 else ""
+                    if _sc in df_f.columns:
+                        _val = df_f[_sc].dropna()
+                        _hq_row[_sc] = round(_val.mean(), 1) if len(_val) > 0 else ""
                     else:
-                        _row[_sc] = ""
-                _row["종합점수"] = round(_odf["_점수100"].mean(), 1) if len(_odf) > 0 else ""
-                _item_rows.append(_row)
+                        _hq_row[_sc] = ""
+                _hq_row["종합점수"] = round(df_f["_점수100"].mean(), 1)
+                _item_rows.insert(0, _hq_row)
 
-            # 본부 합계 행
-            _all_completed = len(df_raw[df_raw[M["office"]].notna()])
-            if _resp_col and _resp_col in df_raw.columns:
-                _raw_with_ofc = df_raw[df_raw[M["office"]].notna()]
-                _rv_all = _raw_with_ofc[_resp_col].astype(str).str.strip()
-                _all_sent = int(_rv_all.isin(["응답", "미응답"]).sum())
-                _all_responded = int((_rv_all == "응답").sum())
-            else:
-                _all_sent = "-"
-                _all_responded = len(df_f)
-            _all_resp_rate = round(_all_responded / _all_sent * 100, 1) if isinstance(_all_sent, int) and _all_sent > 0 else "-"
-            _hq_row = {"구분": "본부", "업무처리완료고객": f"{_all_completed:,}",
-                       "발송호수": f"{_all_sent:,}" if isinstance(_all_sent, int) else _all_sent,
-                       "응답호수": f"{_all_responded:,}" if isinstance(_all_responded, int) else _all_responded,
-                       "응답률(%)": _all_resp_rate}
-            # 본부 행도 필터된 컬럼(_f1_score_cols)만 — 전체 0/NaN 컬럼(이용편리성 등) 자동 제외
-            for _sc in _f1_score_cols:
-                if _sc in df_f.columns:
-                    _val = df_f[_sc].dropna()
-                    _hq_row[_sc] = round(_val.mean(), 1) if len(_val) > 0 else ""
-                else:
-                    _hq_row[_sc] = ""
-            _hq_row["종합점수"] = round(df_f["_점수100"].mean(), 1)
-            _item_rows.insert(0, _hq_row)
-
-            _item_df = pd.DataFrame(_item_rows)
-            # HTML 테이블 (라이트 톤 양식)
-            _hdr_bg = "#f1f5f9"
-            _border = "#e5e7eb"
-            _hdr_style = f'background:{_hdr_bg};font-weight:700;color:{C["navy"]};'
-            _f1_html = ('<div style="overflow-x:auto;background:#ffffff;border-radius:12px;'
-                        'padding:18px 20px;box-shadow:0 1px 3px rgba(15,23,42,0.04),0 4px 12px rgba(15,23,42,0.06);'
-                        'margin-bottom:18px;"><table style="border-collapse:collapse;width:100%;font-size:0.88em;text-align:center;">')
-            _f1_html += f'<tr style="{_hdr_style}">'
-            for _col in _item_df.columns:
-                _f1_html += f'<th style="border:1px solid {_border};padding:8px 4px;">{_col}</th>'
-            _f1_html += '</tr>'
-            for _ri, (_, _row) in enumerate(_item_df.iterrows()):
-                _is_hq = (_ri == 0)
-                _bg = f"background:#f8fafc;font-weight:700;color:{C['navy']};" if _is_hq else ""
-                _dbl_b = "border-bottom:1px solid #94a3b8;" if _is_hq else ""
-                _f1_html += f'<tr style="{_bg}">'
+                _item_df = pd.DataFrame(_item_rows)
+                # HTML 테이블 (라이트 톤 양식)
+                _hdr_bg = "#f1f5f9"
+                _border = "#e5e7eb"
+                _hdr_style = f'background:{_hdr_bg};font-weight:700;color:{C["navy"]};'
+                _f1_html = ('<div style="overflow-x:auto;background:#ffffff;border-radius:12px;'
+                            'padding:18px 20px;box-shadow:0 1px 3px rgba(15,23,42,0.04),0 4px 12px rgba(15,23,42,0.06);'
+                            'margin-bottom:18px;"><table style="border-collapse:collapse;width:100%;font-size:0.88em;text-align:center;">')
+                _f1_html += f'<tr style="{_hdr_style}">'
                 for _col in _item_df.columns:
-                    _v = _row[_col]
-                    if _col == "구분":
-                        _cell_bg = "background:#f1f5f9;" if _is_hq else "background:#fafbfc;"
-                        _f1_html += f'<td style="border:1px solid {_border};{_dbl_b}padding:6px 10px;font-weight:700;color:{C["navy"]};{_cell_bg}">{_v}</td>'
-                    elif _col == "종합점수":
-                        _f1_html += f'<td style="border:1px solid {_border};{_dbl_b}padding:5px 4px;font-weight:700;">{_v}</td>'
-                    else:
-                        _f1_html += f'<td style="border:1px solid {_border};{_dbl_b}padding:5px 4px;">{_v}</td>'
+                    _f1_html += f'<th style="border:1px solid {_border};padding:8px 4px;">{_col}</th>'
                 _f1_html += '</tr>'
-            _f1_html += '</table>'
-            _f1_html += f'<div style="text-align:right;font-size:0.8em;margin-top:6px;color:#888;">(단위 : 호, 점)</div>'
-            _f1_html += '</div>'
-            st.markdown(_f1_html, unsafe_allow_html=True)
-            _dl_sheets["항목별"] = _item_df
+                for _ri, (_, _row) in enumerate(_item_df.iterrows()):
+                    _is_hq = (_ri == 0)
+                    _bg = f"background:#f8fafc;font-weight:700;color:{C['navy']};" if _is_hq else ""
+                    _dbl_b = "border-bottom:1px solid #94a3b8;" if _is_hq else ""
+                    _f1_html += f'<tr style="{_bg}">'
+                    for _col in _item_df.columns:
+                        _v = _row[_col]
+                        if _col == "구분":
+                            _cell_bg = "background:#f1f5f9;" if _is_hq else "background:#fafbfc;"
+                            _f1_html += f'<td style="border:1px solid {_border};{_dbl_b}padding:6px 10px;font-weight:700;color:{C["navy"]};{_cell_bg}">{_v}</td>'
+                        elif _col == "종합점수":
+                            _f1_html += f'<td style="border:1px solid {_border};{_dbl_b}padding:5px 4px;font-weight:700;">{_v}</td>'
+                        else:
+                            _f1_html += f'<td style="border:1px solid {_border};{_dbl_b}padding:5px 4px;">{_v}</td>'
+                    _f1_html += '</tr>'
+                _f1_html += '</table>'
+                _f1_html += f'<div style="text-align:right;font-size:0.8em;margin-top:6px;color:#888;">(단위 : 호, 점)</div>'
+                _f1_html += '</div>'
+                st.markdown(_f1_html, unsafe_allow_html=True)
+                _dl_sheets["항목별"] = _item_df
 
-        # ── ② 계약종별 분석 ──
-        if M["contract"]:
-            st.markdown(_chapter_header(2, "📋", "계약종별별 만족도 분석",
-                                         "현황 요약 · 핵심 KPI · 사업소별 점수 분포"),
-                        unsafe_allow_html=True)
-            _ct_dl_df = _render_category_section(df_f, M["contract"], "계약종별",
-                                     M["office"], "_점수100", avg_score_100)
-            if _ct_dl_df is not None:
-                _dl_sheets["계약종별"] = _ct_dl_df
+            # ── ② 계약종별 분석 ──
+            if M["contract"]:
+                st.markdown(_chapter_header(2, "📋", "계약종별별 만족도 분석",
+                                             "현황 요약 · 핵심 KPI · 사업소별 점수 분포"),
+                            unsafe_allow_html=True)
+                _ct_dl_df = _render_category_section(df_f, M["contract"], "계약종별",
+                                         M["office"], "_점수100", avg_score_100)
+                if _ct_dl_df is not None:
+                    _dl_sheets["계약종별"] = _ct_dl_df
 
-        # ── ③ 업무유형별 분석 ──
-        if M["business"]:
-            st.markdown(_chapter_header(3, "📋", "업무유형별 만족도 분석",
-                                         "현황 요약 · 핵심 KPI · 사분면 진단 · 사업소별 점수 분포"),
-                        unsafe_allow_html=True)
-            _bz_dl_df = _render_category_section(df_f, M["business"], "업무유형",
-                                     M["office"], "_점수100", avg_score_100)
-            if _bz_dl_df is not None:
-                _dl_sheets["업무유형"] = _bz_dl_df
+            # ── ③ 업무유형별 분석 ──
+            if M["business"]:
+                st.markdown(_chapter_header(3, "📋", "업무유형별 만족도 분석",
+                                             "현황 요약 · 핵심 KPI · 사분면 진단 · 사업소별 점수 분포"),
+                            unsafe_allow_html=True)
+                _bz_dl_df = _render_category_section(df_f, M["business"], "업무유형",
+                                         M["office"], "_점수100", avg_score_100)
+                if _bz_dl_df is not None:
+                    _dl_sheets["업무유형"] = _bz_dl_df
 
-        # ── 통합 다운로드 버튼 채우기 ──
-        if _dl_sheets:
-            from openpyxl.styles import PatternFill, Font
-            _all_buf = io.BytesIO()
-            with pd.ExcelWriter(_all_buf, engine="openpyxl") as _aw:
-                for _sname, _sdf in _dl_sheets.items():
-                    _sdf.to_excel(_aw, index=False, sheet_name=_sname)
-                # 업무유형 시트 스타일링
-                if "업무유형" in _dl_sheets and "업무유형" in _aw.sheets:
-                    _bz_df = _dl_sheets["업무유형"]
-                    _ws = _aw.sheets["업무유형"]
-                    _bz_cols = list(_bz_df.columns)
-                    # 본부 행(row 2)에서 평균값 추출
-                    _bz_hq = {}
-                    for _ci, _cn in enumerate(_bz_cols, start=1):
-                        if _ci == 1 or _cn == "합계":
-                            continue
-                        _cv = _ws.cell(row=2, column=_ci).value
-                        if isinstance(_cv, (int, float)):
-                            _bz_hq[_cn] = _cv
-                    # 하위 3개 계산 (지사별)
-                    _bz_bottom3 = {}
-                    for _ri in range(3, len(_bz_df) + 2):
-                        _ofc = _ws.cell(row=_ri, column=1).value
-                        _scores = {}
-                        for _ci, _cn in enumerate(_bz_cols[1:], start=2):
-                            if _cn == "합계":
-                                continue
-                            _cv = _ws.cell(row=_ri, column=_ci).value
-                            if isinstance(_cv, (int, float)):
-                                _scores[_cn] = _cv
-                        if _scores:
-                            _sorted = sorted(_scores.items(), key=lambda x: x[1])
-                            _bz_bottom3[_ri] = {k: i + 1 for i, (k, _) in enumerate(_sorted[:3])}
-                    # 스타일 적용
-                    _red_ft = Font(color="D32F2F", bold=True)
-                    for _ri in range(3, len(_bz_df) + 2):
+            # ── 통합 다운로드 버튼 채우기 ──
+            if _dl_sheets:
+                from openpyxl.styles import PatternFill, Font
+                _all_buf = io.BytesIO()
+                with pd.ExcelWriter(_all_buf, engine="openpyxl") as _aw:
+                    for _sname, _sdf in _dl_sheets.items():
+                        _sdf.to_excel(_aw, index=False, sheet_name=_sname)
+                    # 업무유형 시트 스타일링
+                    if "업무유형" in _dl_sheets and "업무유형" in _aw.sheets:
+                        _bz_df = _dl_sheets["업무유형"]
+                        _ws = _aw.sheets["업무유형"]
+                        _bz_cols = list(_bz_df.columns)
+                        # 본부 행(row 2)에서 평균값 추출
+                        _bz_hq = {}
                         for _ci, _cn in enumerate(_bz_cols, start=1):
                             if _ci == 1 or _cn == "합계":
                                 continue
-                            _cell = _ws.cell(row=_ri, column=_ci)
-                            _cv = _cell.value
-                            if not isinstance(_cv, (int, float)):
-                                continue
-                            _ha = _bz_hq.get(_cn)
-                            if _ha is not None and _cv < _ha:
-                                _g = min((_ha - _cv) / 10.0, 1.0)
-                                _cr = int(237 - (237 - 167) * _g)
-                                _cg = int(233 - (233 - 139) * _g)
-                                _cb = int(254 - (254 - 250) * _g)
-                                _cell.fill = PatternFill(start_color=f"{_cr:02X}{_cg:02X}{_cb:02X}",
-                                                         end_color=f"{_cr:02X}{_cg:02X}{_cb:02X}", fill_type="solid")
-                            if _bz_bottom3.get(_ri, {}).get(_cn):
-                                _cell.font = _red_ft
-            st.download_button(
-                label="📥 항목별 · 계약종별 · 업무유형별 통합 다운로드",
-                data=_all_buf.getvalue(),
-                file_name="분석_통합.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                key="dl_all_combined", use_container_width=True)
+                            _cv = _ws.cell(row=2, column=_ci).value
+                            if isinstance(_cv, (int, float)):
+                                _bz_hq[_cn] = _cv
+                        # 하위 3개 계산 (지사별)
+                        _bz_bottom3 = {}
+                        for _ri in range(3, len(_bz_df) + 2):
+                            _ofc = _ws.cell(row=_ri, column=1).value
+                            _scores = {}
+                            for _ci, _cn in enumerate(_bz_cols[1:], start=2):
+                                if _cn == "합계":
+                                    continue
+                                _cv = _ws.cell(row=_ri, column=_ci).value
+                                if isinstance(_cv, (int, float)):
+                                    _scores[_cn] = _cv
+                            if _scores:
+                                _sorted = sorted(_scores.items(), key=lambda x: x[1])
+                                _bz_bottom3[_ri] = {k: i + 1 for i, (k, _) in enumerate(_sorted[:3])}
+                        # 스타일 적용
+                        _red_ft = Font(color="D32F2F", bold=True)
+                        for _ri in range(3, len(_bz_df) + 2):
+                            for _ci, _cn in enumerate(_bz_cols, start=1):
+                                if _ci == 1 or _cn == "합계":
+                                    continue
+                                _cell = _ws.cell(row=_ri, column=_ci)
+                                _cv = _cell.value
+                                if not isinstance(_cv, (int, float)):
+                                    continue
+                                _ha = _bz_hq.get(_cn)
+                                if _ha is not None and _cv < _ha:
+                                    _g = min((_ha - _cv) / 10.0, 1.0)
+                                    _cr = int(237 - (237 - 167) * _g)
+                                    _cg = int(233 - (233 - 139) * _g)
+                                    _cb = int(254 - (254 - 250) * _g)
+                                    _cell.fill = PatternFill(start_color=f"{_cr:02X}{_cg:02X}{_cb:02X}",
+                                                             end_color=f"{_cr:02X}{_cg:02X}{_cb:02X}", fill_type="solid")
+                                if _bz_bottom3.get(_ri, {}).get(_cn):
+                                    _cell.font = _red_ft
+                st.download_button(
+                    label="📥 항목별 · 계약종별 · 업무유형별 통합 다운로드",
+                    data=_all_buf.getvalue(),
+                    file_name="분석_통합.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    key="dl_all_combined", use_container_width=True)
 
-        # ── ⑤ 업무유형별 AI 진단 보고서 ──
-        if M["business"] and M["score"]:
-            st.markdown('<p class="sec-head">📑 업무유형별 진단 보고서 — 강점·약점 자동 분석</p>', unsafe_allow_html=True)
-            _bbl_grp = df_f.groupby(M["business"]).agg(
-                처리건수=("_점수100", "count"),
-                평균만족도=("_점수100", "mean"),
-            ).reset_index()
-            _bbl_grp.columns = ["업무유형", "처리건수", "평균만족도"]
-            _bbl_grp["평균만족도"] = _bbl_grp["평균만족도"].round(1)
-            _bbl_low = df_f[df_f["_점수100"] < 50].groupby(M["business"]).size().reset_index(name="불만족건수")
-            _bbl_grp = _bbl_grp.merge(_bbl_low, left_on="업무유형", right_on=M["business"], how="left")
-            if M["business"] in _bbl_grp.columns and M["business"] != "업무유형":
-                _bbl_grp.drop(columns=[M["business"]], inplace=True)
-            _bbl_grp["불만족건수"] = _bbl_grp["불만족건수"].fillna(0).astype(int)
+            # ── ⑤ 업무유형별 AI 진단 보고서 ──
+            if M["business"] and M["score"]:
+                st.markdown('<p class="sec-head">📑 업무유형별 진단 보고서 — 강점·약점 자동 분석</p>', unsafe_allow_html=True)
+                _bbl_grp = df_f.groupby(M["business"]).agg(
+                    처리건수=("_점수100", "count"),
+                    평균만족도=("_점수100", "mean"),
+                ).reset_index()
+                _bbl_grp.columns = ["업무유형", "처리건수", "평균만족도"]
+                _bbl_grp["평균만족도"] = _bbl_grp["평균만족도"].round(1)
+                _bbl_low = df_f[df_f["_점수100"] < 50].groupby(M["business"]).size().reset_index(name="불만족건수")
+                _bbl_grp = _bbl_grp.merge(_bbl_low, left_on="업무유형", right_on=M["business"], how="left")
+                if M["business"] in _bbl_grp.columns and M["business"] != "업무유형":
+                    _bbl_grp.drop(columns=[M["business"]], inplace=True)
+                _bbl_grp["불만족건수"] = _bbl_grp["불만족건수"].fillna(0).astype(int)
 
-            # ── 사분면 기준값 (AI 입력용 분류) ──
-            _q_x_avg = _bbl_grp["처리건수"].mean()
-            _q_y_avg = _bbl_grp["평균만족도"].mean()
-            _total_n = _bbl_grp["처리건수"].sum()
+                # ── 사분면 기준값 (AI 입력용 분류) ──
+                _q_x_avg = _bbl_grp["처리건수"].mean()
+                _q_y_avg = _bbl_grp["평균만족도"].mean()
+                _total_n = _bbl_grp["처리건수"].sum()
 
-            _q_names = {(True, True): "1사분면: 본부 견인형",
-                        (False, True): "2사분면: 전문 특화형",
-                        (False, False): "3사분면: 개별 개선형",
-                        (True, False): "4사분면: 최우선 혁신"}
-            _bbl_grp["사분면"] = _bbl_grp.apply(
-                lambda r: _q_names[(r["처리건수"] >= _q_x_avg, r["평균만족도"] >= _q_y_avg)], axis=1)
+                _q_names = {(True, True): "1사분면: 본부 견인형",
+                            (False, True): "2사분면: 전문 특화형",
+                            (False, False): "3사분면: 개별 개선형",
+                            (True, False): "4사분면: 최우선 혁신"}
+                _bbl_grp["사분면"] = _bbl_grp.apply(
+                    lambda r: _q_names[(r["처리건수"] >= _q_x_avg, r["평균만족도"] >= _q_y_avg)], axis=1)
 
-            # 가중치: 해당 업무가 전체 평균을 얼마나 깎는지 (건수 비중 × 평균 차이)
-            _bbl_grp["건수비중"] = (_bbl_grp["처리건수"] / _total_n * 100).round(1)
-            _bbl_grp["점수갭"] = (_bbl_grp["평균만족도"] - _q_y_avg).round(1)
-            _bbl_grp["가중영향"] = (_bbl_grp["처리건수"] / _total_n * _bbl_grp["점수갭"]).round(2)
+                # 가중치: 해당 업무가 전체 평균을 얼마나 깎는지 (건수 비중 × 평균 차이)
+                _bbl_grp["건수비중"] = (_bbl_grp["처리건수"] / _total_n * 100).round(1)
+                _bbl_grp["점수갭"] = (_bbl_grp["평균만족도"] - _q_y_avg).round(1)
+                _bbl_grp["가중영향"] = (_bbl_grp["처리건수"] / _total_n * _bbl_grp["점수갭"]).round(2)
 
-            # 불만족 키워드 TOP3 (VOC 있을 때)
-            _biz_kw_map = {}
-            if M.get("voc"):
-                _low_voc = df_f[df_f["_점수100"] < 70]
-                for biz in _bbl_grp["업무유형"]:
-                    _texts = _low_voc.loc[_low_voc[M["business"]] == biz, M["voc"]].dropna().astype(str).tolist()
-                    _texts = [t for t in _texts if t.strip() not in ("", "nan", "응답없음", "없음", "의견없음", "빈문서", "빈항목") and len(t.strip()) > 2]
-                    if _texts:
-                        kws = extract_action_keywords(tuple(_texts), top_n=3)
-                        _biz_kw_map[biz] = [w for w, s, c in kws][:3]
+                # 불만족 키워드 TOP3 (VOC 있을 때)
+                _biz_kw_map = {}
+                if M.get("voc"):
+                    _low_voc = df_f[df_f["_점수100"] < 70]
+                    for biz in _bbl_grp["업무유형"]:
+                        _texts = _low_voc.loc[_low_voc[M["business"]] == biz, M["voc"]].dropna().astype(str).tolist()
+                        _texts = [t for t in _texts if t.strip() not in ("", "nan", "응답없음", "없음", "의견없음", "빈문서", "빈항목") and len(t.strip()) > 2]
+                        if _texts:
+                            kws = extract_action_keywords(tuple(_texts), top_n=3)
+                            _biz_kw_map[biz] = [w for w, s, c in kws][:3]
 
-            # ── 지사별 업무 점수 (hover용: 하위3·우수1, 최소 응답 기준 적용) ──
-            _MIN_N = 10  # 신뢰 가능한 최소 응답 건수
-            _biz_ofc_stats = {}
-            if M.get("office"):
-                for biz in _bbl_grp["업무유형"]:
-                    _bdf_raw = df_f[df_f[M["business"]] == biz].groupby(M["office"])["_점수100"]
-                    _bdf_mean = _bdf_raw.mean().dropna()
-                    _bdf_cnt = _bdf_raw.count()
-                    if _bdf_mean.empty:
-                        continue
-                    # 신뢰 지사(N>=기준) vs 모수 부족 지사 분리
-                    _reliable = _bdf_mean[_bdf_cnt >= _MIN_N]
-                    _unreliable = _bdf_mean[_bdf_cnt < _MIN_N]
-                    _sorted_r = _reliable.sort_values() if not _reliable.empty else pd.Series(dtype=float)
-                    _bot3 = []
-                    for n, v in (_sorted_r.head(3).items() if not _sorted_r.empty else []):
-                        _bot3.append((n, round(v, 1), int(_bdf_cnt.get(n, 0))))
-                    _top1 = None
-                    if not _sorted_r.empty:
-                        _t = _sorted_r.tail(1)
-                        _top1 = (_t.index[0], round(_t.values[0], 1), int(_bdf_cnt.get(_t.index[0], 0)))
-                    _unreliable_list = []
-                    for n, v in _unreliable.items():
-                        _unreliable_list.append((n, round(v, 1), int(_bdf_cnt.get(n, 0))))
-                    _biz_ofc_stats[biz] = {"bottom3": _bot3, "top1": _top1, "unreliable": _unreliable_list}
+                # ── 지사별 업무 점수 (hover용: 하위3·우수1, 최소 응답 기준 적용) ──
+                _MIN_N = 10  # 신뢰 가능한 최소 응답 건수
+                _biz_ofc_stats = {}
+                if M.get("office"):
+                    for biz in _bbl_grp["업무유형"]:
+                        _bdf_raw = df_f[df_f[M["business"]] == biz].groupby(M["office"])["_점수100"]
+                        _bdf_mean = _bdf_raw.mean().dropna()
+                        _bdf_cnt = _bdf_raw.count()
+                        if _bdf_mean.empty:
+                            continue
+                        # 신뢰 지사(N>=기준) vs 모수 부족 지사 분리
+                        _reliable = _bdf_mean[_bdf_cnt >= _MIN_N]
+                        _unreliable = _bdf_mean[_bdf_cnt < _MIN_N]
+                        _sorted_r = _reliable.sort_values() if not _reliable.empty else pd.Series(dtype=float)
+                        _bot3 = []
+                        for n, v in (_sorted_r.head(3).items() if not _sorted_r.empty else []):
+                            _bot3.append((n, round(v, 1), int(_bdf_cnt.get(n, 0))))
+                        _top1 = None
+                        if not _sorted_r.empty:
+                            _t = _sorted_r.tail(1)
+                            _top1 = (_t.index[0], round(_t.values[0], 1), int(_bdf_cnt.get(_t.index[0], 0)))
+                        _unreliable_list = []
+                        for n, v in _unreliable.items():
+                            _unreliable_list.append((n, round(v, 1), int(_bdf_cnt.get(n, 0))))
+                        _biz_ofc_stats[biz] = {"bottom3": _bot3, "top1": _top1, "unreliable": _unreliable_list}
 
-            # ── AI 분석 트리거 (버튼 클릭 시에만 호출 — API 한도 보호) ──
-            _q_ss_key = "_ai_quadrant_result"
-            _refresh = st.button("📊 보고서 생성", key="ai_quadrant_refresh", type="primary")
-            if _refresh:
-                if not GEMINI_AVAILABLE:
-                    st.error("Gemini API 키가 설정되지 않았습니다. `.env` 파일에 `GEMINI_API_KEY`를 설정해주세요.")
-                else:
-                    # 본부 평균(케이스 가중) 및 임팩트 계산
-                    _overall_case_avg = float(df_f["_점수100"].mean()) if df_f["_점수100"].notna().any() else 0.0
-                    _total_cases = int(df_f["_점수100"].notna().sum())
+                # ── AI 분석 트리거 (버튼 클릭 시에만 호출 — API 한도 보호) ──
+                _q_ss_key = "_ai_quadrant_result"
+                _refresh = st.button("📊 보고서 생성", key="ai_quadrant_refresh", type="primary")
+                if _refresh:
+                    if not GEMINI_AVAILABLE:
+                        st.error("Gemini API 키가 설정되지 않았습니다. `.env` 파일에 `GEMINI_API_KEY`를 설정해주세요.")
+                    else:
+                        # 본부 평균(케이스 가중) 및 임팩트 계산
+                        _overall_case_avg = float(df_f["_점수100"].mean()) if df_f["_점수100"].notna().any() else 0.0
+                        _total_cases = int(df_f["_점수100"].notna().sum())
 
-                    # 사분면별 데이터 요약 (본부 평균까지 끌어올렸을 때 전체 평균 상승폭 포함)
-                    _ai_q_data = (
-                        f"본부 평균 만족도(케이스 가중): {_overall_case_avg:.1f}점\n"
-                        f"전체 응답 건수: {_total_cases:,}건\n"
-                        f"업무유형 평균 처리건수(분면 기준선): {_q_x_avg:.0f}건\n\n"
-                    )
-                    for q_label in ["1사분면: 본부 견인형", "2사분면: 전문 특화형", "3사분면: 개별 개선형", "4사분면: 최우선 혁신"]:
-                        _q_sub = _bbl_grp[_bbl_grp["사분면"] == q_label]
-                        if not _q_sub.empty:
-                            _ai_q_data += f"[{q_label}]\n"
-                            for _, qr in _q_sub.iterrows():
-                                _kws = _biz_kw_map.get(qr["업무유형"], [])
-                                _kw_txt = f" / 불만 키워드: {', '.join(_kws)}" if _kws else ""
-                                # 본부 평균까지 끌어올렸을 때 전체 평균 상승폭 (= 건수 × 점수갭 / 전체건수)
-                                _gap_to_avg = _overall_case_avg - qr["평균만족도"]
-                                _impact = (qr["처리건수"] * _gap_to_avg) / _total_cases if (_total_cases and _gap_to_avg > 0) else 0
-                                _impact_txt = f" / 본부평균까지 끌어올릴 시 전체 평균 +{_impact:.3f}점" if _impact > 0 else ""
-                                _ai_q_data += f"  {qr['업무유형']}: {qr['평균만족도']:.1f}점, {int(qr['처리건수'])}건(비중 {qr['건수비중']}%), 불만족 {int(qr['불만족건수'])}건{_kw_txt}{_impact_txt}\n"
-                            _ai_q_data += "\n"
+                        # 사분면별 데이터 요약 (본부 평균까지 끌어올렸을 때 전체 평균 상승폭 포함)
+                        _ai_q_data = (
+                            f"본부 평균 만족도(케이스 가중): {_overall_case_avg:.1f}점\n"
+                            f"전체 응답 건수: {_total_cases:,}건\n"
+                            f"업무유형 평균 처리건수(분면 기준선): {_q_x_avg:.0f}건\n\n"
+                        )
+                        for q_label in ["1사분면: 본부 견인형", "2사분면: 전문 특화형", "3사분면: 개별 개선형", "4사분면: 최우선 혁신"]:
+                            _q_sub = _bbl_grp[_bbl_grp["사분면"] == q_label]
+                            if not _q_sub.empty:
+                                _ai_q_data += f"[{q_label}]\n"
+                                for _, qr in _q_sub.iterrows():
+                                    _kws = _biz_kw_map.get(qr["업무유형"], [])
+                                    _kw_txt = f" / 불만 키워드: {', '.join(_kws)}" if _kws else ""
+                                    # 본부 평균까지 끌어올렸을 때 전체 평균 상승폭 (= 건수 × 점수갭 / 전체건수)
+                                    _gap_to_avg = _overall_case_avg - qr["평균만족도"]
+                                    _impact = (qr["처리건수"] * _gap_to_avg) / _total_cases if (_total_cases and _gap_to_avg > 0) else 0
+                                    _impact_txt = f" / 본부평균까지 끌어올릴 시 전체 평균 +{_impact:.3f}점" if _impact > 0 else ""
+                                    _ai_q_data += f"  {qr['업무유형']}: {qr['평균만족도']:.1f}점, {int(qr['처리건수'])}건(비중 {qr['건수비중']}%), 불만족 {int(qr['불만족건수'])}건{_kw_txt}{_impact_txt}\n"
+                                _ai_q_data += "\n"
 
-                    # 3·4사분면 VOC 수집
-                    _ai_q_voc = []
-                    if M.get("voc"):
+                        # 3·4사분면 VOC 수집
+                        _ai_q_voc = []
+                        if M.get("voc"):
+                            for _, qr in _bbl_grp[_bbl_grp["사분면"].str.contains("최우선|개별")].iterrows():
+                                _biz = qr["업무유형"]
+                                _vocs = df_f[(df_f[M["business"]] == _biz) & (df_f["_점수100"] < 70)][M["voc"]].dropna().astype(str).tolist()
+                                _vocs = [v for v in _vocs if v.strip() not in ("", "nan", "응답없음", "없음", "의견없음", "빈문서", "빈항목") and len(v.strip()) > 2][:5]
+                                if _vocs:
+                                    _ai_q_voc.append(f"[{_biz}] ({qr['사분면']})")
+                                    for v in _vocs:
+                                        _ai_q_voc.append(f"  - {v}")
+
+                        # 지사별 비교 데이터 수집 (지사명 제외, 격차만)
+                        _ai_q_ofc = []
                         for _, qr in _bbl_grp[_bbl_grp["사분면"].str.contains("최우선|개별")].iterrows():
                             _biz = qr["업무유형"]
-                            _vocs = df_f[(df_f[M["business"]] == _biz) & (df_f["_점수100"] < 70)][M["voc"]].dropna().astype(str).tolist()
-                            _vocs = [v for v in _vocs if v.strip() not in ("", "nan", "응답없음", "없음", "의견없음", "빈문서", "빈항목") and len(v.strip()) > 2][:5]
-                            if _vocs:
-                                _ai_q_voc.append(f"[{_biz}] ({qr['사분면']})")
-                                for v in _vocs:
-                                    _ai_q_voc.append(f"  - {v}")
+                            _st = _biz_ofc_stats.get(_biz)
+                            if _st and _st.get("top1") and _st["bottom3"]:
+                                _tv = _st["top1"][1]
+                                _bv = _st["bottom3"][0][1]
+                                _gap = round(_tv - _bv, 1)
+                                _ai_q_ofc.append(f"[{_biz}] 최고 {_tv}점 vs 최저 {_bv}점 (격차 {_gap}점, 지사 수 {len(_st['bottom3'])+1}개)")
 
-                    # 지사별 비교 데이터 수집 (지사명 제외, 격차만)
-                    _ai_q_ofc = []
-                    for _, qr in _bbl_grp[_bbl_grp["사분면"].str.contains("최우선|개별")].iterrows():
-                        _biz = qr["업무유형"]
-                        _st = _biz_ofc_stats.get(_biz)
-                        if _st and _st.get("top1") and _st["bottom3"]:
-                            _tv = _st["top1"][1]
-                            _bv = _st["bottom3"][0][1]
-                            _gap = round(_tv - _bv, 1)
-                            _ai_q_ofc.append(f"[{_biz}] 최고 {_tv}점 vs 최저 {_bv}점 (격차 {_gap}점, 지사 수 {len(_st['bottom3'])+1}개)")
+                        _ai_q_prompt = f"""당신은 한국전력 경남본부 CS 분석가입니다.
+    업무유형별 데이터를 종합해 **이번 달 최우선 과제 1개 + 보조 케이스 + 공통 패턴 + 강점**을 도출합니다.
 
-                    _ai_q_prompt = f"""당신은 한국전력 경남본부 CS 분석가입니다.
-업무유형별 데이터를 종합해 **이번 달 최우선 과제 1개 + 보조 케이스 + 공통 패턴 + 강점**을 도출합니다.
+    [핵심 원리]
+    "건수 × 점수갭" 영향력이 큰 업무 = 본부 평균 끌어올리기 핵심 레버.
+    건수 적고 점수 낮은 업무 = 개별 클레임 비화 리스크, 별도 케이스 관리.
 
-[핵심 원리]
-"건수 × 점수갭" 영향력이 큰 업무 = 본부 평균 끌어올리기 핵심 레버.
-건수 적고 점수 낮은 업무 = 개별 클레임 비화 리스크, 별도 케이스 관리.
+    [이번 달 업무유형 데이터]
+    {_ai_q_data}
+    [약점 업무 VOC 원문]
+    {chr(10).join(_ai_q_voc) if _ai_q_voc else '- 해당 없음'}
+    [지사별 점수 격차 (지사명 제외)]
+    {chr(10).join(_ai_q_ofc) if _ai_q_ofc else '- 해당 없음'}
 
-[이번 달 업무유형 데이터]
-{_ai_q_data}
-[약점 업무 VOC 원문]
-{chr(10).join(_ai_q_voc) if _ai_q_voc else '- 해당 없음'}
-[지사별 점수 격차 (지사명 제외)]
-{chr(10).join(_ai_q_ofc) if _ai_q_ofc else '- 해당 없음'}
+    # 출력: 반드시 아래 JSON 한 객체만. 코드 블록·설명·주석 금지. JSON 외 다른 텍스트 절대 금지.
 
-# 출력: 반드시 아래 JSON 한 객체만. 코드 블록·설명·주석 금지. JSON 외 다른 텍스트 절대 금지.
-
-{{
-  "headline": "이번 달 최우선 과제는 ○○○입니다. (15자 이내 짧은 진단 한 줄)",
-  "top_priority": {{
-    "업무": "업무명",
-    "점수": 93.1,
-    "건수": 147,
-    "평균상승폭": 0.204,
-    "핵심문제": "VOC 기반 핵심 문제 1-2줄 (구체적, 수치/예시 포함 가능)",
-    "격차": {{
-      "최고": 99.1,
-      "최저": 84.8,
-      "원인": "저점수 지사에 집중된 원인 한 줄"
-    }}
-  }},
-  "watch_list": [
     {{
-      "업무": "업무명",
-      "점수": 74.0,
-      "건수": 3,
-      "평균상승폭": 0.058,
-      "핵심문제": "한 줄 요약",
-      "타입": "개별 심각"
+      "headline": "이번 달 최우선 과제는 ○○○입니다. (15자 이내 짧은 진단 한 줄)",
+      "top_priority": {{
+        "업무": "업무명",
+        "점수": 93.1,
+        "건수": 147,
+        "평균상승폭": 0.204,
+        "핵심문제": "VOC 기반 핵심 문제 1-2줄 (구체적, 수치/예시 포함 가능)",
+        "격차": {{
+          "최고": 99.1,
+          "최저": 84.8,
+          "원인": "저점수 지사에 집중된 원인 한 줄"
+        }}
+      }},
+      "watch_list": [
+        {{
+          "업무": "업무명",
+          "점수": 74.0,
+          "건수": 3,
+          "평균상승폭": 0.058,
+          "핵심문제": "한 줄 요약",
+          "타입": "개별 심각"
+        }}
+      ],
+      "공통패턴": "여러 약점 업무에서 반복되는 공통 불만 1가지 (한 줄). 없으면 빈 문자열.",
+      "강점업무": [
+        {{
+          "업무": "업무명",
+          "점수": 97.0,
+          "건수": 46,
+          "유지포인트": "왜 강점인지 한 줄"
+        }}
+      ]
     }}
-  ],
-  "공통패턴": "여러 약점 업무에서 반복되는 공통 불만 1가지 (한 줄). 없으면 빈 문자열.",
-  "강점업무": [
-    {{
-      "업무": "업무명",
-      "점수": 97.0,
-      "건수": 46,
-      "유지포인트": "왜 강점인지 한 줄"
-    }}
-  ]
-}}
 
-[규칙]
-- **top_priority**는 "건수 多 + 점수 低" 업무 중 평균상승폭 최대 1개만. 적합한 업무 없으면 가장 영향력 큰 약점 업무.
-- **watch_list**는 1-3개. 타입은 "본부 평균"(건수 多) 또는 "개별 심각"(건수 少+점수 低) 중 하나.
-- **강점업무**는 1-3개. 만족도 높은 업무만.
-- 사분면 용어("1사분면", "4사분면") 절대 금지. "본부 평균", "개별 심각"으로만 표현.
-- 지사명 절대 금지. 수치·원인·VOC 키워드만.
-- "친절하게", "자세히" 같은 추상적 형용사 금지.
-- 평균상승폭은 데이터에 명시된 값 그대로 사용 (직접 계산 X).
-- '전기세' → '전기요금'.
-- 데이터 창작 금지. JSON 형식만 출력."""
+    [규칙]
+    - **top_priority**는 "건수 多 + 점수 低" 업무 중 평균상승폭 최대 1개만. 적합한 업무 없으면 가장 영향력 큰 약점 업무.
+    - **watch_list**는 1-3개. 타입은 "본부 평균"(건수 多) 또는 "개별 심각"(건수 少+점수 低) 중 하나.
+    - **강점업무**는 1-3개. 만족도 높은 업무만.
+    - 사분면 용어("1사분면", "4사분면") 절대 금지. "본부 평균", "개별 심각"으로만 표현.
+    - 지사명 절대 금지. 수치·원인·VOC 키워드만.
+    - "친절하게", "자세히" 같은 추상적 형용사 금지.
+    - 평균상승폭은 데이터에 명시된 값 그대로 사용 (직접 계산 X).
+    - '전기세' → '전기요금'.
+    - 데이터 창작 금지. JSON 형식만 출력."""
 
-                    with st.spinner("AI가 업무유형별 분석 생성 중…"):
-                        try:
-                            import urllib.request
-                            _models = ["gemini-2.5-flash", "gemini-flash-latest", "gemini-2.5-flash-lite", "gemini-2.5-pro", "gemini-2.0-flash"]
-                            _payload = {"contents": [{"parts": [{"text": _ai_q_prompt}]}],
-                                         "generationConfig": {"temperature": 0.7, "maxOutputTokens": 8192}}
-                            _ctx = ssl._create_unverified_context()
-                            _body = None
-                            _last_err_code = None
-                            for _model in _models:
-                                _api_url = f"https://generativelanguage.googleapis.com/v1beta/models/{_model}:generateContent?key={_GEMINI_KEY}"
-                                _req = urllib.request.Request(_api_url, data=json.dumps(_payload).encode("utf-8"),
-                                                               headers={"Content-Type": "application/json"}, method="POST")
-                                try:
-                                    with urllib.request.urlopen(_req, context=_ctx, timeout=90) as _resp:
-                                        _body = json.loads(_resp.read().decode("utf-8"))
-                                    break
-                                except urllib.error.HTTPError as _http_err:
-                                    _last_err_code = _http_err.code
-                                    # 403(권한/모델별 미지원), 404(모델 없음), 429(한도), 503(과부하) → 다음 모델 시도
-                                    if _http_err.code in (403, 404, 429, 503):
-                                        continue
-                                    raise
-                            if _body is None:
-                                if _last_err_code == 403:
-                                    st.error("AI 분석 호출 권한 오류(403). API 키가 만료됐거나 일일 한도를 초과했을 수 있습니다. `GEMINI_API_KEY` 확인 또는 잠시 후 다시 시도해주세요.")
-                                elif _last_err_code in (429, 503):
-                                    st.error("모든 AI 모델의 일일 한도가 소진되었습니다. 내일 다시 시도해주세요.")
-                                else:
-                                    st.error(f"AI 분석 실패 (HTTP {_last_err_code}). 잠시 후 다시 시도해주세요.")
-                            else:
-                                st.session_state[_q_ss_key] = _body["candidates"][0]["content"]["parts"][0]["text"].strip()
-                        except Exception as e:
-                            st.error(f"AI 분석 중 오류: {e}")
-            # 캐시된 결과 표시 (리런 후에도 유지) — JSON narrative 카드
-            if _q_ss_key in st.session_state:
-                _q_raw = st.session_state[_q_ss_key].strip()
-                # JSON 추출 (코드 블록 또는 본문 내 JSON)
-                _jm = re.search(r'\{[\s\S]*\}', _q_raw)
-                _q_data = None
-                if _jm:
-                    try:
-                        _q_data = json.loads(_jm.group(0))
-                    except Exception:
-                        _q_data = None
-
-                if _q_data is None:
-                    st.warning("AI 응답 파싱 실패. 원문을 표시합니다.")
-                    with st.expander("원문 보기"):
-                        st.code(_q_raw)
-                else:
-                    _tp = _q_data.get("top_priority") or {}
-                    _hl = _q_data.get("headline", "")
-                    _wl = _q_data.get("watch_list") or []
-                    _cp = _q_data.get("공통패턴") or ""
-                    _sg = _q_data.get("강점업무") or []
-
-                    def _fmt_num(_v, _suffix=""):
-                        if _v is None or _v == "":
-                            return "-"
-                        try:
-                            _fv = float(_v)
-                            if _fv == int(_fv):
-                                return f"{int(_fv):,}{_suffix}"
-                            return f"{_fv:.1f}{_suffix}"
-                        except Exception:
-                            return f"{_v}{_suffix}"
-
-                    _html_parts = []
-
-                    # ── Headline (얇은 진단 한 줄) ──
-                    if _hl:
-                        _html_parts.append(
-                            f'<div style="font-size:0.92em;color:#555;margin:8px 0 4px 2px;'
-                            f'letter-spacing:0.2px;">💡 {_hl}</div>'
-                        )
-
-                    # ── Hero card: 최우선 과제 ──
-                    if _tp.get("업무"):
-                        _gap = _tp.get("격차") or {}
-                        _gap_html = ""
-                        if _gap and _gap.get("최고") is not None and _gap.get("최저") is not None:
+                        with st.spinner("AI가 업무유형별 분석 생성 중…"):
                             try:
-                                _gap_val = round(float(_gap["최고"]) - float(_gap["최저"]), 1)
+                                import urllib.request
+                                _models = ["gemini-2.5-flash", "gemini-flash-latest", "gemini-2.5-flash-lite", "gemini-2.5-pro", "gemini-2.0-flash"]
+                                _payload = {"contents": [{"parts": [{"text": _ai_q_prompt}]}],
+                                             "generationConfig": {"temperature": 0.7, "maxOutputTokens": 8192}}
+                                _ctx = ssl._create_unverified_context()
+                                _body = None
+                                _last_err_code = None
+                                for _model in _models:
+                                    _api_url = f"https://generativelanguage.googleapis.com/v1beta/models/{_model}:generateContent?key={_GEMINI_KEY}"
+                                    _req = urllib.request.Request(_api_url, data=json.dumps(_payload).encode("utf-8"),
+                                                                   headers={"Content-Type": "application/json"}, method="POST")
+                                    try:
+                                        with urllib.request.urlopen(_req, context=_ctx, timeout=90) as _resp:
+                                            _body = json.loads(_resp.read().decode("utf-8"))
+                                        break
+                                    except urllib.error.HTTPError as _http_err:
+                                        _last_err_code = _http_err.code
+                                        # 403(권한/모델별 미지원), 404(모델 없음), 429(한도), 503(과부하) → 다음 모델 시도
+                                        if _http_err.code in (403, 404, 429, 503):
+                                            continue
+                                        raise
+                                if _body is None:
+                                    if _last_err_code == 403:
+                                        st.error("AI 분석 호출 권한 오류(403). API 키가 만료됐거나 일일 한도를 초과했을 수 있습니다. `GEMINI_API_KEY` 확인 또는 잠시 후 다시 시도해주세요.")
+                                    elif _last_err_code in (429, 503):
+                                        st.error("모든 AI 모델의 일일 한도가 소진되었습니다. 내일 다시 시도해주세요.")
+                                    else:
+                                        st.error(f"AI 분석 실패 (HTTP {_last_err_code}). 잠시 후 다시 시도해주세요.")
+                                else:
+                                    st.session_state[_q_ss_key] = _body["candidates"][0]["content"]["parts"][0]["text"].strip()
+                            except Exception as e:
+                                st.error(f"AI 분석 중 오류: {e}")
+                # 캐시된 결과 표시 (리런 후에도 유지) — JSON narrative 카드
+                if _q_ss_key in st.session_state:
+                    _q_raw = st.session_state[_q_ss_key].strip()
+                    # JSON 추출 (코드 블록 또는 본문 내 JSON)
+                    _jm = re.search(r'\{[\s\S]*\}', _q_raw)
+                    _q_data = None
+                    if _jm:
+                        try:
+                            _q_data = json.loads(_jm.group(0))
+                        except Exception:
+                            _q_data = None
+
+                    if _q_data is None:
+                        st.warning("AI 응답 파싱 실패. 원문을 표시합니다.")
+                        with st.expander("원문 보기"):
+                            st.code(_q_raw)
+                    else:
+                        _tp = _q_data.get("top_priority") or {}
+                        _hl = _q_data.get("headline", "")
+                        _wl = _q_data.get("watch_list") or []
+                        _cp = _q_data.get("공통패턴") or ""
+                        _sg = _q_data.get("강점업무") or []
+
+                        def _fmt_num(_v, _suffix=""):
+                            if _v is None or _v == "":
+                                return "-"
+                            try:
+                                _fv = float(_v)
+                                if _fv == int(_fv):
+                                    return f"{int(_fv):,}{_suffix}"
+                                return f"{_fv:.1f}{_suffix}"
                             except Exception:
-                                _gap_val = _gap.get("격차", "-")
-                            _gap_html = (
-                                '<div style="margin-top:14px;padding:12px 16px;'
-                                'background:rgba(255,255,255,0.7);border-radius:8px;">'
+                                return f"{_v}{_suffix}"
+
+                        _html_parts = []
+
+                        # ── Headline (얇은 진단 한 줄) ──
+                        if _hl:
+                            _html_parts.append(
+                                f'<div style="font-size:0.92em;color:#555;margin:8px 0 4px 2px;'
+                                f'letter-spacing:0.2px;">💡 {_hl}</div>'
+                            )
+
+                        # ── Hero card: 최우선 과제 ──
+                        if _tp.get("업무"):
+                            _gap = _tp.get("격차") or {}
+                            _gap_html = ""
+                            if _gap and _gap.get("최고") is not None and _gap.get("최저") is not None:
+                                try:
+                                    _gap_val = round(float(_gap["최고"]) - float(_gap["최저"]), 1)
+                                except Exception:
+                                    _gap_val = _gap.get("격차", "-")
+                                _gap_html = (
+                                    '<div style="margin-top:14px;padding:12px 16px;'
+                                    'background:rgba(255,255,255,0.7);border-radius:8px;">'
+                                    '<div style="font-size:0.78em;color:#888;font-weight:700;'
+                                    'letter-spacing:0.4px;margin-bottom:6px;">📊 지사 간 격차</div>'
+                                    f'<div style="font-size:0.96em;color:#1f2937;">'
+                                    f'최고 <b>{_fmt_num(_gap.get("최고"), "점")}</b> · '
+                                    f'최저 <b>{_fmt_num(_gap.get("최저"), "점")}</b> '
+                                    f'<span style="color:#c25151;font-weight:700;">(격차 {_gap_val}점)</span>'
+                                    '</div>'
+                                    f'<div style="font-size:0.85em;color:#555;margin-top:6px;'
+                                    'line-height:1.5;">└ ' + (_gap.get("원인") or "") + '</div>'
+                                    '</div>'
+                                )
+                            _html_parts.append(
+                                '<div style="background:linear-gradient(135deg,#fff5f5 0%,#fff0f0 100%);'
+                                'border:1px solid #f8d7d7;border-left:5px solid #c25151;'
+                                'border-radius:14px;padding:20px 26px;margin:14px 0;'
+                                'box-shadow:0 2px 10px rgba(194,81,81,0.08);">'
+                                '<div style="font-size:0.78em;color:#b71c1c;font-weight:800;'
+                                'letter-spacing:0.8px;margin-bottom:6px;">🎯 이번 달 최우선 과제</div>'
+                                f'<div style="font-size:1.7em;font-weight:900;color:#0f172a;'
+                                f'margin:4px 0 14px 0;letter-spacing:-0.3px;">{_tp.get("업무","")}</div>'
+                                '<div style="display:flex;gap:28px;flex-wrap:wrap;align-items:baseline;'
+                                'margin-bottom:14px;">'
+                                f'<div><span style="font-size:1.5em;font-weight:900;color:#c25151;">{_fmt_num(_tp.get("점수"))}</span>'
+                                '<span style="color:#888;font-size:0.9em;margin-left:2px;">점</span></div>'
+                                f'<div><span style="font-size:1.25em;font-weight:800;color:#1f2937;">{_fmt_num(_tp.get("건수"))}</span>'
+                                '<span style="color:#888;font-size:0.9em;margin-left:2px;">건</span></div>'
+                                '<div style="color:#666;font-size:0.92em;">개선 시 본부 평균 '
+                                f'<b style="color:#1f2937;">+{_fmt_num(_tp.get("평균상승폭"))}점</b></div>'
+                                '</div>'
+                                '<div style="background:rgba(255,255,255,0.7);padding:12px 16px;'
+                                'border-radius:8px;">'
                                 '<div style="font-size:0.78em;color:#888;font-weight:700;'
-                                'letter-spacing:0.4px;margin-bottom:6px;">📊 지사 간 격차</div>'
-                                f'<div style="font-size:0.96em;color:#1f2937;">'
-                                f'최고 <b>{_fmt_num(_gap.get("최고"), "점")}</b> · '
-                                f'최저 <b>{_fmt_num(_gap.get("최저"), "점")}</b> '
-                                f'<span style="color:#c25151;font-weight:700;">(격차 {_gap_val}점)</span>'
+                                'letter-spacing:0.4px;margin-bottom:6px;">⚠️ 핵심 문제 (VOC 기반)</div>'
+                                f'<div style="font-size:0.96em;color:#1f2937;line-height:1.6;">{_tp.get("핵심문제","")}</div>'
                                 '</div>'
-                                f'<div style="font-size:0.85em;color:#555;margin-top:6px;'
-                                'line-height:1.5;">└ ' + (_gap.get("원인") or "") + '</div>'
+                                f'{_gap_html}'
                                 '</div>'
                             )
-                        _html_parts.append(
-                            '<div style="background:linear-gradient(135deg,#fff5f5 0%,#fff0f0 100%);'
-                            'border:1px solid #f8d7d7;border-left:5px solid #c25151;'
-                            'border-radius:14px;padding:20px 26px;margin:14px 0;'
-                            'box-shadow:0 2px 10px rgba(194,81,81,0.08);">'
-                            '<div style="font-size:0.78em;color:#b71c1c;font-weight:800;'
-                            'letter-spacing:0.8px;margin-bottom:6px;">🎯 이번 달 최우선 과제</div>'
-                            f'<div style="font-size:1.7em;font-weight:900;color:#0f172a;'
-                            f'margin:4px 0 14px 0;letter-spacing:-0.3px;">{_tp.get("업무","")}</div>'
-                            '<div style="display:flex;gap:28px;flex-wrap:wrap;align-items:baseline;'
-                            'margin-bottom:14px;">'
-                            f'<div><span style="font-size:1.5em;font-weight:900;color:#c25151;">{_fmt_num(_tp.get("점수"))}</span>'
-                            '<span style="color:#888;font-size:0.9em;margin-left:2px;">점</span></div>'
-                            f'<div><span style="font-size:1.25em;font-weight:800;color:#1f2937;">{_fmt_num(_tp.get("건수"))}</span>'
-                            '<span style="color:#888;font-size:0.9em;margin-left:2px;">건</span></div>'
-                            '<div style="color:#666;font-size:0.92em;">개선 시 본부 평균 '
-                            f'<b style="color:#1f2937;">+{_fmt_num(_tp.get("평균상승폭"))}점</b></div>'
-                            '</div>'
-                            '<div style="background:rgba(255,255,255,0.7);padding:12px 16px;'
-                            'border-radius:8px;">'
-                            '<div style="font-size:0.78em;color:#888;font-weight:700;'
-                            'letter-spacing:0.4px;margin-bottom:6px;">⚠️ 핵심 문제 (VOC 기반)</div>'
-                            f'<div style="font-size:0.96em;color:#1f2937;line-height:1.6;">{_tp.get("핵심문제","")}</div>'
-                            '</div>'
-                            f'{_gap_html}'
-                            '</div>'
-                        )
 
-                    # ── Watch list: 함께 주시할 케이스 ──
-                    if _wl:
-                        _wl_cards = ""
-                        for _w in _wl:
-                            _wt = _w.get("타입", "")
-                            _type_bg = "#fdecec" if "심각" in _wt else "#fef3e2"
-                            _type_fg = "#c25151" if "심각" in _wt else "#c2660e"
-                            _wl_cards += (
-                                '<div style="flex:1;min-width:240px;background:#ffffff;'
-                                'border:1px solid #e5e7eb;border-radius:10px;padding:14px 16px;'
-                                'box-shadow:0 1px 3px rgba(15,23,42,0.04);">'
-                                '<div style="display:flex;align-items:center;justify-content:space-between;'
-                                'margin-bottom:8px;gap:8px;">'
-                                f'<span style="font-size:1.02em;font-weight:800;color:#1f2937;">{_w.get("업무","")}</span>'
-                                f'<span style="font-size:0.72em;color:{_type_fg};background:{_type_bg};'
-                                f'padding:3px 9px;border-radius:10px;font-weight:700;white-space:nowrap;">{_wt}</span>'
-                                '</div>'
-                                '<div style="font-size:0.88em;color:#555;margin-bottom:8px;">'
-                                f'<b style="color:#1f2937;">{_fmt_num(_w.get("점수"))}점</b> · '
-                                f'{_fmt_num(_w.get("건수"))}건 · '
-                                f'<span style="color:#888;">+{_fmt_num(_w.get("평균상승폭"))}점</span>'
-                                '</div>'
-                                f'<div style="font-size:0.86em;color:#444;line-height:1.55;">{_w.get("핵심문제","")}</div>'
+                        # ── Watch list: 함께 주시할 케이스 ──
+                        if _wl:
+                            _wl_cards = ""
+                            for _w in _wl:
+                                _wt = _w.get("타입", "")
+                                _type_bg = "#fdecec" if "심각" in _wt else "#fef3e2"
+                                _type_fg = "#c25151" if "심각" in _wt else "#c2660e"
+                                _wl_cards += (
+                                    '<div style="flex:1;min-width:240px;background:#ffffff;'
+                                    'border:1px solid #e5e7eb;border-radius:10px;padding:14px 16px;'
+                                    'box-shadow:0 1px 3px rgba(15,23,42,0.04);">'
+                                    '<div style="display:flex;align-items:center;justify-content:space-between;'
+                                    'margin-bottom:8px;gap:8px;">'
+                                    f'<span style="font-size:1.02em;font-weight:800;color:#1f2937;">{_w.get("업무","")}</span>'
+                                    f'<span style="font-size:0.72em;color:{_type_fg};background:{_type_bg};'
+                                    f'padding:3px 9px;border-radius:10px;font-weight:700;white-space:nowrap;">{_wt}</span>'
+                                    '</div>'
+                                    '<div style="font-size:0.88em;color:#555;margin-bottom:8px;">'
+                                    f'<b style="color:#1f2937;">{_fmt_num(_w.get("점수"))}점</b> · '
+                                    f'{_fmt_num(_w.get("건수"))}건 · '
+                                    f'<span style="color:#888;">+{_fmt_num(_w.get("평균상승폭"))}점</span>'
+                                    '</div>'
+                                    f'<div style="font-size:0.86em;color:#444;line-height:1.55;">{_w.get("핵심문제","")}</div>'
+                                    '</div>'
+                                )
+                            _html_parts.append(
+                                '<div style="margin:16px 0 10px 0;">'
+                                '<div style="font-size:0.84em;font-weight:800;color:#555;'
+                                'letter-spacing:0.4px;margin-bottom:10px;">⚠️ 함께 주시해야 할 케이스</div>'
+                                f'<div style="display:flex;gap:10px;flex-wrap:wrap;">{_wl_cards}</div>'
                                 '</div>'
                             )
-                        _html_parts.append(
-                            '<div style="margin:16px 0 10px 0;">'
-                            '<div style="font-size:0.84em;font-weight:800;color:#555;'
-                            'letter-spacing:0.4px;margin-bottom:10px;">⚠️ 함께 주시해야 할 케이스</div>'
-                            f'<div style="display:flex;gap:10px;flex-wrap:wrap;">{_wl_cards}</div>'
-                            '</div>'
-                        )
 
-                    # ── 공통 패턴 ──
-                    if _cp:
-                        _html_parts.append(
-                            '<div style="background:linear-gradient(135deg,#f3f5fb 0%,#eef0f8 100%);'
-                            'border:1px solid #d6dcef;border-left:4px solid #3949ab;'
-                            'border-radius:10px;padding:14px 18px;margin:14px 0;">'
-                            '<div style="font-size:0.78em;color:#1a237e;font-weight:800;'
-                            'letter-spacing:0.4px;margin-bottom:6px;">🔍 공통 패턴</div>'
-                            f'<div style="font-size:0.94em;color:#1f2937;line-height:1.6;">{_cp}</div>'
-                            '</div>'
-                        )
-
-                    # ── 강점 업무 ──
-                    if _sg:
-                        _sg_chips = ""
-                        for _s in _sg:
-                            _sg_chips += (
-                                '<div style="background:rgba(255,255,255,0.75);'
-                                'border:1px solid #c8e6c9;border-radius:8px;padding:10px 14px;'
-                                'flex:1;min-width:220px;">'
-                                '<div style="display:flex;align-items:baseline;'
-                                'justify-content:space-between;margin-bottom:4px;gap:8px;">'
-                                f'<span style="font-weight:800;color:#1f2937;">{_s.get("업무","")}</span>'
-                                '<span style="font-size:0.84em;color:#2e7d32;font-weight:700;'
-                                f'white-space:nowrap;">{_fmt_num(_s.get("점수"))}점 · {_fmt_num(_s.get("건수"))}건</span>'
-                                '</div>'
-                                f'<div style="font-size:0.84em;color:#555;line-height:1.5;">{_s.get("유지포인트","")}</div>'
+                        # ── 공통 패턴 ──
+                        if _cp:
+                            _html_parts.append(
+                                '<div style="background:linear-gradient(135deg,#f3f5fb 0%,#eef0f8 100%);'
+                                'border:1px solid #d6dcef;border-left:4px solid #3949ab;'
+                                'border-radius:10px;padding:14px 18px;margin:14px 0;">'
+                                '<div style="font-size:0.78em;color:#1a237e;font-weight:800;'
+                                'letter-spacing:0.4px;margin-bottom:6px;">🔍 공통 패턴</div>'
+                                f'<div style="font-size:0.94em;color:#1f2937;line-height:1.6;">{_cp}</div>'
                                 '</div>'
                             )
-                        _html_parts.append(
-                            '<div style="background:linear-gradient(135deg,#f1f8e9 0%,#e8f5e9 100%);'
-                            'border:1px solid #d6e9d8;border-left:4px solid #2e7d32;'
-                            'border-radius:10px;padding:14px 18px;margin:14px 0;">'
-                            '<div style="font-size:0.78em;color:#1b5e20;font-weight:800;'
-                            'letter-spacing:0.4px;margin-bottom:10px;">✅ 유지 — 강점 업무</div>'
-                            f'<div style="display:flex;gap:10px;flex-wrap:wrap;">{_sg_chips}</div>'
-                            '</div>'
-                        )
 
-                    st.markdown("".join(_html_parts), unsafe_allow_html=True)
+                        # ── 강점 업무 ──
+                        if _sg:
+                            _sg_chips = ""
+                            for _s in _sg:
+                                _sg_chips += (
+                                    '<div style="background:rgba(255,255,255,0.75);'
+                                    'border:1px solid #c8e6c9;border-radius:8px;padding:10px 14px;'
+                                    'flex:1;min-width:220px;">'
+                                    '<div style="display:flex;align-items:baseline;'
+                                    'justify-content:space-between;margin-bottom:4px;gap:8px;">'
+                                    f'<span style="font-weight:800;color:#1f2937;">{_s.get("업무","")}</span>'
+                                    '<span style="font-size:0.84em;color:#2e7d32;font-weight:700;'
+                                    f'white-space:nowrap;">{_fmt_num(_s.get("점수"))}점 · {_fmt_num(_s.get("건수"))}건</span>'
+                                    '</div>'
+                                    f'<div style="font-size:0.84em;color:#555;line-height:1.5;">{_s.get("유지포인트","")}</div>'
+                                    '</div>'
+                                )
+                            _html_parts.append(
+                                '<div style="background:linear-gradient(135deg,#f1f8e9 0%,#e8f5e9 100%);'
+                                'border:1px solid #d6e9d8;border-left:4px solid #2e7d32;'
+                                'border-radius:10px;padding:14px 18px;margin:14px 0;">'
+                                '<div style="font-size:0.78em;color:#1b5e20;font-weight:800;'
+                                'letter-spacing:0.4px;margin-bottom:10px;">✅ 유지 — 강점 업무</div>'
+                                f'<div style="display:flex;gap:10px;flex-wrap:wrap;">{_sg_chips}</div>'
+                                '</div>'
+                            )
 
-        st.markdown("---")
+                        st.markdown("".join(_html_parts), unsafe_allow_html=True)
 
+            st.markdown("---")
+
+
+
+    _render_tab3()
 
 # ─────────────────────────────────────────────────────────────
 #  TAB SOL  지사별 정밀 진단 · AI 심층 분석 (3-Level UX)
