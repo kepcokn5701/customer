@@ -2752,11 +2752,12 @@ neg_ratio = neg_cnt / max(_voc_total, 1) * 100
 # ══════════════════════════════════════════════════════════════
 #  13. 탭 구성
 # ══════════════════════════════════════════════════════════════
-tab1, tab3, tab_sol, tab_weekly = st.tabs([
+tab1, tab3, tab_sol, tab_weekly, tab_manual = st.tabs([
     "📊  종합 현황",
     "📡  항목별 · 계약종별 · 업무유형별 분석",
     "🏢  지사 맞춤형 CS 솔루션",
     "📋  지사별 주간 리포트",
+    "📖  사용 매뉴얼",
 ])
 
 # ─────────────────────────────────────────────────────────────
@@ -6606,6 +6607,228 @@ with tab_sol:
 
 
     _render_tab_sol()
+
+
+# ═════════════════════════════════════════════════════════════
+#  TAB MANUAL  사용 매뉴얼
+# ═════════════════════════════════════════════════════════════
+with tab_manual:
+    # CSS — 매뉴얼 전용
+    st.markdown("""
+    <style>
+      .mn-toc { background:#fff; border:1px solid #e5e7eb; border-radius:12px;
+                padding:18px 24px; margin:12px 0 28px; box-shadow:0 1px 3px rgba(15,23,42,0.04); }
+      .mn-toc a { display:block; padding:6px 0; color:#1565c0; text-decoration:none;
+                  font-size:0.93em; }
+      .mn-toc a:hover { color:#0d47a1; text-decoration:underline; }
+      .mn-h2 { font-size:1.35em; font-weight:800; color:#1565c0; margin:32px 0 14px;
+               padding-bottom:8px; border-bottom:2px solid #e3f2fd; }
+      .mn-h3 { font-size:1.05em; font-weight:700; color:#0a2540; margin:18px 0 10px; }
+      .mn-step { background:#fff; border:1px solid #e5e7eb; border-left:5px solid #1565c0;
+                 border-radius:8px; padding:14px 18px 12px; margin:10px 0;
+                 box-shadow:0 1px 3px rgba(15,23,42,0.04); }
+      .mn-step-num { display:inline-flex; align-items:center; justify-content:center;
+                     width:24px; height:24px; background:#1565c0; color:#fff;
+                     border-radius:50%; font-size:0.82em; font-weight:800;
+                     margin-right:10px; vertical-align:middle; }
+      .mn-step-title { display:inline; font-weight:700; color:#0a2540; font-size:1em; }
+      .mn-step-body { margin:8px 0 0 34px; font-size:0.93em; color:#444; line-height:1.7; }
+      .mn-note { background:#e3f2fd; border-left:5px solid #1976d2; border-radius:8px;
+                 padding:14px 18px; margin:14px 0; font-size:0.93em; color:#0d47a1;
+                 line-height:1.7; }
+      .mn-note-icon { font-weight:800; color:#1976d2; margin-right:6px; }
+      .mn-table { width:100%; border-collapse:collapse; margin:12px 0; font-size:0.93em;
+                  background:#fff; border-radius:8px; overflow:hidden;
+                  box-shadow:0 1px 3px rgba(15,23,42,0.04); }
+      .mn-table th { background:#f1f5f9; padding:10px 14px; text-align:left;
+                     border-bottom:1px solid #e5e7eb; color:#0a2540; font-weight:700; }
+      .mn-table td { padding:10px 14px; border-bottom:1px solid #f1f5f9; color:#333; }
+      .mn-table tr:last-child td { border-bottom:none; }
+      .mn-arrow { text-align:center; color:#90a4ae; margin:4px 0; font-size:0.9em; }
+      .mn-tag { display:inline-block; background:#1565c0; color:#fff; padding:2px 9px;
+                border-radius:10px; font-size:0.78em; font-weight:700; margin:0 4px; }
+    </style>
+    """, unsafe_allow_html=True)
+
+    # ── 목차 ──
+    st.markdown(
+        '<div class="mn-toc">'
+        '<div style="font-weight:800;color:#0a2540;margin-bottom:10px;font-size:1.02em;">📑 목차</div>'
+        '<a href="#mn-1">1. 시스템 개요</a>'
+        '<a href="#mn-2">2. 화면 구성</a>'
+        '<a href="#mn-3">3. 데이터 업로드 흐름</a>'
+        '<a href="#mn-4">4. 종합 현황 탭</a>'
+        '<a href="#mn-5">5. 항목·계약종별·업무유형별 분석 탭</a>'
+        '<a href="#mn-6">6. 지사 맞춤형 CS 솔루션 탭</a>'
+        '<a href="#mn-7">7. 지사별 주간 리포트 탭</a>'
+        '<a href="#mn-8">8. AI 기능 활용</a>'
+        '<a href="#mn-9">9. 자주 묻는 질문 (FAQ)</a>'
+        '</div>', unsafe_allow_html=True)
+
+    # ── 1. 시스템 개요 ──
+    st.markdown('<div id="mn-1"></div><div class="mn-h2">1. 시스템 개요</div>', unsafe_allow_html=True)
+    st.markdown(
+        '<p style="font-size:0.95em;color:#333;line-height:1.7;">'
+        'KEPCO 경남본부에서 운영하는 <b>CS 경험 고객 분석 및 솔루션 제공 시스템</b>입니다.<br>'
+        '「고객경험관리시스템」의 만족도 설문 데이터를 활용하여 지사별 강·약점을 신속히 파악하고, '
+        '현장 중심의 데이터 기반 CS 활동을 지원합니다.'
+        '</p>', unsafe_allow_html=True)
+    st.markdown(
+        '<table class="mn-table">'
+        '<tr><th style="width:160px;">구분</th><th>내용</th></tr>'
+        '<tr><td>사용자</td><td>경남본부 CS 담당자, 각 지사 담당자</td></tr>'
+        '<tr><td>주요 기능</td><td>설문 분석·시각화, 지사별 강·약점 자동 진단, AI 기반 CS 솔루션 도출</td></tr>'
+        '<tr><td>입력 데이터</td><td>「고객경험관리시스템」 만족도 설문 결과 엑셀 파일(.xlsx)</td></tr>'
+        '<tr><td>AI 연동</td><td>Gemini API (VOC 키워드 추출, 종합 처방전, 주간 협조요청 등)</td></tr>'
+        '<tr><td>접속 방법</td><td>웹 브라우저 (Chrome, Edge 등) — 별도 안내된 URL</td></tr>'
+        '</table>', unsafe_allow_html=True)
+
+    # ── 2. 화면 구성 ──
+    st.markdown('<div id="mn-2"></div><div class="mn-h2">2. 화면 구성</div>', unsafe_allow_html=True)
+    st.markdown(
+        '<table class="mn-table">'
+        '<tr><th style="width:160px;">영역</th><th>설명</th></tr>'
+        '<tr><td>상단 헤더</td><td>시스템 명칭 · 부제 표시</td></tr>'
+        '<tr><td>좌측 사이드바</td><td>데이터 업로드, 전월/전년 동월 비교 파일 업로드, 필터 (지사·접수자구분·계약종별·업무구분 등)</td></tr>'
+        '<tr><td>탭 네비게이션</td><td>📊 종합 현황 / 📡 분석 / 🏢 지사 솔루션 / 📋 주간 리포트 / 📖 사용 매뉴얼</td></tr>'
+        '<tr><td>본문</td><td>선택된 탭의 콘텐츠 표시</td></tr>'
+        '<tr><td>푸터</td><td>저작권 표기</td></tr>'
+        '</table>', unsafe_allow_html=True)
+
+    # ── 3. 데이터 업로드 흐름 ──
+    st.markdown('<div id="mn-3"></div><div class="mn-h2">3. 데이터 업로드 흐름</div>', unsafe_allow_html=True)
+    for n, t, b in [
+        ("1", "사이드바에서 파일 업로드",
+         '좌측 사이드바 <span class="mn-tag">📁 데이터 업로드</span> 영역에 만족도 설문 결과 엑셀(.xlsx) 또는 CSV 파일을 드래그앤드롭 또는 클릭하여 업로드합니다.'),
+        ("2", "비교 데이터 업로드 (선택)",
+         '필요시 <b>전월 비교 파일</b>, <b>전년 동월 비교 파일</b>을 추가로 업로드하면 점수 증감·트렌드 분석이 가능합니다.'),
+        ("3", "컬럼 자동 인식",
+         '시스템이 엑셀 헤더를 자동 인식해 지사·계약종별·업무구분·점수·서술의견 컬럼을 매핑합니다. 헤더가 1행이 아니어도 자동 감지됩니다.'),
+        ("4", "필터 적용",
+         '사이드바 필터로 지사·접수자구분·신청방법·접수종류·계약종별·업무구분·연령대·점수 범위 등을 조정해 분석 범위를 좁힙니다.'),
+        ("5", "탭별 분석 결과 확인",
+         '5개 탭(종합 현황 / 분석 / 지사 솔루션 / 주간 리포트 / 사용 매뉴얼)에서 자동 생성된 결과를 열람합니다.'),
+    ]:
+        st.markdown(
+            f'<div class="mn-step"><span class="mn-step-num">{n}</span>'
+            f'<span class="mn-step-title">{t}</span>'
+            f'<div class="mn-step-body">{b}</div></div>'
+            '<div class="mn-arrow">↓</div>' if n != "5" else
+            f'<div class="mn-step"><span class="mn-step-num">{n}</span>'
+            f'<span class="mn-step-title">{t}</span>'
+            f'<div class="mn-step-body">{b}</div></div>',
+            unsafe_allow_html=True)
+    st.markdown(
+        '<div class="mn-note"><span class="mn-note-icon">⚠️</span>'
+        '<b>개인정보 차단</b>: 고객명·고객번호·연락처 등 개인식별 정보가 포함된 파일은 자동 거부됩니다. '
+        '업로드 전에 반드시 개인정보 컬럼을 제거해 주세요.'
+        '</div>', unsafe_allow_html=True)
+
+    # ── 4. 종합 현황 탭 ──
+    st.markdown('<div id="mn-4"></div><div class="mn-h2">4. 종합 현황 탭</div>', unsafe_allow_html=True)
+    st.markdown('<div class="mn-h3">주요 콘텐츠</div>', unsafe_allow_html=True)
+    st.markdown(
+        '<table class="mn-table">'
+        '<tr><th style="width:200px;">섹션</th><th>설명</th></tr>'
+        '<tr><td>📌 핵심 요약 지표</td><td>종합만족도 / 분석 건수 / VOC 응답률 / 긍정 비율 4개 KPI 카드 (100점 환산)</td></tr>'
+        '<tr><td>📋 본부 조사결과 표</td><td>경험고객·발송건수·응답건수·응답률·종합만족도·전월대비·전년동월대비</td></tr>'
+        '<tr><td>📊 만족도 구간 분포</td><td>50/70/90점 구간별 응답 비중 도넛 차트 + 상세 표</td></tr>'
+        '<tr><td>🍩 응답 분포 현황</td><td>업무유형별·계약종별·연령대·접수자구분 분포 차트</td></tr>'
+        '</table>', unsafe_allow_html=True)
+    st.markdown(
+        '<div class="mn-note"><span class="mn-note-icon">💡</span>'
+        '<b>긍정 비율</b>은 VOC 의견 작성자 기준입니다. 의견 미작성 응답은 분류 대상에서 제외됩니다.'
+        '</div>', unsafe_allow_html=True)
+
+    # ── 5. 분석 탭 ──
+    st.markdown('<div id="mn-5"></div><div class="mn-h2">5. 항목·계약종별·업무유형별 분석 탭</div>', unsafe_allow_html=True)
+    st.markdown(
+        '<table class="mn-table">'
+        '<tr><th style="width:200px;">섹션</th><th>설명</th></tr>'
+        '<tr><td>📡 만족도 항목별 점수</td><td>5개 만족도 항목(전반적 만족 · 직원 친절도 · 처리 신속도 · 처리 정확도 · 업무 개선도) 점수 비교</td></tr>'
+        '<tr><td>🏢 계약종별 분석</td><td>주택용/일반용/산업용/농사용 등 계약종별 만족도 비교</td></tr>'
+        '<tr><td>📋 업무유형별 분석</td><td>15개 업무유형(신규증설/기본사항변경/정전/요금수납 등) 점수·건수 분석</td></tr>'
+        '<tr><td>📑 업무유형별 진단 보고서</td><td>"📊 보고서 생성" 버튼 클릭 시 AI가 강점·약점 업무 자동 분석</td></tr>'
+        '</table>', unsafe_allow_html=True)
+
+    # ── 6. 지사 맞춤형 CS 솔루션 탭 ──
+    st.markdown('<div id="mn-6"></div><div class="mn-h2">6. 지사 맞춤형 CS 솔루션 탭</div>', unsafe_allow_html=True)
+    st.markdown('<div class="mn-h3">분석 흐름 (4단계)</div>', unsafe_allow_html=True)
+    for n, t, b in [
+        ("1", "지사 선택 + STEP 1 진단",
+         '상단 셀렉트박스에서 분석 대상 지사 선택 → 종합 컨디션 리포트 (점수 / 본부 순위 / 강점·약점 TOP3 / 항목별 레이더) 표시'),
+        ("2", "STEP 2 우선순위",
+         '종합 리스크 TOP 3 카드 (임팩트 = 건수 × 점수갭 기준) + 소수 심각 케이스 (건수 적지만 점수 낮은 조합) 자동 추출'),
+        ("3", "STEP 3 단서",
+         '🔬 VOC 키워드 자동 추출 / 🚨 50점 이하 원문 명단 / 💬 고객 요청사항 포스트잇 (구체적 개선 의견)'),
+        ("4", "STEP 4 처방",
+         '"💊 AI 종합 처방전 생성" 버튼 클릭 → 사내 매뉴얼·환경 변수 기반 지사 맞춤 액션 자동 도출 (응대 포인트 / 절차 / 관리 액션 등)'),
+    ]:
+        is_last = (n == "4")
+        st.markdown(
+            f'<div class="mn-step"><span class="mn-step-num">{n}</span>'
+            f'<span class="mn-step-title">{t}</span>'
+            f'<div class="mn-step-body">{b}</div></div>'
+            + ('' if is_last else '<div class="mn-arrow">↓</div>'),
+            unsafe_allow_html=True)
+    st.markdown(
+        '<div class="mn-note"><span class="mn-note-icon">💡</span>'
+        '<b>"상세 원인 분석"</b> 버튼: 리스크 카드 클릭 시 해당 계약종 × 업무 조합의 세부 항목 점수 + 항목별 점수 비교 + VOC 원문 펼쳐 보기 제공.'
+        '</div>', unsafe_allow_html=True)
+
+    # ── 7. 주간 리포트 탭 ──
+    st.markdown('<div id="mn-7"></div><div class="mn-h2">7. 지사별 주간 리포트 탭</div>', unsafe_allow_html=True)
+    st.markdown(
+        '<table class="mn-table">'
+        '<tr><th style="width:200px;">섹션</th><th>설명</th></tr>'
+        '<tr><td>📂 주간 데이터 업로드 (옵션)</td><td>이번주·전주 파일을 따로 업로드. 미업로드 시 사이드바 메인 데이터의 날짜 컬럼으로 자동 분류</td></tr>'
+        '<tr><td>1. 주간 조사 결과</td><td>지사별 업무처리 건수, 응답 호수, 금주/전주 점수, 월 누계, 본부 내 순위</td></tr>'
+        '<tr><td>2. 업무유형별 조사결과 분석</td><td>업무유형별 금주 평균·전주 대비 증감</td></tr>'
+        '<tr><td>3. 조사결과 피드백</td><td>긍정/부정 카드 + 전체 VOC 표 (부정 행 빨간 배경 강조)</td></tr>'
+        '<tr><td>4. 협조요청 사항</td><td>고객 우호 활동 안내 + "🧠 AI 주간 협조요청 분석" 버튼 → AI 카드 (핵심이슈/주의/개선/실행과제)</td></tr>'
+        '<tr><td>📥 통합 다운로드</td><td>주간조사+업무유형별+피드백을 한 엑셀 파일로 통합 다운로드</td></tr>'
+        '</table>', unsafe_allow_html=True)
+
+    # ── 8. AI 기능 활용 ──
+    st.markdown('<div id="mn-8"></div><div class="mn-h2">8. AI 기능 활용</div>', unsafe_allow_html=True)
+    st.markdown(
+        '<table class="mn-table">'
+        '<tr><th style="width:240px;">AI 기능</th><th>위치</th><th>활용 방법</th></tr>'
+        '<tr><td>📑 업무유형별 진단 보고서</td><td>분석 탭 하단</td><td>"📊 보고서 생성" 버튼 클릭</td></tr>'
+        '<tr><td>🔬 VOC 키워드 자동 추출</td><td>지사 솔루션 STEP 3</td><td>지사 선택 시 자동 실행 (부정 3개 + 특이 1~2개)</td></tr>'
+        '<tr><td>💊 AI 종합 처방전</td><td>지사 솔루션 STEP 4</td><td>"💊 AI 종합 처방전 생성" 버튼 클릭</td></tr>'
+        '<tr><td>🧠 AI 주간 협조요청 분석</td><td>주간 리포트 4번</td><td>"🧠 AI 주간 협조요청 분석" 버튼 클릭</td></tr>'
+        '</table>', unsafe_allow_html=True)
+    st.markdown(
+        '<div class="mn-note"><span class="mn-note-icon">⚠️</span>'
+        '<b>AI 응답 속도</b>: 10~30초 소요. 결과는 세션에 캐시되어 같은 지사·범위에선 재호출하지 않습니다.'
+        '</div>', unsafe_allow_html=True)
+
+    # ── 9. FAQ ──
+    st.markdown('<div id="mn-9"></div><div class="mn-h2">9. 자주 묻는 질문 (FAQ)</div>', unsafe_allow_html=True)
+    for q, a in [
+        ("Q. 엑셀을 업로드했는데 \"개인정보가 탐지되어 업로드할 수 없습니다\" 메시지가 나옵니다.",
+         "고객명·고객번호·연락처·주소 등 개인식별 정보 컬럼을 모두 제거한 후 다시 업로드해 주세요. "
+         "컬럼명 자체에 \"고객명\", \"전화\" 등 키워드가 들어가도 차단됩니다."),
+        ("Q. AI 처방전 결과가 \"AI 분석 호출 권한 오류(403)\"로 나옵니다.",
+         "Gemini API 키가 만료됐거나 일일 한도를 초과한 경우입니다. 잠시 후 다시 시도하거나 시스템 관리자에게 문의해 주세요."),
+        ("Q. 주간 리포트 탭에 \"날짜 정보가 없다\" 메시지가 표시됩니다.",
+         "엑셀에 접수일자 또는 접수번호 컬럼이 있어야 주간/월 자동 분류가 가능합니다. "
+         "또는 주간 리포트 탭 상단의 별도 업로더에 이번주·전주 파일을 직접 올리시면 됩니다."),
+        ("Q. 동일한 지사를 다시 선택했는데 AI 결과가 바뀌지 않습니다.",
+         "지사별 AI 결과는 세션에 캐시됩니다. 브라우저 새로고침(F5) 후 다시 시도해 주세요."),
+        ("Q. 상세 원인 분석 / 보고서 생성 버튼을 눌렀더니 첫 화면으로 돌아갔습니다.",
+         "Streamlit 탭 상태 유지 기능이 적용되어 있어 일반적으로 점프 안 됩니다. "
+         "그래도 발생 시 브라우저 새로고침 후 다시 시도해 주세요."),
+        ("Q. 비교 파일(전월/전년 동월)이 분석에 반영되지 않습니다.",
+         "비교 파일의 컬럼 구조가 메인 파일과 동일해야 합니다(지사/업무구분/점수 등). "
+         "또한 메인 파일과 같은 양식으로 작성되어야 자동 매핑됩니다."),
+    ]:
+        st.markdown(
+            f'<div class="mn-step" style="border-left-color:#7e57c2;">'
+            f'<div style="font-weight:700;color:#4527a0;font-size:0.95em;">{q}</div>'
+            f'<div style="margin-top:6px;font-size:0.93em;color:#444;line-height:1.7;">A. {a}</div>'
+            '</div>', unsafe_allow_html=True)
 
 
 # ══════════════════════════════════════════════════════════════
