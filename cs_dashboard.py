@@ -1012,11 +1012,11 @@ _POS_PHRASES = [
 
 # 건의/요청 감지 패턴
 _REQUEST_PATTERNS = [
-    # ── 직접 요청 ──
-    r'(해\s*주세요|해\s*주시|해\s*줬으면|해\s*주셨으면)',
-    r'(알려\s*주세요|알려\s*주시|알려\s*주신다면|알려주시면)',
-    r'(연락\s*주세요|연락\s*주시|통보\s*해\s*주|안내\s*해\s*주|미리\s*알림)',
-    r'(주시면|주신다면|주시기를)',
+    # ── 직접 요청 ── (감사 표현인 "해주시고/해주셔서" 등 광범위 매칭 제외)
+    r'(해\s*주세요|해\s*주시면|해\s*주시길|해\s*줬으면|해\s*주셨으면|해\s*주시기를)',
+    r'(알려\s*주세요|알려\s*주시면|알려\s*주시길|알려주시면|알려\s*주신다면)',
+    r'(연락\s*주세요|연락\s*주시면|연락\s*주시길|통보\s*해\s*주시면|안내\s*해\s*주시면|미리\s*알림)',
+    r'(주시면|주신다면|주시기를|주시길)',
 
     # ── 바람·희망 ──
     r'(바랍니다|바래요|바람|희망합니다)',
@@ -1033,9 +1033,7 @@ _REQUEST_PATTERNS = [
     r'(부탁합니다|부탁드립니다|부탁\s*해요|부탁이요|노력\s*부탁)',
     r'(요망|요청\s*합니다|요청\s*드립니다)',
 
-    # ── 의견·제안 표현 ──
-    r'(아쉬운\s*점|아쉽\s*습니다|아쉬워요|아쉽다)',
-    r'(미흡|부족|불충분)(한|할|함|합니다)',
+    # ── 의견·제안 표현 (단순 평가 "미흡/아쉽다"는 제외) ──
     r'(이해\s*안|이해가\s*안|이해되지\s*않|납득\s*안)',
     r'(생각합니다|생각\s*해\s*봅니다|생각\s*해요|적어\s*봅니다|드는\s*생각)',
 
@@ -1083,11 +1081,29 @@ def _extract_voc_phrases(voc_texts, scores):
                         pos_counts[label].append(s)
                         break
 
-        # 건의/요청 감지 — 점수 무관하게 추출
-        # (90점 이상도 만족도 높지만 개선 의견을 같이 주는 경우 많아 모두 포함)
-        # 단, "감사합니다" 같은 단순 인사만 있는 경우는 제외
+        # 건의/요청 감지 — Stage 3: 3단 가드 (인사 / 현 상태 유지 / 칭찬 결론)
+        # 90점 이상도 모든 패턴 매칭. 단, 결론부에 강한 감사·칭찬이 있으면 칭찬 메시지로 보고 제외
         _is_pure_thanks = bool(re.fullmatch(r'\s*(감사합니다|감사드립니다|고맙습니다|만족합니다|좋습니다)[.\s!~]*', s))
-        if not _is_pure_thanks:
+        # 현 상태 유지 표현 = 만족 표현
+        _keep_current_kw = (
+            "개선점 없", "개선점은 없", "개선할 점 없", "개선할것 없", "개선할것없",
+            "개선 사항 없", "개선할 것 없", "개선해야 할 사항이 없", "개선요청사항 없", "요청사항 없",
+            "변치 말", "변치말", "변하지 마", "변하지 안", "변하지 않", "변하지않",
+            "변치 안", "변치 않", "바뀌지 마", "바뀌지 않",
+            "이대로", "그대로", "지금처럼", "지금 그대로", "지금하시는대로",
+            "현재대로", "현재처럼", "현 상태로", "현재 상태", "현 상태",
+        )
+        _is_keep_current = any(kw in s for kw in _keep_current_kw)
+        # 결론부(끝 35자) 강한 감사·칭찬 표현 → 칭찬 메시지로 보고 제외
+        _tail35 = s[-35:] if len(s) > 35 else s
+        _strong_praise_tail = any(p in _tail35 for p in (
+            "감사합니다", "감사드립니다", "감사해요", "감사하겠습니다", "감사할", "감사하게",
+            "고맙습니다", "고마워요", "추천합니다", "추천해요",
+            "만족합니다", "훌륭합니다", "최고예요", "최고입니다",
+            "해주셨어요", "해주셨습니다", "해주셔서", "해주어서",  # 칭찬형 과거표현
+        ))
+
+        if not _is_pure_thanks and not _is_keep_current and not _strong_praise_tail:
             for pat in _REQUEST_PATTERNS:
                 if re.search(pat, s):
                     notable.append((s, sc))
@@ -2088,6 +2104,9 @@ st.markdown(f"""
     /* 자식 요소도 GPU 레이어로 — 부모와 함께 변환되어 일렁임 X */
     -webkit-font-smoothing: antialiased;
     backface-visibility: hidden;
+    /* 공백 없는 긴 한국어 텍스트도 카드 폭에 맞춰 줄바꿈 */
+    overflow-wrap: anywhere;
+    word-break: break-word;
   }}
   /* 포스트잇 hover — 회전 유지하면서 위로 살짝 떠오름 (translate3d로 가속) */
   .postit-card:hover {{
@@ -2265,7 +2284,6 @@ st.markdown("""
     <div class="dash-title"><span class="dash-title-icon">⚡</span>CS 경험 고객 분석 및 솔루션 제공 시스템</div>
     <div class="dash-subtitle">『고객경험관리시스템』설문 데이터 기반 자료 분석·시각화·AI 지사 맞춤 CS솔루션 도출</div>
   </div>
-  <div class="dash-meta">경남본부 · CS 분석</div>
 </div>
 """, unsafe_allow_html=True)
 
@@ -2632,13 +2650,17 @@ if M["score"]:
     avg_score_100 = score_100.mean()
     df_f["_점수구간"] = score_100.apply(score_bucket)
 
-# ── 비교 파일 처리 (전월/전년 동월 비교용) ──
+# ── 비교 파일 처리 (전월/전년 동월/주간 업로더 공용) ──
 def _load_compare_file(_uploaded):
-    """비교 파일 → (df_raw, df_f, avg_score_100). 실패시 (None, None, None)"""
+    """비교 파일 → (df_raw, df_f, avg_score_100). 실패시 (None, None, None)
+
+    NOTE: fragment 안에서 호출될 때 같은 파일 객체에 read()를 두 번 호출하면
+          stream이 비어버리므로 getvalue() 사용 (stream 위치 무관)."""
     if _uploaded is None:
         return None, None, None
     try:
-        _bytes = _uploaded.read()
+        # getvalue()는 stream 위치 무관하게 항상 전체 바이트 반환 (read() 대비 안전)
+        _bytes = _uploaded.getvalue() if hasattr(_uploaded, "getvalue") else _uploaded.read()
         _raw, _ = load_data(_bytes, _uploaded.name)
         _f = _raw.copy()
         if "순번" in _f.columns:
@@ -5479,7 +5501,7 @@ with tab_sol:
                                         type="secondary"):
                                     st.session_state["sol_cell_sel"] = (
                                         None if _is_sel else {"계약종별": _rk["계약종별"], "업무": _rk["업무"]})
-                                    st.rerun()
+                                    st.rerun(scope="fragment")
 
                     # ── 옵션: 소수 심각 케이스 더 보기 (TOP 3 외, 건수≤5 & 70점 미만) ──
                     if _minor_severe:
@@ -5513,7 +5535,7 @@ with tab_sol:
                                             type="secondary"):
                                         st.session_state["sol_cell_sel"] = (
                                             None if _is_sel else {"계약종별": _mk["계약종별"], "업무": _mk["업무"]})
-                                        st.rerun()
+                                        st.rerun(scope="fragment")
 
                     if not _risk_top3:
                         st.success("✅ 모든 업무×계약종별 조합이 지사 평균 이상입니다.")
@@ -5592,12 +5614,12 @@ with tab_sol:
                             else:
                                 st.markdown(f"**타겟**: [{_sel_ct}] 고객의 [{_sel_biz}] — **{_c3_n}건**")
 
-                            # ── 세부항목 점수 (전부 0/NaN 컬럼은 자동 제외) ──────────────
+                            # ── 세부항목 점수 (이용편리성처럼 비매김 컬럼은 _sol_score_cols 단계에서 이미 제외) ──
                             _item_scores = {}
                             for _sc in _sol_score_cols:
                                 _vals = pd.to_numeric(_c3_df[_sc], errors="coerce").dropna()
-                                # 양수 값이 하나라도 있어야 포함 (이용편리성처럼 작년만 채워진 컬럼 제외)
-                                if len(_vals) > 0 and (_vals > 0).any():
+                                # 데이터만 있으면 포함 — 0점이어도 표시
+                                if len(_vals) > 0:
                                     _item_scores[_sc] = round(float(_vals.mean()), 1)
 
                             if _item_scores:
@@ -5921,16 +5943,20 @@ with tab_sol:
                             _pc_show_cols.append(M["voc"])
                         _pc_show = _pc_df[[c for c in _pc_show_cols if c in _pc_df.columns]].head(10)
                         _pc_show = _pc_show.rename(columns={"_점수100": "점수(100점)"})
-                        # 컬럼 폭 조정 — 서술 의견을 가장 넓게
+                        # 컬럼 폭 조정 — 짧은 컬럼은 픽셀 고정, VOC는 large로 넓게
                         _pc_col_cfg = {}
                         if M.get("receipt_no") and M["receipt_no"] in _pc_show.columns:
-                            _pc_col_cfg[M["receipt_no"]] = st.column_config.TextColumn(width="small")
+                            _pc_col_cfg[M["receipt_no"]] = st.column_config.TextColumn(
+                                label="접수번호", width=110)
                         if M.get("business") and M["business"] in _pc_show.columns:
-                            _pc_col_cfg[M["business"]] = st.column_config.TextColumn(width="small")
+                            _pc_col_cfg[M["business"]] = st.column_config.TextColumn(
+                                label="업무구분", width=110)
                         if "점수(100점)" in _pc_show.columns:
-                            _pc_col_cfg["점수(100점)"] = st.column_config.NumberColumn(width="small")
+                            _pc_col_cfg["점수(100점)"] = st.column_config.NumberColumn(
+                                label="점수", width=80, format="%.0f")
                         if M.get("voc") and M["voc"] in _pc_show.columns:
-                            _pc_col_cfg[M["voc"]] = st.column_config.TextColumn(width="large")
+                            _pc_col_cfg[M["voc"]] = st.column_config.TextColumn(
+                                label="서술 의견", width="large")
                         st.dataframe(_pc_show.reset_index(drop=True), use_container_width=True,
                                       hide_index=True, column_config=_pc_col_cfg)
                     else:
@@ -5969,14 +5995,14 @@ with tab_sol:
 
                                 _grid_html = (
                                     '<div style="display:grid;'
-                                    # 카드 폭 260~300px — 텍스트가 긴 VOC도 잘 안 잘림
-                                    'grid-template-columns:repeat(auto-fill,minmax(260px,300px));'
+                                    # auto-fill + minmax(280px, 340px) → 카드 폭 max 340px 고정, 빈 공간 그대로
+                                    'grid-template-columns:repeat(auto-fill,minmax(280px,340px));'
                                     'justify-content:start;'
                                     'gap:18px;margin:16px 6px 10px 6px;">'
                                 )
                                 for _vi_i, (_voc_txt, _voc_sc) in enumerate(_notable[:15]):
                                     # 텍스트 길면 잘라서 카드 안에 깔끔하게
-                                    _voc_display = _voc_txt[:75] + ('…' if len(_voc_txt) > 75 else '')
+                                    _voc_display = _voc_txt[:120] + ('…' if len(_voc_txt) > 120 else '')
                                     _palette = _postit_palette[_vi_i % len(_postit_palette)]
                                     _rot = _postit_rotates[_vi_i % len(_postit_rotates)]
                                     _sc_tag = (f'<div style="position:absolute;bottom:8px;right:10px;'
@@ -6002,11 +6028,12 @@ with tab_sol:
                                         f'width:54px;height:14px;'
                                         f'background:rgba(255,255,255,0.6);'
                                         f'box-shadow:0 2px 3px rgba(0,0,0,0.10);"></div>'
-                                        # 본문 — 한국어 어미 보호(word-break:keep-all) + 행간 조정
+                                        # 본문 — 한국어 어미 보호(keep-all) + 공백 없는 긴 텍스트는 강제 줄바꿈(anywhere)
                                         f'<div style="font-size:1.05em;line-height:1.75;'
                                         f'color:{_palette["text"]};font-weight:600;text-align:center;'
                                         f'word-break:keep-all;line-break:strict;'
-                                        f'overflow-wrap:break-word;">'
+                                        f'overflow-wrap:anywhere;'
+                                        f'max-width:100%;">'
                                         f'{_voc_display}</div>'
                                         f'{_sc_tag}</div>'
                                     )
