@@ -5871,6 +5871,9 @@ with tab_sol:
                             }
                             def _clean_kw(_s):
                                 _s = _s.strip().strip("()[]{}\"'`「」『』").strip()
+                                # 1자 이하 = 무의미 (예: '하', '없'). 2자 미만은 제외
+                                if len(_s) < 2:
+                                    return ""
                                 if _s in _GENERIC_KW_BLOCKLIST:
                                     return ""
                                 return _s
