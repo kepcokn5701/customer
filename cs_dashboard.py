@@ -2824,6 +2824,9 @@ def _find_score_cols():
     return found
 
 individual_scores = _find_score_cols()
+# 이용편리성 항목은 현재 평가 대상이 아니므로 추출에서 제외 (컬럼이 있어도 무시)
+individual_scores = [c for c in individual_scores
+                     if "이용편리성" not in str(c).replace(" ", "")]
 
 # 개별 점수도 100점 환산
 for _sc in individual_scores:
