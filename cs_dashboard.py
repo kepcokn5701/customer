@@ -2485,7 +2485,7 @@ def _render_manual():
         '<tr><td>📂 주간 데이터 업로드<br>(옵션)</td><td>이번주·전주 파일을 따로 업로드. 미업로드 시 사이드바 메인 데이터의 날짜 컬럼으로 자동 분류</td></tr>'
         '<tr><td>1. 주간 조사 결과</td><td>지사별 업무처리 건수, 응답 호수, 금주/전주 점수, 월 누계, 본부 내 순위</td></tr>'
         '<tr><td>2. 업무유형별 조사결과 분석</td><td>업무유형별 금주 평균·전주 대비 증감</td></tr>'
-        '<tr><td>3. 조사결과 피드백</td><td>긍정/부정 카드 + 전체 VOC 표 (부정 행 빨간 배경 강조)</td></tr>'
+        '<tr><td>3. VOC 분석</td><td>긍정/부정 카드 + 전체 VOC 표 (부정 행 빨간 배경 강조)</td></tr>'
         '<tr><td>4. 협조요청 사항</td><td>고객 우호 활동 안내 + "🧠 AI 주간 협조요청 분석" 버튼 → AI 카드 (핵심이슈/주의/개선/실행과제)</td></tr>'
         '<tr><td>📥 통합 다운로드</td><td>주간조사+업무유형별+피드백을 한 엑셀 파일로 통합 다운로드</td></tr>'
         '</table>', unsafe_allow_html=True)
@@ -2508,6 +2508,9 @@ def _render_manual():
     # ── 9. FAQ ──
     st.markdown('<div id="mn-9"></div><div class="mn-h2">9. 자주 묻는 질문 (FAQ)</div>', unsafe_allow_html=True)
     for q, a in [
+        ("Q. 엑셀을 업로드했는데 \"개인정보가 탐지되어 업로드할 수 없습니다\" 메시지가 나옵니다.",
+         "고객명·고객번호·연락처·주소 등 개인식별 정보 컬럼을 모두 제거한 후 다시 업로드해 주세요. "
+         "컬럼명 자체에 \"고객명\", \"전화\" 등 키워드가 들어가도 차단됩니다."),
         ("Q. AI 처방전 결과가 \"AI 분석 호출 권한 오류(403)\"로 나옵니다.",
          "Gemini API 키가 만료됐거나 일일 한도를 초과한 경우입니다. 잠시 후 다시 시도하거나 시스템 관리자에게 문의해 주세요."),
         ("Q. 주간 리포트 탭에 \"날짜 정보가 없다\" 메시지가 표시됩니다.",
@@ -3386,8 +3389,8 @@ with tab_weekly:
 
             st.markdown("---")
 
-            # ── Section 3: 조사결과 피드백 ──
-            st.markdown('<p class="sec-head">3. 조사결과 피드백</p>', unsafe_allow_html=True)
+            # ── Section 3: VOC 분석 ──
+            st.markdown('<p class="sec-head">3. VOC 분석</p>', unsafe_allow_html=True)
 
             if _wr_voc:
                 _fb_df = _wr_tw_view.copy()
